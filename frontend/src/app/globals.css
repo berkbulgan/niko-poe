@@ -1,0 +1,75 @@
+/* ABOUTME: Global CSS with Tailwind directives, Google Font imports, and PoE-themed base styles. */
+/* ABOUTME: Includes custom scrollbar styling, selection colors, and rarity utility classes. */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-poe-bg text-poe-text antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  ::selection {
+    @apply bg-poe-gold/30 text-poe-text;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-poe-bg;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-poe-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-poe-text-muted;
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #2A2A3E #0C0C0E;
+  }
+}
+
+@layer components {
+  /* PoE rarity color utilities */
+  .rarity-normal {
+    @apply text-poe-normal;
+  }
+
+  .rarity-magic {
+    @apply text-poe-magic;
+  }
+
+  .rarity-rare {
+    @apply text-poe-rare;
+  }
+
+  .rarity-unique {
+    @apply text-poe-unique;
+  }
+
+  .rarity-gem {
+    @apply text-poe-gem;
+  }
+
+  .rarity-currency {
+    @apply text-poe-currency;
+  }
+
+  /* Default smooth transitions */
+  .transition-default {
+    @apply transition-all duration-200 ease-in-out;
+  }
+}

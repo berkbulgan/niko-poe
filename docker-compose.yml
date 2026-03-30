@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cadiro-db
+    ports:
+      - "9391:5432"
+    environment:
+      POSTGRES_DB: cadiro
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - cadiro_pgdata:/var/lib/postgresql/data
+
+volumes:
+  cadiro_pgdata:
