@@ -34,6 +34,7 @@ interface SelectedItem {
   quantity: number;
   unitPrice: number;
   icon: string;
+  mapsPerUse: number;
 }
 
 export interface StrategyBuilderRef {
@@ -47,7 +48,13 @@ const CATEGORY_OPTIONS: Array<{ value: PriceCategory; label: string }> = [
   { value: 'scarab', label: 'Scarab' },
   { value: 'deliriumOrb', label: 'Delirium Orb' },
   { value: 'chisel', label: 'Chisels' },
+  { value: 'astrolabe', label: 'Astrolabe' },
 ];
+
+// Categories where 1 unit covers multiple maps
+const MAPS_PER_USE: Partial<Record<PriceCategory, number>> = {
+  astrolabe: 8,
+};
 
 // ── Sub-components ──
 
@@ -140,7 +147,7 @@ function SelectedItemRow({
   onQuantityChange: (qty: number) => void;
   onRemove: () => void;
 }) {
-  const lineTotal = item.quantity * item.unitPrice;
+  const perMapCost = (item.quantity * item.unitPrice) / item.mapsPerUse;
 
   return (
     <div className="flex items-center gap-2 border-b border-poe-border/15 px-3 py-1.5">
@@ -149,6 +156,9 @@ function SelectedItemRow({
           <img src={item.icon} alt="" width={20} height={20} className="shrink-0" />
         )}
         <span className="truncate text-sm text-poe-text">{item.name}</span>
+        {item.mapsPerUse > 1 && (
+          <span className="shrink-0 text-[10px] text-poe-text-muted">/{item.mapsPerUse} maps</span>
+        )}
       </div>
       <input
         type="number"
@@ -166,7 +176,7 @@ function SelectedItemRow({
         {item.unitPrice.toFixed(1)} <PoeIcon name="chaos" size={12} />
       </span>
       <span className="flex w-20 items-center justify-end gap-1 text-sm font-medium text-poe-currency">
-        {lineTotal.toFixed(1)} <PoeIcon name="chaos" size={12} />
+        {perMapCost.toFixed(1)} <PoeIcon name="chaos" size={12} />
       </span>
       <button
         type="button"
@@ -199,24 +209,97 @@ function LinkedPresetSection({
   const selectedPreset = presets.find((p) => p.id === selectedPresetId);
   const [searching, setSearching] = useState(false);
 
+  function buildPresetTradeQuery(config: FilterPreset['config']) {
+    type StatFilter = { id: string; value?: { min?: number }; disabled: boolean };
+    const statFilters: StatFilter[] = [];
+
+    const moreDropsMap: Record<string, string> = {
+      moreCurrency: 'pseudo.pseudo_map_more_currency_drops',
+      moreMaps: 'pseudo.pseudo_map_more_map_drops',
+      moreScarabs: 'pseudo.pseudo_map_more_scarab_drops',
+      moreDivination: 'pseudo.pseudo_map_more_card_drops',
+    };
+
+    const qualityTypeMap: Record<string, string> = {
+      pack_size: 'pseudo.pseudo_map_quality_pack_size',
+      rarity: 'pseudo.pseudo_map_quality_rarity',
+      currency: 'pseudo.pseudo_map_quality_currency',
+      scarabs: 'pseudo.pseudo_map_quality_scarabs',
+      cards: 'pseudo.pseudo_map_quality_cards',
+    };
+
+    for (const [key, pseudoId] of Object.entries(moreDropsMap)) {
+      const val = config[key as keyof typeof config] as string | undefined;
+      if (!val) continue;
+      const num = parseInt(val, 10);
+      if (!Number.isNaN(num) && num > 0) {
+        statFilters.push({ id: pseudoId, value: { min: num }, disabled: false });
+      }
+    }
+
+    if (config.quality && config.qualityType) {
+      const qId = qualityTypeMap[config.qualityType];
+      const qNum = parseInt(config.quality, 10);
+      if (qId && !Number.isNaN(qNum) && qNum > 0) {
+        statFilters.push({ id: qId, value: { min: qNum }, disabled: false });
+      }
+    }
+
+    const stats = statFilters.length > 0
+      ? [{ type: 'and', filters: statFilters }]
+      : [{ type: 'and', filters: [] as StatFilter[] }];
+
+    const safeInt = (val: string): number | undefined => {
+      if (!val) return undefined;
+      const n = parseInt(val, 10);
+      return Number.isNaN(n) ? undefined : n;
+    };
+
+    const mapFilters: Record<string, { min?: number; max?: number }> = {};
+    const iiq = safeInt(config.quantity);
+    const packsize = safeInt(config.packSize);
+    const iir = safeInt(config.rarity);
+    const tier = safeInt(config.mapTier);
+    if (iiq !== undefined) mapFilters['map_iiq'] = { min: iiq };
+    if (packsize !== undefined) mapFilters['map_packsize'] = { min: packsize };
+    if (iir !== undefined) mapFilters['map_iir'] = { min: iir };
+    if (tier !== undefined) mapFilters['map_tier'] = { min: tier, max: tier };
+
+    const miscFilters: Record<string, unknown> = {};
+    if (config.quality) {
+      const qVal = parseInt(config.quality, 10);
+      if (!Number.isNaN(qVal) && qVal > 0) miscFilters['quality'] = { min: qVal };
+    }
+    if (config.corrupted === 'prefer') miscFilters['corrupted'] = { option: 'true' };
+    if (config.corrupted === 'avoid') miscFilters['corrupted'] = { option: 'false' };
+
+    const queryFilters: Record<string, { filters: Record<string, unknown> }> = {};
+    if (Object.keys(mapFilters).length > 0) queryFilters['map_filters'] = { filters: mapFilters };
+    if (Object.keys(miscFilters).length > 0) queryFilters['misc_filters'] = { filters: miscFilters };
+
+    const mapType: string | { option: string; discriminator: string } = config.isNightmareMap
+      ? 'Nightmare Map'
+      : { option: 'Map', discriminator: 'map' };
+
+    return {
+      query: {
+        status: { option: 'securable' },
+        type: mapType,
+        stats,
+        ...(Object.keys(queryFilters).length > 0 ? { filters: queryFilters } : {}),
+      },
+      sort: { price: 'asc' },
+    };
+  }
+
   async function handleOpenTrade() {
     if (!selectedPreset) return;
     setSearching(true);
     try {
-      const config = selectedPreset.config;
-      const result = await api.post<TradeProxyResponse>('/trade/search-by-mods', {
+      const query = buildPresetTradeQuery(selectedPreset.config);
+      const result = await api.post<TradeProxyResponse>('/trade/proxy-search', {
         league: currentLeague,
-        preferMods: [] as string[],
-        avoidMods: [] as string[],
-        filters: {
-          quantity: config.quantity || undefined,
-          packSize: config.packSize || undefined,
-          rarity: config.rarity || undefined,
-          mapTier: config.mapTier || undefined,
-          quality: config.quality || undefined,
-          qualityType: config.qualityType || undefined,
-          corrupted: config.corrupted === 'natural' ? undefined : config.corrupted,
-        },
+        query,
       });
       window.open(result.url, '_blank', 'noopener');
     } catch {
@@ -293,7 +376,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
   // ── Calculations ──
 
   const itemsCostPerMap = useMemo(() => {
-    return selectedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    return selectedItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice) / item.mapsPerUse, 0);
   }, [selectedItems]);
 
   const costPerMap = itemsCostPerMap + averageMapCost;
@@ -303,6 +386,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
   // ── Handlers ──
 
   const handleAddItem = useCallback((poeItem: PoeWatchItem) => {
+    const mapsPerUse = MAPS_PER_USE[category] ?? 1;
     setSelectedItems((prev) => {
       const existing = prev.find((i) => i.itemId === poeItem.id && i.category === category);
       if (existing) {
@@ -321,6 +405,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
           quantity: 1,
           unitPrice: poeItem.mean,
           icon: poeItem.icon,
+          mapsPerUse,
         },
       ];
     });
@@ -353,6 +438,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
         quantity: si.quantity,
         unitPrice: si.unitPrice,
         icon: si.icon,
+        mapsPerUse: si.mapsPerUse > 1 ? si.mapsPerUse : undefined,
       })),
       averageMapCost,
       mapCount,
@@ -367,6 +453,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           icon: item.icon,
+          mapsPerUse: item.mapsPerUse ?? 1,
         })),
       );
       setAverageMapCost(config.averageMapCost);
@@ -379,10 +466,6 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">
-        Strategy Cost Calculator
-      </h3>
-
       {/* ── Linked Filter Preset ── */}
       <LinkedPresetSection
         presets={presets}

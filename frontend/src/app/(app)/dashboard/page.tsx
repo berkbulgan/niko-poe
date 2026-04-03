@@ -1,12 +1,13 @@
 // ABOUTME: Dashboard page — the exile's command center after login.
-// ABOUTME: Shows quick stats, recent filters, and shortcuts to main features.
+// ABOUTME: Shows saved presets/strategies count, recent presets, and shortcuts to main features.
 
 'use client';
 
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth-context';
-import { useRegexFilters } from '@/lib/hooks/use-regex-filters';
-import { Badge } from '@/components/ui/badge';
+import { useFilterPresets } from '@/lib/hooks/use-filter-presets';
+import { useStrategies } from '@/lib/hooks/use-strategies';
+import { useLeague } from '@/lib/league-context';
 
 function StatCard({ value, label, icon }: { value: string; label: string; icon: string }) {
   return (
@@ -44,10 +45,13 @@ function QuickAction({ href, icon, title, description }: {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { data: filtersResponse } = useRegexFilters(1, 5);
+  const { currentLeague } = useLeague();
+  const { data: presets } = useFilterPresets();
+  const { data: strategies } = useStrategies();
 
-  const filters = filtersResponse?.data ?? [];
-  const totalFilters = filtersResponse?.meta?.total ?? 0;
+  const presetCount = presets?.length ?? 0;
+  const strategyCount = strategies?.length ?? 0;
+  const recentPresets = (presets ?? []).slice(0, 5);
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -57,24 +61,24 @@ export default function DashboardPage() {
           Welcome back, <span className="text-poe-gold">{user?.displayName}</span>
         </h1>
         <p className="mt-1 text-sm text-poe-text-muted">
-          Your trading post awaits.
+          League: <span className="text-poe-currency">{currentLeague}</span>
         </p>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard value={String(totalFilters)} label="ACTIVE FILTERS" icon="⚔️" />
-        <StatCard value="—" label="TRADES TODAY" icon="💰" />
-        <StatCard value="—" label="PROFIT (CHAOS)" icon="📈" />
+        <StatCard value={String(presetCount)} label="FILTER PRESETS" icon="⚔️" />
+        <StatCard value={String(strategyCount)} label="STRATEGIES" icon="📊" />
+        <StatCard value={currentLeague} label="ACTIVE LEAGUE" icon="🌐" />
       </div>
 
       {/* Two-column layout */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent filters */}
+        {/* Recent presets */}
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-xs tracking-[0.3em] text-poe-text-muted">
-              RECENT FILTERS
+              RECENT PRESETS
             </h2>
             <Link
               href="/filters"
@@ -84,31 +88,36 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          {filters.length === 0 ? (
+          {recentPresets.length === 0 ? (
             <div className="border border-dashed border-poe-border/30 p-8 text-center">
-              <p className="text-sm text-poe-text-dim">No filters yet.</p>
+              <p className="text-sm text-poe-text-dim">No presets saved yet.</p>
               <Link
                 href="/filters"
                 className="mt-2 inline-block text-xs text-poe-gold hover:underline"
               >
-                Create your first filter
+                Create your first preset
               </Link>
             </div>
           ) : (
             <div className="space-y-1.5">
-              {filters.map((filter) => (
-                <div
-                  key={filter.id}
-                  className="flex items-center justify-between border border-poe-border/20 bg-poe-panel/20 px-4 py-3"
+              {recentPresets.map((preset) => (
+                <Link
+                  key={preset.id}
+                  href="/filters"
+                  className="flex items-center justify-between border border-poe-border/20 bg-poe-panel/20 px-4 py-3 transition-colors hover:bg-poe-panel/40"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-poe-text">{filter.name}</p>
-                    <p className="mt-0.5 truncate font-mono text-xs text-poe-text-muted">
-                      {filter.pattern}
+                    <p className="truncate text-sm text-poe-text">{preset.name}</p>
+                    <p className="mt-0.5 text-xs text-poe-text-muted">
+                      {preset.config.avoidModIds.length} avoid · {preset.config.preferModIds.length} prefer
+                      {preset.config.mapTier && <span> · T{preset.config.mapTier}</span>}
+                      {preset.config.quantity && <span> · IIQ≥{preset.config.quantity}</span>}
                     </p>
                   </div>
-                  <Badge variant={filter.category}>{filter.category}</Badge>
-                </div>
+                  <span className="shrink-0 font-mono text-xs text-poe-text-muted">
+                    {preset.shareCode}
+                  </span>
+                </Link>
               ))}
             </div>
           )}
@@ -123,14 +132,14 @@ export default function DashboardPage() {
             <QuickAction
               href="/filters"
               icon="⚔️"
-              title="Create a Regex Filter"
-              description="Build a pattern to match the stats you want"
+              title="Map Mod Filters"
+              description="Pick avoid/prefer mods, set map stats, get stash regex"
             />
             <QuickAction
-              href="/trade"
-              icon="💰"
-              title="Search Trade"
-              description="Find items matching your filters on the trade site"
+              href="/strategies"
+              icon="📊"
+              title="Strategy Calculator"
+              description="Plan your map farming cost with live prices"
             />
           </div>
         </div>

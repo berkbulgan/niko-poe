@@ -11,6 +11,8 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   useFilterPresets,
   useCreatePreset,
+  useUpdatePreset,
+  useDuplicatePreset,
   useDeletePreset,
   useImportPreset,
   type FilterPresetConfig,
@@ -18,7 +20,9 @@ import {
 } from '@/lib/hooks/use-filter-presets';
 import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
 import { copyToClipboard } from '@/lib/utils';
+import { api } from '@/lib/api';
 import { useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 function SavePresetModal({
   open,
@@ -114,10 +118,12 @@ function PresetRow({
   preset,
   active,
   onSelect,
+  onDuplicate,
 }: {
   preset: FilterPreset;
   active: boolean;
   onSelect: () => void;
+  onDuplicate: () => void;
 }) {
   const [showCode, setShowCode] = useState(false);
   const deletePreset = useDeletePreset(preset.id);
@@ -148,6 +154,13 @@ function PresetRow({
           </button>
           <span className="text-poe-border">·</span>
           <button
+            onClick={onDuplicate}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Duplicate
+          </button>
+          <span className="text-poe-border">·</span>
+          <button
             onClick={() => deletePreset.mutate(undefined)}
             disabled={deletePreset.isPending}
             className="text-xs text-poe-text-dim hover:text-poe-error"
@@ -161,18 +174,42 @@ function PresetRow({
 }
 
 export default function FiltersPage() {
-  const [showSave, setShowSave] = useState(false);
+  const [showSaveAs, setShowSaveAs] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const pickerRef = useRef<StatPickerRef>(null);
 
   const { data: presets, isLoading } = useFilterPresets();
   const createPreset = useCreatePreset();
+  const duplicatePreset = useDuplicatePreset();
 
-  function handleSave(name: string) {
+  // Find active preset for Save (overwrite) operation
+  const activePreset = presets?.find((p) => p.id === activePresetId);
+
+  function handleSaveAs(name: string) {
     const config = pickerRef.current?.getConfig();
     if (!config) return;
-    createPreset.mutate({ name, config });
+    createPreset.mutate({ name, config }, {
+      onSuccess: (saved) => { setActivePresetId(saved.id); },
+    });
+  }
+
+  const queryClient = useQueryClient();
+
+  function handleSaveOverwrite() {
+    if (!activePresetId) return;
+    const config = pickerRef.current?.getConfig();
+    if (!config) return;
+    void api.patch(`/filter-presets/${activePresetId}`, { config }).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
+    });
+  }
+
+  function handleDuplicate(preset: FilterPreset) {
+    duplicatePreset.mutate(
+      { name: `${preset.name} (copy)`, config: preset.config },
+      { onSuccess: (dup) => { setActivePresetId(dup.id); pickerRef.current?.loadConfig(dup.config); } },
+    );
   }
 
   function handleLoadPreset(preset: FilterPreset) {
@@ -187,14 +224,9 @@ export default function FiltersPage() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-poe-border/20 px-3 py-3">
           <h2 className="text-sm font-semibold text-poe-text-dim">Presets</h2>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={() => setShowImport(true)}>
-              Import
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => setShowSave(true)}>
-              Save
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={() => setShowImport(true)}>
+            Import
+          </Button>
         </div>
 
         {/* Preset list */}
@@ -216,6 +248,7 @@ export default function FiltersPage() {
                   preset={preset}
                   active={activePresetId === preset.id}
                   onSelect={() => handleLoadPreset(preset)}
+                  onDuplicate={() => handleDuplicate(preset)}
                 />
               ))}
             </div>
@@ -224,11 +257,24 @@ export default function FiltersPage() {
       </aside>
 
       {/* ── Right panel: Map Mod Picker ── */}
-      <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-        <StatPicker ref={pickerRef} />
+      <main className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
+          <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Map Mod Picker</h3>
+          <div className="flex gap-2">
+            {activePreset && (
+              <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
+            )}
+            <Button variant="primary" size="sm" onClick={() => setShowSaveAs(true)}>
+              {activePreset ? 'Save As' : 'Save'}
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <StatPicker ref={pickerRef} />
+        </div>
       </main>
 
-      <SavePresetModal open={showSave} onClose={() => setShowSave(false)} onSave={handleSave} />
+      <SavePresetModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
     </div>
   );

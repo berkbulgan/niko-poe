@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 export interface TradeQuery {
   query: {
     status: { option: string };
+    type?: string | { option: string; discriminator: string };
     stats: Array<{
       type: string;
       filters: Array<{
@@ -94,6 +95,7 @@ export class PoeApiService {
     const url = `${this.baseUrl}/search/${encodeURIComponent(targetLeague)}`;
 
     this.logger.debug(`POST ${url}`);
+    this.logger.debug(`Query: ${JSON.stringify(query, null, 2)}`);
 
     const response = await fetch(url, {
       method: 'POST',

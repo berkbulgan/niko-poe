@@ -14,5 +14,6 @@ import { RegexFiltersModule } from '@/regex-filters/regex-filters.module';
   imports: [AuthModule, RegexFiltersModule],
   controllers: [TradeController],
   providers: [TradeService, PoeApiService, PoeStaticDataService, LeagueService],
+  // PoeStaticDataService kept for TradeService.search() stat ID matching
 })
 export class TradeModule {}

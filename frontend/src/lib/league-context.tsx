@@ -35,25 +35,42 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    api.get<League[]>('/trade/leagues')
-      .then((data) => {
-        setLeagues(data);
-        const stored = typeof window !== 'undefined'
-          ? localStorage.getItem(LEAGUE_STORAGE_KEY)
-          : null;
-        // Use stored league if it exists in the list, otherwise first league
-        const valid = stored && data.some((l) => l.id === stored);
-        setCurrentLeague(valid ? stored : data[0]?.id ?? 'Standard');
-      })
-      .catch(() => {
-        // Fallback if API fails
-        setLeagues([
-          { id: 'Standard', text: 'Standard' },
-          { id: 'Settlers', text: 'Settlers' },
-        ]);
-        setCurrentLeague('Settlers');
-      })
-      .finally(() => setIsLoading(false));
+    let cancelled = false;
+
+    async function fetchLeagues() {
+      // Try up to 3 times with 2s delay (backend might still be starting)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const data = await api.get<League[]>('/trade/leagues');
+          if (cancelled) return;
+          if (Array.isArray(data) && data.length > 0) {
+            setLeagues(data);
+            const stored = typeof window !== 'undefined'
+              ? localStorage.getItem(LEAGUE_STORAGE_KEY)
+              : null;
+            const valid = stored && data.some((l) => l.id === stored);
+            setCurrentLeague(valid ? stored : data[0].id);
+            setIsLoading(false);
+            return;
+          }
+        } catch {
+          if (cancelled) return;
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 2000));
+          }
+        }
+      }
+
+      // All retries failed — use fallback
+      if (!cancelled) {
+        setLeagues([{ id: 'Standard', text: 'Standard' }]);
+        setCurrentLeague('Standard');
+        setIsLoading(false);
+      }
+    }
+
+    void fetchLeagues();
+    return () => { cancelled = true; };
   }, []);
 
   const setLeague = useCallback((id: string) => {

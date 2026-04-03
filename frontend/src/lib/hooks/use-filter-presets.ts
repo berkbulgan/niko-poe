@@ -19,6 +19,7 @@ export interface FilterPresetConfig {
   moreScarabs: string;
   moreDivination: string;
   corrupted: 'natural' | 'prefer' | 'avoid';
+  isNightmareMap?: boolean;
   avoidModIds: number[];
   preferModIds: number[];
 }
@@ -56,6 +57,24 @@ export function useDeletePreset(id: string) {
   return useAuthMutation<void, void>(
     `/filter-presets/${id}`,
     'DELETE',
+    { onSettled: () => { void queryClient.invalidateQueries({ queryKey: PRESETS_KEY }); } },
+  );
+}
+
+export function useUpdatePreset(id: string) {
+  const queryClient = useQueryClient();
+  return useAuthMutation<FilterPreset, Partial<{ name: string; config: FilterPresetConfig }>>(
+    `/filter-presets/${id}`,
+    'PATCH',
+    { onSettled: () => { void queryClient.invalidateQueries({ queryKey: PRESETS_KEY }); } },
+  );
+}
+
+export function useDuplicatePreset() {
+  const queryClient = useQueryClient();
+  return useAuthMutation<FilterPreset, { name: string; config: FilterPresetConfig }>(
+    '/filter-presets',
+    'POST',
     { onSettled: () => { void queryClient.invalidateQueries({ queryKey: PRESETS_KEY }); } },
   );
 }

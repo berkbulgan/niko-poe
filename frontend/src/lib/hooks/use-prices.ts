@@ -21,7 +21,8 @@ export type PriceCategory =
   | 'scarab'
   | 'deliriumOrb'
   | 'currency'
-  | 'chisel';
+  | 'chisel'
+  | 'astrolabe';
 
 const PRICES_KEY = ['prices'] as const;
 

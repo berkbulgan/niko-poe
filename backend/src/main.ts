@@ -11,8 +11,12 @@ import { ResponseInterceptor } from '@/shared/interceptors/response.interceptor'
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
+  const allowedOrigins = process.env['CORS_ORIGIN']
+    ? process.env['CORS_ORIGIN'].split(',')
+    : ['http://localhost:3000'];
+
   app.enableCors({
-    origin: 'http://localhost:3000',
+    origin: allowedOrigins,
     credentials: true,
   });
 
@@ -37,7 +41,8 @@ async function bootstrap(): Promise<void> {
   const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document);
 
-  await app.listen(3001);
+  const port = process.env['PORT'] ?? 3001;
+  await app.listen(port);
 }
 
 bootstrap();

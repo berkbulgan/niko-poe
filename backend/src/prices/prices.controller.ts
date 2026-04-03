@@ -32,6 +32,14 @@ export class PricesController {
       );
     }
 
+    // Virtual category: "astrolabe" → fetch currency, filter to astrolabes
+    if (category === 'astrolabe') {
+      const allCurrency = await this.priceCacheService.fetchPrices(resolvedLeague, 'currency');
+      return allCurrency.filter((item) =>
+        item.name.toLowerCase().includes('astrolabe'),
+      );
+    }
+
     return this.priceCacheService.fetchPrices(resolvedLeague, category);
   }
 

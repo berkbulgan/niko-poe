@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLeague } from '@/lib/league-context';
 import { api } from '@/lib/api';
+import { useTradeStats, matchModTexts } from '@/lib/hooks/use-trade-stats';
 import { MAP_MODS, type MapMod, NIGHTMARE_THRESHOLD } from '@/data';
 import { generateNumberRegex } from '@/lib/generate-number-regex';
 import { buildOptimizedVendorRegex } from '@/lib/optimize-regex';
@@ -93,9 +94,6 @@ const QUALITY_REGEX_MAP: Record<QualityType, string> = {
   cards: 'div.*',         // "**Div**ination"
 };
 
-// Exported for backend trade query building
-export type { MapStatFilters, QualityType };
-export { TRADE_PSEUDO_IDS, TRADE_QUALITY_TYPE_IDS };
 
 export interface StatPickerRef {
   getConfig: () => import('@/lib/hooks/use-filter-presets').FilterPresetConfig;
@@ -224,11 +222,13 @@ function ModRow({
 
 export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, ref) {
   const { currentLeague } = useLeague();
+  const { data: tradeStats } = useTradeStats();
   const [avoidIds, setAvoidIds] = useState<Set<number>>(new Set());
   const [preferIds, setPreferIds] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState<MapStatFilters>(EMPTY_FILTERS);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNightmare, setShowNightmare] = useState(false);
+  const [isNightmareMap, setIsNightmareMap] = useState(false);
   const [copied, setCopied] = useState(false);
   const [searching, setSearching] = useState(false);
 
@@ -264,6 +264,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
   useImperativeHandle(ref, () => ({
     getConfig: () => ({
       ...filters,
+      isNightmareMap,
       avoidModIds: Array.from(avoidIds),
       preferModIds: Array.from(preferIds),
     }),
@@ -281,6 +282,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
         moreDivination: config.moreDivination ?? '',
         corrupted: config.corrupted ?? 'natural',
       });
+      setIsNightmareMap(config.isNightmareMap ?? false);
       setAvoidIds(new Set(config.avoidModIds ?? []));
       setPreferIds(new Set(config.preferModIds ?? []));
     },
@@ -314,16 +316,115 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
     });
   }
 
+  function buildTradeQuery() {
+    type StatFilter = { id: string; value?: { min?: number }; disabled: boolean };
+    const andFilters: StatFilter[] = [];
+    const notFilters: StatFilter[] = [];
+
+    // "More X drops" → pseudo stat IDs
+    const moreKeys = ['moreCurrency', 'moreMaps', 'moreScarabs', 'moreDivination'] as const;
+    for (const key of moreKeys) {
+      const val = filters[key];
+      if (!val) continue;
+      const num = parseInt(val, 10);
+      if (!Number.isNaN(num) && num > 0) {
+        andFilters.push({ id: TRADE_PSEUDO_IDS[key], value: { min: num }, disabled: false });
+      }
+    }
+
+    // Quality type → pseudo stat ID
+    if (filters.quality && filters.qualityType) {
+      const qualityPseudoId = TRADE_QUALITY_TYPE_IDS[filters.qualityType];
+      const qualityNum = parseInt(filters.quality, 10);
+      if (qualityPseudoId && !Number.isNaN(qualityNum) && qualityNum > 0) {
+        andFilters.push({ id: qualityPseudoId, value: { min: qualityNum }, disabled: false });
+      }
+    }
+
+    // Mod text → stat ID matching (frontend-side, using cached trade stats)
+    if (tradeStats && tradeStats.length > 0) {
+      if (preferMods.length > 0) {
+        const matches = matchModTexts(tradeStats, preferMods.map((m) => m.text));
+        for (const match of matches) {
+          if (match.statId) andFilters.push({ id: match.statId, disabled: false });
+        }
+      }
+      if (avoidMods.length > 0) {
+        const matches = matchModTexts(tradeStats, avoidMods.map((m) => m.text));
+        for (const match of matches) {
+          if (match.statId) notFilters.push({ id: match.statId, disabled: false });
+        }
+      }
+    }
+
+    const stats: Array<{ type: string; filters: StatFilter[] }> = [];
+    if (andFilters.length > 0) {
+      stats.push({ type: 'and', filters: andFilters });
+    }
+    if (notFilters.length > 0) {
+      stats.push({ type: 'not', filters: notFilters });
+    }
+    if (stats.length === 0) {
+      stats.push({ type: 'and', filters: [] });
+    }
+
+    // Map filters (IIQ, pack size, IIR, tier)
+    const mapFilters: Record<string, { min?: number; max?: number }> = {};
+    const safeInt = (val: string): number | undefined => {
+      if (!val) return undefined;
+      const n = parseInt(val, 10);
+      return Number.isNaN(n) ? undefined : n;
+    };
+
+    const iiq = safeInt(filters.quantity);
+    const packsize = safeInt(filters.packSize);
+    const iir = safeInt(filters.rarity);
+    const tier = safeInt(filters.mapTier);
+
+    if (iiq !== undefined) mapFilters['map_iiq'] = { min: iiq };
+    if (packsize !== undefined) mapFilters['map_packsize'] = { min: packsize };
+    if (iir !== undefined) mapFilters['map_iir'] = { min: iir };
+    if (tier !== undefined) mapFilters['map_tier'] = { min: tier, max: tier };
+
+    // Misc filters (quality, corrupted)
+    const miscFilters: Record<string, unknown> = {};
+    if (filters.quality) {
+      const qVal = parseInt(filters.quality, 10);
+      if (!Number.isNaN(qVal) && qVal > 0) miscFilters['quality'] = { min: qVal };
+    }
+    if (filters.corrupted === 'prefer') miscFilters['corrupted'] = { option: 'true' };
+    if (filters.corrupted === 'avoid') miscFilters['corrupted'] = { option: 'false' };
+
+    // Build query filters object
+    const queryFilters: Record<string, { filters: Record<string, unknown> }> = {};
+    if (Object.keys(mapFilters).length > 0) queryFilters['map_filters'] = { filters: mapFilters };
+    if (Object.keys(miscFilters).length > 0) queryFilters['misc_filters'] = { filters: miscFilters };
+
+    // Map type
+    const mapType: string | { option: string; discriminator: string } = isNightmareMap
+      ? 'Nightmare Map'
+      : { option: 'Map', discriminator: 'map' };
+
+    return {
+      query: {
+        status: { option: 'securable' },
+        type: mapType,
+        stats,
+        ...(Object.keys(queryFilters).length > 0 ? { filters: queryFilters } : {}),
+      },
+      sort: { price: 'asc' },
+    };
+  }
+
   async function handleOpenTrade() {
     if (!hasAnyFilter) return;
     setSearching(true);
 
     try {
-      const result = await api.post<TradeProxyResponse>('/trade/search-by-mods', {
+      const query = buildTradeQuery();
+      const result = await api.post<TradeProxyResponse>('/trade/proxy-search', {
         league: currentLeague,
-        preferMods: preferMods.map((m) => m.text),
-        avoidMods: avoidMods.map((m) => m.text),
-        filters,
+        query,
       });
       window.open(result.url, '_blank', 'noopener');
     } catch {
@@ -341,12 +442,18 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">
-          Map Mod Picker
-        </h3>
+    <div className="flex min-h-full flex-col">
+      {/* Header checkboxes */}
+      <div className="flex flex-wrap items-center justify-end gap-4">
+        <label className="flex items-center gap-1.5 text-sm text-poe-text-muted">
+          <input
+            type="checkbox"
+            checked={isNightmareMap}
+            onChange={(e) => setIsNightmareMap(e.target.checked)}
+            className="accent-purple-500"
+          />
+          Nightmare Map
+        </label>
         <label className="flex items-center gap-1.5 text-sm text-poe-text-muted">
           <input
             type="checkbox"
@@ -354,12 +461,12 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
             onChange={(e) => setShowNightmare(e.target.checked)}
             className="accent-purple-500"
           />
-          Nightmare mods
+          Show NM mods
         </label>
       </div>
 
       {/* ── Map stat filters — 3 rows ── */}
-      <div className="space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4">
+      <div className="mt-4 space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4">
         <h4 className="text-xs font-medium tracking-wide text-poe-text-dim">
           Map Stats
         </h4>
@@ -431,11 +538,11 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Filter mods... (e.g. reflect, regen, life)"
-        className="text-xs"
+        className="mt-4 text-xs"
       />
 
       {/* ── Two columns: Avoid / Prefer ── */}
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="mt-4 grid flex-1 gap-3 lg:grid-cols-2">
         {/* Avoid — high scary first */}
         <div>
           <div className="mb-2 flex items-center gap-2">
@@ -473,55 +580,52 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
         </div>
       </div>
 
-      {/* ── Action bar + vendor regex ── */}
-      {hasAnyFilter && (
-        <div className="space-y-3">
-          {/* Vendor regex output */}
-          {vendorRegex.length > 0 && (
-            <div className="border border-poe-gold/30 bg-poe-panel/40 p-3">
-              <div className="mb-1.5 flex items-center justify-between">
-                <h4 className="text-xs font-medium tracking-wide text-poe-gold/70">
-                  Stash Search Regex
-                </h4>
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(vendorRegex);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className={`text-[11px] ${copied ? 'text-poe-success' : 'text-poe-text-dim hover:text-poe-gold'}`}
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-              <p className="break-all font-mono text-sm text-poe-currency">{vendorRegex}</p>
-              <p className={`mt-1.5 text-xs ${vendorRegex.length > 250 ? 'text-poe-error' : 'text-poe-text-muted'}`}>
-                {vendorRegex.length}/250 chars{vendorRegex.length > 250 ? ' — too long! Remove some filters' : ' — paste in stash tab search'}
-              </p>
+      {/* ── Sticky bottom bar: vendor regex + actions ── */}
+      <div className="sticky bottom-0 z-10 -mx-4 mt-4 border-t border-poe-border/30 bg-poe-bg/95 px-4 py-3 backdrop-blur-sm lg:-mx-6 lg:px-6">
+        {hasAnyFilter && vendorRegex.length > 0 && (
+          <div className="mb-3 border border-poe-gold/30 bg-poe-panel/40 p-3">
+            <div className="mb-1.5 flex items-center justify-between">
+              <h4 className="text-xs font-medium tracking-wide text-poe-gold/70">
+                Stash Search Regex
+              </h4>
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(vendorRegex);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className={`text-[11px] ${copied ? 'text-poe-success' : 'text-poe-text-dim hover:text-poe-gold'}`}
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
             </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-poe-text-dim">
-              <span className="text-poe-error">{avoidIds.size}</span> avoid
-              {' · '}
-              <span className="text-poe-success">{preferIds.size}</span> prefer
-              {Object.values(filters).some((v) => v !== '') && (
-                <span className="text-poe-currency"> · stats active</span>
-              )}
+            <p className="break-all font-mono text-sm text-poe-currency">{vendorRegex}</p>
+            <p className={`mt-1.5 text-xs ${vendorRegex.length > 250 ? 'text-poe-error' : 'text-poe-text-muted'}`}>
+              {vendorRegex.length}/250 chars{vendorRegex.length > 250 ? ' — too long! Remove some filters' : ' — paste in stash tab search'}
             </p>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={handleClear}>
-                Clear All
-              </Button>
-              <Button variant="primary" size="sm" onClick={handleOpenTrade} disabled={searching}>
-                {searching ? 'Searching...' : 'Open Trade ↗'}
-              </Button>
-            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-poe-text-dim">
+            <span className="text-poe-error">{avoidIds.size}</span> avoid
+            {' · '}
+            <span className="text-poe-success">{preferIds.size}</span> prefer
+            {isNightmareMap && <span className="text-purple-400"> · nightmare</span>}
+            {Object.values(filters).some((v) => v !== '') && (
+              <span className="text-poe-currency"> · stats active</span>
+            )}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={handleClear}>
+              Clear All
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleOpenTrade} disabled={searching || !hasAnyFilter}>
+              {searching ? 'Searching...' : 'Open Trade ↗'}
+            </Button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 });

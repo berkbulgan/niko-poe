@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import {
   useStrategies,
   useCreateStrategy,
+  useDuplicateStrategy,
   useDeleteStrategy,
   useImportStrategy,
   type Strategy,
@@ -20,6 +21,8 @@ import {
   type StrategyBuilderRef,
 } from '@/components/strategies/strategy-builder';
 import { copyToClipboard } from '@/lib/utils';
+import { api } from '@/lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 function SaveStrategyModal({
   open,
@@ -115,10 +118,12 @@ function StrategyRow({
   strategy,
   active,
   onSelect,
+  onDuplicate,
 }: {
   strategy: Strategy;
   active: boolean;
   onSelect: () => void;
+  onDuplicate: () => void;
 }) {
   const [showCode, setShowCode] = useState(false);
   const deleteStrategy = useDeleteStrategy(strategy.id);
@@ -149,6 +154,13 @@ function StrategyRow({
           </button>
           <span className="text-poe-border">·</span>
           <button
+            onClick={onDuplicate}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Duplicate
+          </button>
+          <span className="text-poe-border">·</span>
+          <button
             onClick={() => deleteStrategy.mutate(undefined)}
             disabled={deleteStrategy.isPending}
             className="text-xs text-poe-text-dim hover:text-poe-error"
@@ -162,18 +174,40 @@ function StrategyRow({
 }
 
 export default function StrategiesPage() {
-  const [showSave, setShowSave] = useState(false);
+  const [showSaveAs, setShowSaveAs] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [activeStrategyId, setActiveStrategyId] = useState<string | null>(null);
   const builderRef = useRef<StrategyBuilderRef>(null);
 
   const { data: strategies, isLoading } = useStrategies();
   const createStrategy = useCreateStrategy();
+  const duplicateStrategy = useDuplicateStrategy();
+  const queryClient = useQueryClient();
 
-  function handleSave(name: string) {
+  const activeStrategy = strategies?.find((s) => s.id === activeStrategyId);
+
+  function handleSaveAs(name: string) {
     const config = builderRef.current?.getConfig();
     if (!config) return;
-    createStrategy.mutate({ name, config });
+    createStrategy.mutate({ name, config }, {
+      onSuccess: (saved) => { setActiveStrategyId(saved.id); },
+    });
+  }
+
+  function handleSaveOverwrite() {
+    if (!activeStrategyId) return;
+    const config = builderRef.current?.getConfig();
+    if (!config) return;
+    void api.patch(`/strategies/${activeStrategyId}`, { config }).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+    });
+  }
+
+  function handleDuplicate(strategy: Strategy) {
+    duplicateStrategy.mutate(
+      { name: `${strategy.name} (copy)`, config: strategy.config },
+      { onSuccess: (dup) => { setActiveStrategyId(dup.id); builderRef.current?.loadConfig(dup.config); } },
+    );
   }
 
   function handleLoadStrategy(strategy: Strategy) {
@@ -188,14 +222,9 @@ export default function StrategiesPage() {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-poe-border/20 px-3 py-3">
           <h2 className="text-sm font-semibold text-poe-text-dim">Strategies</h2>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={() => setShowImport(true)}>
-              Import
-            </Button>
-            <Button variant="primary" size="sm" onClick={() => setShowSave(true)}>
-              Save
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={() => setShowImport(true)}>
+            Import
+          </Button>
         </div>
 
         {/* Strategy list */}
@@ -217,6 +246,7 @@ export default function StrategiesPage() {
                   strategy={strategy}
                   active={activeStrategyId === strategy.id}
                   onSelect={() => handleLoadStrategy(strategy)}
+                  onDuplicate={() => handleDuplicate(strategy)}
                 />
               ))}
             </div>
@@ -225,11 +255,24 @@ export default function StrategiesPage() {
       </aside>
 
       {/* Right panel: Strategy Builder */}
-      <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-        <StrategyBuilder ref={builderRef} />
+      <main className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
+          <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Strategy Cost Calculator</h3>
+          <div className="flex gap-2">
+            {activeStrategy && (
+              <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
+            )}
+            <Button variant="primary" size="sm" onClick={() => setShowSaveAs(true)}>
+              {activeStrategy ? 'Save As' : 'Save'}
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <StrategyBuilder ref={builderRef} />
+        </div>
       </main>
 
-      <SaveStrategyModal open={showSave} onClose={() => setShowSave(false)} onSave={handleSave} />
+      <SaveStrategyModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
       <ImportStrategyModal open={showImport} onClose={() => setShowImport(false)} />
     </div>
   );

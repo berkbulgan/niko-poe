@@ -21,11 +21,18 @@ import { StrategiesModule } from '@/strategies/strategies.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: 'postgres' as const,
-        host: config.get<string>('DB_HOST', 'localhost'),
-        port: config.get<number>('DB_PORT', 5432),
-        database: config.get<string>('DB_NAME', 'cadiro'),
-        username: config.get<string>('DB_USER', 'postgres'),
-        password: config.get<string>('DB_PASS', 'postgres'),
+        ...(config.get<string>('DATABASE_URL')
+          ? {
+              url: config.get<string>('DATABASE_URL'),
+              ssl: { rejectUnauthorized: false },
+            }
+          : {
+              host: config.get<string>('DB_HOST', 'localhost'),
+              port: config.get<number>('DB_PORT', 5432),
+              database: config.get<string>('DB_NAME', 'cadiro'),
+              username: config.get<string>('DB_USER', 'postgres'),
+              password: config.get<string>('DB_PASS', 'postgres'),
+            }),
         autoLoadEntities: true,
         synchronize: config.get<string>('NODE_ENV') !== 'production',
         logging: config.get<string>('NODE_ENV') === 'development',

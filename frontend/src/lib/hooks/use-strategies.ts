@@ -13,6 +13,7 @@ export interface StrategyItem {
   quantity: number;
   unitPrice: number;
   icon: string;
+  mapsPerUse?: number;
 }
 
 export interface StrategyConfig {
@@ -55,6 +56,15 @@ export function useDeleteStrategy(id: string) {
   return useAuthMutation<void, void>(
     `/strategies/${id}`,
     'DELETE',
+    { onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); } },
+  );
+}
+
+export function useDuplicateStrategy() {
+  const queryClient = useQueryClient();
+  return useAuthMutation<Strategy, { name: string; config: StrategyConfig }>(
+    '/strategies',
+    'POST',
     { onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); } },
   );
 }
