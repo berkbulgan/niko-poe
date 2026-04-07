@@ -3,6 +3,8 @@
 .claude-flow/
 .claude/
 .mcp.json
+.planning
+
 
 # ── GSD baseline (auto-generated) ──
 .gsd
@@ -28,6 +30,9 @@ venv/
 target/
 vendor/
 *.log
+
+# Tauri updater signing private key — never commit
+updater.key
 coverage/
 .cache/
 tmp/

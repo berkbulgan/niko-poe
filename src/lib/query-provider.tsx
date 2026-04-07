@@ -1,8 +1,6 @@
 // ABOUTME: TanStack React Query provider with sensible default configuration.
 // ABOUTME: Sets staleTime, retry policy, and wraps children with QueryClientProvider.
 
-'use client';
-
 import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 

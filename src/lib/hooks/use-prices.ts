@@ -1,21 +1,9 @@
 // ABOUTME: TanStack Query hooks for fetching poe.watch price data by category.
 // ABOUTME: Public data — uses useQuery directly without auth wrappers.
 
-'use client';
-
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-
-export interface PoeWatchItem {
-  name: string;
-  mean: number;
-  daily: number;
-  change: number;
-  lowConfidence: boolean;
-  icon: string;
-  category: string;
-  id: number;
-}
+import { getPrices } from '@/lib/ipc';
+import type { PriceItem } from '@/types/index';
 
 export type PriceCategory =
   | 'scarab'
@@ -29,10 +17,9 @@ const PRICES_KEY = ['prices'] as const;
 const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 export function usePrices(category: PriceCategory, league: string) {
-  return useQuery<PoeWatchItem[]>({
+  return useQuery<PriceItem[]>({
     queryKey: [...PRICES_KEY, category, league],
-    queryFn: () =>
-      api.get<PoeWatchItem[]>(`/prices/${category}?league=${encodeURIComponent(league)}`),
+    queryFn: () => getPrices(category, league),
     staleTime: FIFTEEN_MINUTES,
     enabled: league.length > 0,
   });

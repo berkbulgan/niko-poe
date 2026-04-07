@@ -1,99 +1,65 @@
-// ABOUTME: Authentication context provider managing user session state.
-// ABOUTME: Provides useAuth() hook for login, logout, and current user access throughout the app.
+// ABOUTME: Authentication context — GGG OAuth2 PKCE integration for Tauri.
+// ABOUTME: App works fully when unauthenticated; login is optional for stash features.
 
-'use client';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import type { GggProfile, UserProfile } from '@/types';
+import { getGggProfile, logoutGgg, startOAuthLogin } from '@/lib/ipc';
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
-import type { UserProfile, LoginResponse } from '@/types';
-import { api, setToken, clearToken } from '@/lib/api';
-
-interface AuthState {
+interface AuthContextValue {
   user: UserProfile | null;
-  token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-}
-
-interface AuthContextValue extends AuthState {
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-interface AuthProviderProps {
-  children: React.ReactNode;
+function profileToUser(profile: GggProfile): UserProfile {
+  return {
+    id: profile.accountName,
+    username: profile.accountName,
+    displayName: profile.accountName,
+  };
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [token, setTokenState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // On mount, check if a stored session exists.
   useEffect(() => {
-    const stored = typeof window !== 'undefined'
-      ? localStorage.getItem('cadiro_token')
-      : null;
+    let cancelled = false;
 
-    if (!stored) {
-      setIsLoading(false);
-      return;
-    }
-
-    setTokenState(stored);
-
-    api.get<UserProfile>('/auth/me')
+    getGggProfile()
       .then((profile) => {
-        setUser(profile);
+        if (cancelled) return;
+        setUser(profile !== null ? profileToUser(profile) : null);
       })
       .catch(() => {
-        clearToken();
-        setTokenState(null);
+        // No stored session or command unavailable — continue unauthenticated.
+        if (!cancelled) setUser(null);
       })
       .finally(() => {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       });
+
+    return () => { cancelled = true; };
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const response = await api.post<LoginResponse>('/auth/login', {
-      username,
-      password,
-    });
-
-    setToken(response.token);
-    setTokenState(response.token);
-    setUser(response.user);
+  const login = useCallback(async () => {
+    await startOAuthLogin();
+    const profile = await getGggProfile();
+    setUser(profile !== null ? profileToUser(profile) : null);
   }, []);
 
-  const logout = useCallback(() => {
-    clearToken();
-    setTokenState(null);
+  const logout = useCallback(async () => {
+    await logoutGgg();
     setUser(null);
-
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
   }, []);
-
-  const value = useMemo<AuthContextValue>(() => ({
-    user,
-    token,
-    isLoading,
-    isAuthenticated: user !== null && token !== null,
-    login,
-    logout,
-  }), [user, token, isLoading, login, logout]);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthenticated: user !== null, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

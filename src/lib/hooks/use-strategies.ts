@@ -1,10 +1,9 @@
-// ABOUTME: TanStack Query hooks for strategy CRUD and share/import operations.
-// ABOUTME: Manages saved strategy configurations with 8-digit share codes.
+// ABOUTME: TanStack Query hooks for strategy CRUD operations.
+// ABOUTME: config is serialized to/from JSON string at the hook boundary for SQLite storage.
 
-'use client';
-
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuthQuery, useAuthMutation } from '@/lib/hooks/use-auth-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { Strategy } from '@/types/index';
+import * as ipc from '@/lib/ipc';
 
 export interface StrategyItem {
   itemId: number;
@@ -23,57 +22,63 @@ export interface StrategyConfig {
   filterPresetId: string | null;
 }
 
-export interface Strategy {
-  id: string;
-  userId: string;
-  name: string;
-  shareCode: string;
+// Parsed view of a Strategy — config as an object instead of a JSON string.
+export interface StrategyParsed extends Omit<Strategy, 'config'> {
   config: StrategyConfig;
-  createdAt: string;
-  updatedAt: string;
+}
+
+function parseStrategy(strategy: Strategy): StrategyParsed {
+  return { ...strategy, config: JSON.parse(strategy.config) as StrategyConfig };
 }
 
 const STRATEGIES_KEY = ['strategies'] as const;
 
 export function useStrategies() {
-  return useAuthQuery<Strategy[]>(
-    [...STRATEGIES_KEY],
-    '/strategies',
-  );
+  return useQuery<StrategyParsed[]>({
+    queryKey: [...STRATEGIES_KEY],
+    queryFn: async () => {
+      const strategies = await ipc.getStrategies();
+      return strategies.map(parseStrategy);
+    },
+  });
 }
 
 export function useCreateStrategy() {
   const queryClient = useQueryClient();
-  return useAuthMutation<Strategy, { name: string; config: StrategyConfig }>(
-    '/strategies',
-    'POST',
-    { onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); } },
-  );
+  return useMutation<StrategyParsed, Error, { name: string; config: StrategyConfig }>({
+    mutationFn: async ({ name, config }) => {
+      const strategy = await ipc.createStrategy({ name, config: JSON.stringify(config) });
+      return parseStrategy(strategy);
+    },
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); },
+  });
 }
 
 export function useDeleteStrategy(id: string) {
   const queryClient = useQueryClient();
-  return useAuthMutation<void, void>(
-    `/strategies/${id}`,
-    'DELETE',
-    { onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); } },
-  );
+  return useMutation<void, Error, void>({
+    mutationFn: () => ipc.deleteStrategy(id),
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); },
+  });
 }
 
 export function useDuplicateStrategy() {
   const queryClient = useQueryClient();
-  return useAuthMutation<Strategy, { name: string; config: StrategyConfig }>(
-    '/strategies',
-    'POST',
-    { onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); } },
-  );
+  return useMutation<StrategyParsed, Error, { name: string; config: StrategyConfig }>({
+    mutationFn: async ({ name, config }) => {
+      const strategy = await ipc.createStrategy({ name, config: JSON.stringify(config) });
+      return parseStrategy(strategy);
+    },
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); },
+  });
 }
 
-export function useImportStrategy(code: string) {
+// Import by share code is a Phase 4 feature (requires GGG OAuth / server).
+// Keeping the hook stub so call sites compile.
+export function useImportStrategy(_code: string) {
   const queryClient = useQueryClient();
-  return useAuthMutation<Strategy, void>(
-    `/strategies/import/${code}`,
-    'POST',
-    { onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); } },
-  );
+  return useMutation<StrategyParsed, Error, void>({
+    mutationFn: async () => { throw new Error('Import not yet implemented'); },
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); },
+  });
 }

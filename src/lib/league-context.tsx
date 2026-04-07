@@ -1,7 +1,5 @@
-// ABOUTME: League selection context — fetches leagues from PoE API on mount.
-// ABOUTME: Provides useLeague() hook for current league and league switching.
-
-'use client';
+// ABOUTME: League selection context — provides current league and league switching.
+// ABOUTME: Phase 3 replaces the hardcoded list with an ipc.getLeagues() call.
 
 import {
   createContext,
@@ -11,12 +9,10 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { api } from '@/lib/api';
-
-interface League {
-  id: string;
-  text: string;
-}
+import { useQuery } from '@tanstack/react-query';
+import { getLeagues } from '@/lib/ipc';
+import type { League } from '@/types/index';
+import { storage } from '@/lib/platform';
 
 interface LeagueContextValue {
   leagues: League[];
@@ -27,57 +23,41 @@ interface LeagueContextValue {
 
 const LeagueContext = createContext<LeagueContextValue | null>(null);
 
-const LEAGUE_STORAGE_KEY = 'cadiro_league';
+const LEAGUE_STORAGE_KEY = 'niko_league';
+
+// Fallback used when the IPC call fails or returns an empty list.
+const FALLBACK_LEAGUES: League[] = [
+  { id: 'Standard', text: 'Standard' },
+  { id: 'Settlers', text: 'Settlers of Kalguur' },
+];
+
+const ONE_HOUR = 60 * 60 * 1000;
 
 export function LeagueProvider({ children }: { children: React.ReactNode }) {
-  const [leagues, setLeagues] = useState<League[]>([]);
-  const [currentLeague, setCurrentLeague] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: fetchedLeagues, isLoading } = useQuery<League[]>({
+    queryKey: ['leagues'],
+    queryFn: () => getLeagues(),
+    staleTime: ONE_HOUR,
+  });
 
+  const leagues = (fetchedLeagues && fetchedLeagues.length > 0)
+    ? fetchedLeagues
+    : FALLBACK_LEAGUES;
+
+  const [currentLeague, setCurrentLeague] = useState(() => {
+    return storage.get(LEAGUE_STORAGE_KEY) ?? FALLBACK_LEAGUES[0].id;
+  });
+
+  // When the league list loads, validate the stored selection against it.
   useEffect(() => {
-    let cancelled = false;
-
-    async function fetchLeagues() {
-      // Try up to 3 times with 2s delay (backend might still be starting)
-      for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-          const data = await api.get<League[]>('/trade/leagues');
-          if (cancelled) return;
-          if (Array.isArray(data) && data.length > 0) {
-            setLeagues(data);
-            const stored = typeof window !== 'undefined'
-              ? localStorage.getItem(LEAGUE_STORAGE_KEY)
-              : null;
-            const valid = stored && data.some((l) => l.id === stored);
-            setCurrentLeague(valid ? stored : data[0].id);
-            setIsLoading(false);
-            return;
-          }
-        } catch {
-          if (cancelled) return;
-          if (attempt < 2) {
-            await new Promise((r) => setTimeout(r, 2000));
-          }
-        }
-      }
-
-      // All retries failed — use fallback
-      if (!cancelled) {
-        setLeagues([{ id: 'Standard', text: 'Standard' }]);
-        setCurrentLeague('Standard');
-        setIsLoading(false);
-      }
+    if (leagues.length > 0 && !leagues.some((l) => l.id === currentLeague)) {
+      setCurrentLeague(leagues[0].id);
     }
-
-    void fetchLeagues();
-    return () => { cancelled = true; };
-  }, []);
+  }, [leagues, currentLeague]);
 
   const setLeague = useCallback((id: string) => {
     setCurrentLeague(id);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(LEAGUE_STORAGE_KEY, id);
-    }
+    storage.set(LEAGUE_STORAGE_KEY, id);
   }, []);
 
   const value = useMemo<LeagueContextValue>(() => ({

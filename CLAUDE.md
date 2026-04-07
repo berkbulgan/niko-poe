@@ -1,188 +1,81 @@
-# Claude Code Configuration - RuFlo V3
+# CLAUDE.md
 
-## Behavioral Rules (Always Enforced)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-- Do what has been asked; nothing more, nothing less
-- NEVER create files unless they're absolutely necessary for achieving your goal
-- ALWAYS prefer editing an existing file to creating a new one
-- NEVER proactively create documentation files (*.md) or README files unless explicitly requested
-- NEVER save working files, text/mds, or tests to the root folder
-- Never continuously check status after spawning a swarm — wait for results
-- ALWAYS read a file before editing it
-- NEVER commit secrets, credentials, or .env files
+## Project
 
-## File Organization
+N.I.K.O. — a Tauri v2 desktop app for Path of Exile 1 players. Regex filter builder, trade search, strategy cost calculator, atlas tree helper, and GGG account integration (OAuth + stash reading).
 
-- NEVER save to root folder — use the directories below
-- Use `/src` for source code files
-- Use `/tests` for test files
-- Use `/docs` for documentation and markdown files
-- Use `/config` for configuration files
-- Use `/scripts` for utility scripts
-- Use `/examples` for example code
-
-## Project Architecture
-
-- Follow Domain-Driven Design with bounded contexts
-- Keep files under 500 lines
-- Use typed interfaces for all public APIs
-- Prefer TDD London School (mock-first) for new code
-- Use event sourcing for state changes
-- Ensure input validation at system boundaries
-
-### Project Config
-
-- **Topology**: hierarchical-mesh
-- **Max Agents**: 15
-- **Memory**: hybrid
-- **HNSW**: Enabled
-- **Neural**: Enabled
-
-## Build & Test
+## Build & Dev
 
 ```bash
-# Build
-npm run build
-
-# Test
-npm test
-
-# Lint
-npm run lint
+npm run dev           # Tauri dev (launches Vite + native window together)
+npm run dev:vite      # Vite dev server only (port 1420)
+npm run build         # Full production build (Vite + Rust → installer)
+npm run build:vite    # Vite build only (outputs to dist/)
+npm run lint          # ESLint
+npm test              # Vitest
+cd src-tauri && cargo check   # Rust type check
+cd src-tauri && cargo build   # Full Rust build
 ```
 
-- ALWAYS run tests after making code changes
-- ALWAYS verify build succeeds before committing
+## Architecture
 
-## Security Rules
+Two-process model: React frontend in a Tauri WebView communicates with a Rust backend via IPC. No HTTP server runs in production.
 
-- NEVER hardcode API keys, secrets, or credentials in source files
-- NEVER commit .env files or any file containing secrets
-- Always validate user input at system boundaries
-- Always sanitize file paths to prevent directory traversal
-- Run `npx @claude-flow/cli@latest security scan` after security-related changes
-
-## Concurrency: 1 MESSAGE = ALL RELATED OPERATIONS
-
-- All operations MUST be concurrent/parallel in a single message
-- Use Claude Code's Task tool for spawning agents, not just MCP
-- ALWAYS batch ALL todos in ONE TodoWrite call (5-10+ minimum)
-- ALWAYS spawn ALL agents in ONE message with full instructions via Task tool
-- ALWAYS batch ALL file reads/writes/edits in ONE message
-- ALWAYS batch ALL Bash commands in ONE message
-
-## Swarm Orchestration
-
-- MUST initialize the swarm using CLI tools when starting complex tasks
-- MUST spawn concurrent agents using Claude Code's Task tool
-- Never use CLI tools alone for execution — Task tool agents do the actual work
-- MUST call CLI tools AND Task tool in ONE message for complex work
-
-### 3-Tier Model Routing (ADR-026)
-
-| Tier | Handler | Latency | Cost | Use Cases |
-|------|---------|---------|------|-----------|
-| **1** | Agent Booster (WASM) | <1ms | $0 | Simple transforms (var→const, add types) — Skip LLM |
-| **2** | Haiku | ~500ms | $0.0002 | Simple tasks, low complexity (<30%) |
-| **3** | Sonnet/Opus | 2-5s | $0.003-0.015 | Complex reasoning, architecture, security (>30%) |
-
-- Always check for `[AGENT_BOOSTER_AVAILABLE]` or `[TASK_MODEL_RECOMMENDATION]` before spawning agents
-- Use Edit tool directly when `[AGENT_BOOSTER_AVAILABLE]`
-
-## Swarm Configuration & Anti-Drift
-
-- ALWAYS use hierarchical topology for coding swarms
-- Keep maxAgents at 6-8 for tight coordination
-- Use specialized strategy for clear role boundaries
-- Use `raft` consensus for hive-mind (leader maintains authoritative state)
-- Run frequent checkpoints via `post-task` hooks
-- Keep shared memory namespace for all agents
-
-```bash
-npx @claude-flow/cli@latest swarm init --topology hierarchical --max-agents 8 --strategy specialized
+```
+React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command] → SQLite/HTTP
 ```
 
-## Swarm Execution Rules
+### Frontend (`src/`)
 
-- ALWAYS use `run_in_background: true` for all agent Task calls
-- ALWAYS put ALL agent Task calls in ONE message for parallel execution
-- After spawning, STOP — do NOT add more tool calls or check status
-- Never poll TaskOutput or check swarm status — trust agents to return
-- When agent results arrive, review ALL results before proceeding
+- **`lib/ipc.ts`** — THE single point of Tauri IPC contact. Every `invoke()` call lives here. 34 typed wrappers for all Rust commands.
+- **`lib/platform.ts`** — Abstracts browser APIs (storage, clipboard, external links). No raw `window.*` or `localStorage` calls should exist outside this file.
+- **`lib/auth-context.tsx`** — GGG OAuth state. App works fully without login; OAuth unlocks stash features only.
+- **`lib/league-context.tsx`** — Active PoE league selection, persisted via platform.storage.
+- **`lib/hooks/`** — TanStack Query hooks for each data domain. Pattern: `useQuery({ queryFn: () => ipc.commandName() })`.
+- **`pages/`** — Route-level components. React Router v6 HashRouter (required for Tauri production builds).
+- **`providers.tsx`** — Provider composition order matters: QueryClient → Auth → League.
 
-## V3 CLI Commands
+### Backend (`src-tauri/src/`)
 
-### Core Commands
+- **`lib.rs`** — Tauri builder, plugin registration, all commands registered in one `generate_handler!` call.
+- **`state.rs`** — `AppState` singleton: SQLite pool, HTTP client, rate limiter, price/league/stat caches (Arc<Mutex<T>>), GGG token state.
+- **`commands/`** — 8 modules, 32 commands total. CRUD for 4 entities + trade + prices + auth + stash.
+- **`db/migrations.rs`** — 4 versioned SQLite migrations. Append-only, no down migrations.
+- **`error.rs`** — `Error` enum with `serde::Serialize` (required for IPC boundary crossing).
 
-| Command | Subcommands | Description |
-|---------|-------------|-------------|
-| `init` | 4 | Project initialization |
-| `agent` | 8 | Agent lifecycle management |
-| `swarm` | 6 | Multi-agent swarm coordination |
-| `memory` | 11 | AgentDB memory with HNSW search |
-| `task` | 6 | Task creation and lifecycle |
-| `session` | 7 | Session state management |
-| `hooks` | 17 | Self-learning hooks + 12 workers |
-| `hive-mind` | 6 | Byzantine fault-tolerant consensus |
+### Key Patterns
 
-### Quick CLI Examples
+- **IPC contract**: Rust structs use `#[serde(rename_all = "camelCase")]`, TypeScript interfaces use camelCase — field names match 1:1.
+- **Config columns**: Complex objects stored as `TEXT` (JSON string) in SQLite. Hooks handle `JSON.parse/stringify` at the boundary.
+- **Rate limiting**: Rust-side token bucket for PoE Trade API. Reads `X-Rate-Limit-Ip-State` headers for adaptive backoff.
+- **Caching**: Two layers — TanStack Query in frontend (UI cache), `Arc<Mutex<Cache>>` in Rust (API response cache with TTL).
+- **Auth is optional**: `isAuthenticated: false` does not block any route. Stash page shows login prompt; all other features work without OAuth.
 
-```bash
-npx @claude-flow/cli@latest init --wizard
-npx @claude-flow/cli@latest agent spawn -t coder --name my-coder
-npx @claude-flow/cli@latest swarm init --v3-mode
-npx @claude-flow/cli@latest memory search --query "authentication patterns"
-npx @claude-flow/cli@latest doctor --fix
-```
+## Adding a New Rust Command
 
-## Available Agents (60+ Types)
+1. Add function with `#[tauri::command]` in `src-tauri/src/commands/module.rs`
+2. Register in `src-tauri/src/lib.rs` invoke_handler
+3. Add typed wrapper in `src/lib/ipc.ts`
+4. Create/update hook in `src/lib/hooks/`
 
-### Core Development
-`coder`, `reviewer`, `tester`, `planner`, `researcher`
+## Adding a New Page
 
-### Specialized
-`security-architect`, `security-auditor`, `memory-specialist`, `performance-engineer`
+1. Create `src/pages/PageName.tsx` (named export, not default)
+2. Add route in `src/router.tsx`
+3. Add nav item in `src/pages/AppLayout.tsx`
 
-### Swarm Coordination
-`hierarchical-coordinator`, `mesh-coordinator`, `adaptive-coordinator`
+## External APIs
 
-### GitHub & Repository
-`pr-manager`, `code-review-swarm`, `issue-tracker`, `release-manager`
+- **PoE Trade**: `www.pathofexile.com/api/trade2/` — rate limited, proxied through Rust
+- **poe.watch**: `poe.watch/api` — price data, 15-min cache
+- **GGG OAuth**: `oauth.pathofexile.com` — PKCE flow, localhost callback via tauri-plugin-oauth
+- **GGG Stash**: `api.pathofexile.com/stash/` — requires OAuth token
 
-### SPARC Methodology
-`sparc-coord`, `sparc-coder`, `specification`, `pseudocode`, `architecture`
+## Placeholders That Need Real Values
 
-## Memory Commands Reference
-
-```bash
-# Store (REQUIRED: --key, --value; OPTIONAL: --namespace, --ttl, --tags)
-npx @claude-flow/cli@latest memory store --key "pattern-auth" --value "JWT with refresh" --namespace patterns
-
-# Search (REQUIRED: --query; OPTIONAL: --namespace, --limit, --threshold)
-npx @claude-flow/cli@latest memory search --query "authentication patterns"
-
-# List (OPTIONAL: --namespace, --limit)
-npx @claude-flow/cli@latest memory list --namespace patterns --limit 10
-
-# Retrieve (REQUIRED: --key; OPTIONAL: --namespace)
-npx @claude-flow/cli@latest memory retrieve --key "pattern-auth" --namespace patterns
-```
-
-## Quick Setup
-
-```bash
-claude mcp add claude-flow -- npx -y @claude-flow/cli@latest
-npx @claude-flow/cli@latest daemon start
-npx @claude-flow/cli@latest doctor --fix
-```
-
-## Claude Code vs CLI Tools
-
-- Claude Code's Task tool handles ALL execution: agents, file ops, code generation, git
-- CLI tools handle coordination via Bash: swarm init, memory, hooks, routing
-- NEVER use CLI tools as a substitute for Task tool agents
-
-## Support
-
-- Documentation: https://github.com/ruvnet/claude-flow
-- Issues: https://github.com/ruvnet/claude-flow/issues
+- `NIKO_CLIENT_ID` in `src-tauri/src/commands/auth.rs` — GGG OAuth client ID
+- `REPLACE_WITH_PUBLIC_KEY_FROM_KEYGEN_SCRIPT` in `tauri.conf.json` — updater signing pubkey
+- `YOUR_GITHUB_USERNAME` in `.github/workflows/release.yml`
+- `src-tauri/icons/` — placeholder icons, need real 1024x1024 source PNG

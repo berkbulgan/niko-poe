@@ -77,7 +77,14 @@ Plans:
   4. Logged-in user sees their GGG account profile (character name or account name)
   5. App remains fully functional (filters, trade, strategies) when the user has not logged in
   6. Stash tab list and contents are visible in the app if `account:stashes` scope is confirmed available for public clients (scope availability verified via STASH-01 spike)
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 4/PLAN.md (Plan 04-01) — PKCE OAuth server + Rust token exchange (tauri-plugin-oauth, commands/auth.rs, AppState)
+- [ ] 4/PLAN.md (Plan 04-02) — Frontend auth context replacement (auth-context.tsx, ipc.ts auth, LoginButton)
+- [ ] 4/PLAN.md (Plan 04-03) — Token persistence + automatic refresh (tauri-plugin-store, ensure_valid_token)
+- [ ] 4/PLAN.md (Plan 04-04) — STASH-01 spike + stash API commands (commands/stash.rs, types/stash.ts)
+- [ ] 4/PLAN.md (Plan 04-05) — Stash UI + graceful unauthenticated fallback (Stash.tsx, StashTabList, StashItemGrid)
 
 ### Phase 5: Distribution
 **Goal**: A signed Windows installer ships to users and keeps itself up to date automatically
@@ -97,5 +104,5 @@ Plans:
 | 1. Tauri Shell | 0/3 | Planned | - |
 | 2. SQLite Data Layer | 0/3 | Planned | - |
 | 3. Trade API | 0/5 | Planned | - |
-| 4. GGG OAuth + Stash | 0/TBD | Not started | - |
+| 4. GGG OAuth + Stash | 0/5 | Planned | - |
 | 5. Distribution | 0/TBD | Not started | - |

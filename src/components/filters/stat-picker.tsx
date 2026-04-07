@@ -1,24 +1,16 @@
 // ABOUTME: Scary-inspired two-column mod picker with map stat filters.
 // ABOUTME: Quantity/packsize/rarity/quality/bonus filters affect both vendor regex and trade search.
 
-'use client';
-
 import { useState, useMemo, useImperativeHandle, forwardRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLeague } from '@/lib/league-context';
-import { api } from '@/lib/api';
+import { openExternal, copyToClipboard } from '@/lib/platform';
 import { useTradeStats, matchModTexts } from '@/lib/hooks/use-trade-stats';
 import { MAP_MODS, type MapMod, NIGHTMARE_THRESHOLD } from '@/data';
 import { generateNumberRegex } from '@/lib/generate-number-regex';
 import { buildOptimizedVendorRegex } from '@/lib/optimize-regex';
 import { PoeIcon, type PoeIconName } from '@/components/ui/poe-icon';
-
-interface TradeProxyResponse {
-  id: string;
-  total: number;
-  url: string;
-}
 
 type QualityType = 'pack_size' | 'rarity' | 'currency' | 'scarabs' | 'cards';
 
@@ -416,20 +408,13 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
     };
   }
 
+  // Phase 2: replace stub with ipc.proxyTradeSearch() then openExternal(result.url)
   async function handleOpenTrade() {
     if (!hasAnyFilter) return;
     setSearching(true);
-
     try {
-      const query = buildTradeQuery();
-      const result = await api.post<TradeProxyResponse>('/trade/proxy-search', {
-        league: currentLeague,
-        query,
-      });
-      window.open(result.url, '_blank', 'noopener');
-    } catch {
       const fallbackUrl = `https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`;
-      window.open(fallbackUrl, '_blank', 'noopener');
+      await openExternal(fallbackUrl);
     } finally {
       setSearching(false);
     }
@@ -590,7 +575,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
               </h4>
               <button
                 onClick={async () => {
-                  await navigator.clipboard.writeText(vendorRegex);
+                  await copyToClipboard(vendorRegex);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}

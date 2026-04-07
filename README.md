@@ -1,123 +1,95 @@
-# C.A.D.I.R.O.
+# N.I.K.O.
 
-**Capture All Data, Identify Real Opportunities**
-
-Path of Exile 1 trade helper — regex-powered map mod filtering, strategy cost calculator, and filter preset sharing.
+**Path of Exile 1 trade helper** — a native desktop app for regex-powered item filtering, trade search, strategy cost calculation, and GGG account integration.
 
 ## Features
 
-- **Map Mod Picker** — Two-column avoid/prefer selection with scary danger values (data from [poe-vendor-string](https://github.com/veiset/poe-vendor-string))
+- **Regex Filter Builder** — Create and test regex patterns against PoE mod database, organize with categories
+- **Map Mod Picker** — Two-column avoid/prefer selection with danger values (data from [poe-vendor-string](https://github.com/veiset/poe-vendor-string))
 - **Regex Optimization** — 313 precomputed patterns for shorter stash search strings (250 char limit)
-- **Trade Search** — Proxy search via pathofexile.com/api/trade, opens results in new tab
-- **Strategy Calculator** — Pick scarabs, delirium orbs, chisels with live prices from [poe.watch](https://poe.watch), calculate cost per map and total investment
-- **Filter Presets** — Save/load full configurations with 8-digit share codes
-- **League Selector** — Auto-fetches PC leagues from PoE API, cached 24h
+- **Trade Search** — Search PoE Trade API with rate limiting, view results with pricing
+- **Strategy Calculator** — Pick scarabs, delirium orbs, chisels with live prices from [poe.watch](https://poe.watch)
+- **Atlas Tree Helper** — Interactive passive tree viewer
+- **Filter Presets** — Save and load full filter configurations
+- **GGG Account Login** — OAuth2 PKCE integration for account features
+- **Stash Viewer** — Browse stash tabs with item details and pricing (requires GGG login)
+- **League Selector** — Auto-fetches PC leagues from PoE API
 
 ## Tech Stack
 
 | Layer | Stack |
 |-------|-------|
-| Backend | NestJS 10, TypeORM, PostgreSQL |
-| Frontend | Next.js 15 (App Router), TanStack Query, Tailwind CSS |
+| Desktop Shell | Tauri v2 (Rust) |
+| Frontend | React 19, React Router v6, TanStack Query, Tailwind CSS |
+| Database | SQLite (local, via sqlx) |
+| Trade API | pathofexile.com/api/trade (rate limited, Rust proxy) |
 | Prices | poe.watch API (15min cache) |
-| Trade | pathofexile.com/api/trade (rate limited) |
+| Auth | GGG OAuth2 PKCE (tauri-plugin-oauth) |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
-- Docker (for PostgreSQL)
+- Rust toolchain (rustup)
+- Platform build tools (Visual Studio Build Tools on Windows)
 
 ### Setup
 
 ```bash
-# Clone
-git clone git@github.com:berkbulgan/cadiro.git
-cd cadiro
+git clone git@github.com:berkbulgan/niko-poe.git
+cd niko-poe
 
-# Start PostgreSQL (port 9391)
-docker compose up -d
-
-# Install dependencies
 npm install
-cd backend && npm install
-cd ../frontend && npm install
-cd ..
 
-# Configure environment
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
-# Seed database (test users + sample filters)
-cd backend && npm run seed
-
-# Run both backend (3001) and frontend (3000)
+# Development (launches Vite + Tauri window)
 npm run dev
 ```
 
-### Test Accounts
+### Build
 
-| Username | Password |
-|----------|----------|
-| test1 | 123456 |
-| test2 | 123456 |
+```bash
+# Full production build (outputs Windows installer)
+npm run build
+```
 
 ## Project Structure
 
 ```
-cadiro/
-├── backend/                 # NestJS API
+niko-poe/
+├── src/                        # React frontend
+│   ├── pages/                  # Route pages (Dashboard, Filters, Strategies, AtlasTree, Stash)
+│   ├── components/             # UI + feature components
+│   ├── lib/
+│   │   ├── ipc.ts              # Typed Tauri IPC wrappers
+│   │   ├── platform.ts         # Browser API abstraction
+│   │   ├── auth-context.tsx    # GGG OAuth state
+│   │   ├── league-context.tsx  # Active league selection
+│   │   └── hooks/              # TanStack Query data hooks
+│   └── types/                  # Shared TypeScript types
+├── src-tauri/                  # Rust backend
 │   └── src/
-│       ├── auth/            # Placeholder JWT auth
-│       ├── filter-presets/   # Saved filter configurations
-│       ├── prices/          # poe.watch price cache
-│       ├── regex-filters/   # Regex CRUD + validation
-│       ├── strategies/      # Cost calculator strategies
-│       └── trade/           # PoE trade API proxy + leagues
-├── frontend/                # Next.js App
-│   └── src/
-│       ├── app/             # Pages (landing, login, filters, strategies)
-│       ├── components/      # UI components + feature components
-│       ├── data/            # Map mod data + optimization table
-│       └── lib/             # API client, hooks, contexts
-└── docker-compose.yml       # PostgreSQL on port 9391
+│       ├── commands/           # IPC command handlers (CRUD, trade, auth, stash)
+│       ├── db/                 # SQLite migrations
+│       ├── state.rs            # Shared app state (DB, caches, tokens)
+│       └── lib.rs              # Plugin registration
+├── .github/workflows/          # Release CI/CD
+└── scripts/                    # Updater key generation
 ```
-
-## API Endpoints
-
-### Auth
-- `POST /auth/login` — Login
-- `GET /auth/me` — Current user
-
-### Filter Presets
-- `GET/POST /filter-presets` — List / Create
-- `GET/PATCH/DELETE /filter-presets/:id` — Read / Update / Delete
-- `GET /filter-presets/share/:code` — Get by share code
-- `POST /filter-presets/import/:code` — Import shared preset
-
-### Strategies
-- `GET/POST /strategies` — List / Create
-- `GET/PATCH/DELETE /strategies/:id` — Read / Update / Delete
-- `GET /strategies/share/:code` — Get by share code
-- `POST /strategies/import/:code` — Import shared strategy
-
-### Trade
-- `POST /trade/search-by-mods` — Search trade by modifier texts
-- `GET /trade/leagues` — Available leagues (24h cache)
-- `GET /trade/stats/search?q=life` — Search stat IDs
-
-### Prices
-- `GET /prices/:category?league=X` — Item prices (scarab, deliriumOrb, chisel, currency)
-- `POST /prices/refresh` — Force cache refresh
 
 ## Roadmap
 
-- [ ] GGG OAuth integration (application submitted)
+- [x] Regex filter builder + presets
+- [x] Trade search with rate limiting
+- [x] Strategy cost calculator
+- [x] Atlas passive tree helper
+- [x] Tauri v2 desktop migration
+- [x] GGG OAuth2 PKCE login
+- [x] Stash tab viewer
+- [ ] Filter push to PoE account (account:item_filter)
 - [ ] Stash snapshots + ROI tracking
-- [ ] Atlas passive tree viewer
-- [ ] Community strategy sharing feed
-- [ ] Cost per map history tracking
+- [ ] Net worth estimation
+- [ ] macOS / Linux builds
 
 ## License
 

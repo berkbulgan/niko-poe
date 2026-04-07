@@ -1,23 +1,16 @@
 // ABOUTME: Fetches PoE trade stat data from backend and provides text-to-statId matching.
 // ABOUTME: Stats are cached for 1 hour via TanStack Query. Used for trade search query building.
 
-'use client';
-
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-
-interface TradeStat {
-  id: string;
-  text: string;
-  type: string;
-}
+import { getTradeStats } from '@/lib/ipc';
+import type { TradeStat } from '@/types/index';
 
 const ONE_HOUR = 60 * 60 * 1000;
 
 export function useTradeStats() {
   return useQuery<TradeStat[]>({
     queryKey: ['trade-stats'],
-    queryFn: () => api.get<TradeStat[]>('/trade/stats'),
+    queryFn: () => getTradeStats(),
     staleTime: ONE_HOUR,
   });
 }

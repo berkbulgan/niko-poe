@@ -1,8 +1,6 @@
 // ABOUTME: Strategy cost calculator with item picker, quantity editor, and cost summary.
 // ABOUTME: Links to filter presets for trade search. Uses poe.watch prices for cost calculation.
 
-'use client';
-
 import {
   useState,
   useMemo,
@@ -23,7 +21,7 @@ import {
 } from '@/lib/hooks/use-prices';
 import type { StrategyConfig, StrategyItem } from '@/lib/hooks/use-strategies';
 import { useFilterPresets, type FilterPreset } from '@/lib/hooks/use-filter-presets';
-import { api } from '@/lib/api';
+import { openExternal } from '@/lib/platform';
 
 // ── Types ──
 
@@ -190,12 +188,6 @@ function SelectedItemRow({
   );
 }
 
-interface TradeProxyResponse {
-  id: string;
-  total: number;
-  url: string;
-}
-
 function LinkedPresetSection({
   presets,
   selectedPresetId,
@@ -292,18 +284,13 @@ function LinkedPresetSection({
     };
   }
 
+  // Phase 2: replace stub with ipc.proxyTradeSearch() then openExternal(result.url)
   async function handleOpenTrade() {
     if (!selectedPreset) return;
     setSearching(true);
     try {
-      const query = buildPresetTradeQuery(selectedPreset.config);
-      const result = await api.post<TradeProxyResponse>('/trade/proxy-search', {
-        league: currentLeague,
-        query,
-      });
-      window.open(result.url, '_blank', 'noopener');
-    } catch {
-      window.open(`https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`, '_blank', 'noopener');
+      const fallbackUrl = `https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`;
+      await openExternal(fallbackUrl);
     } finally {
       setSearching(false);
     }

@@ -56,9 +56,7 @@ export interface AtlasTreeConfig {
 
 export interface AtlasTree {
   id: string;
-  userId: string;
   name: string;
-  shareCode: string;
   config: AtlasTreeConfig;
   createdAt: string;
   updatedAt: string;
