@@ -17,7 +17,6 @@ import {
   type FilterPreset,
 } from '@/lib/hooks/use-filter-presets';
 import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
-import { copyToClipboard } from '@/lib/utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
 function SavePresetModal({
@@ -121,7 +120,6 @@ function PresetRow({
   onSelect: () => void;
   onDuplicate: () => void;
 }) {
-  const [showCode, setShowCode] = useState(false);
   const deletePreset = useDeletePreset(preset.id);
 
   return (
@@ -132,23 +130,9 @@ function PresetRow({
         className="w-full px-3 py-2 text-left"
       >
         <span className="block truncate text-sm text-poe-text">{preset.name}</span>
-        <span className="block text-xs text-poe-text-muted">
-          Code: {preset.shareCode}
-        </span>
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
-          <button
-            onClick={async () => {
-              await copyToClipboard(preset.shareCode);
-              setShowCode(true);
-              setTimeout(() => setShowCode(false), 2000);
-            }}
-            className={`text-xs ${showCode ? 'text-poe-success' : 'text-poe-text-dim hover:text-poe-gold'}`}
-          >
-            {showCode ? 'Copied!' : 'Share'}
-          </button>
-          <span className="text-poe-border">·</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"

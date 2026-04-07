@@ -8,6 +8,7 @@ import { Filters } from './pages/Filters';
 import { Strategies } from './pages/Strategies';
 import { AtlasTree } from './pages/AtlasTree';
 import { Stash } from './pages/Stash';
+import { Settings } from './pages/Settings';
 
 export const router = createHashRouter([
   {
@@ -20,6 +21,7 @@ export const router = createHashRouter([
       { path: 'strategies', element: <Strategies /> },
       { path: 'atlas-tree', element: <AtlasTree /> },
       { path: 'stash', element: <Stash /> },
+      { path: 'settings', element: <Settings /> },
     ],
   },
 ]);

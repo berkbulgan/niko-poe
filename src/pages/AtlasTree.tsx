@@ -17,8 +17,8 @@ import {
 } from '@/lib/hooks/use-atlas-trees';
 import { processTreeData } from '@/lib/atlas-tree-utils';
 import { canDeallocate } from '@/lib/atlas-tree-utils';
-import { copyToClipboard } from '@/lib/utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
+import * as ipc from '@/lib/ipc';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type {
   AtlasTreeRawData,
@@ -131,7 +131,6 @@ function AtlasTreeRow({
   onSelect: () => void;
   onDuplicate: () => void;
 }) {
-  const [showCode, setShowCode] = useState(false);
   const deleteTree = useDeleteAtlasTree(tree.id);
 
   return (
@@ -143,22 +142,11 @@ function AtlasTreeRow({
       >
         <span className="block truncate text-sm text-poe-text">{tree.name}</span>
         <span className="block text-xs text-poe-text-muted">
-          Code: {tree.shareCode} &middot; {tree.config.allocatedNodeIds.length} pts
+          {tree.config.allocatedNodeIds.length} pts
         </span>
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
-          <button
-            onClick={async () => {
-              await copyToClipboard(tree.shareCode);
-              setShowCode(true);
-              setTimeout(() => setShowCode(false), 2000);
-            }}
-            className={`text-xs ${showCode ? 'text-poe-success' : 'text-poe-text-dim hover:text-poe-gold'}`}
-          >
-            {showCode ? 'Copied!' : 'Share'}
-          </button>
-          <span className="text-poe-border">&middot;</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -256,15 +244,11 @@ export function AtlasTree() {
     });
   }
 
-  // Phase 2: replace with ipc.updateAtlasTree() call
   const overwriteMutation = useMutation<AtlasTree, Error, { config: AtlasTreeConfig }>({
-    mutationFn: async () => {
-      // stub — Phase 2 wires to IPC
-      return {} as AtlasTree;
+    mutationFn: async ({ config }) => {
+      return ipc.updateAtlasTree(activeTreeId!, { config: JSON.stringify(config) }) as Promise<AtlasTree>;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['atlas-trees'] });
-    },
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: ['atlas-trees'] }); },
   });
 
   function handleSaveOverwrite() {

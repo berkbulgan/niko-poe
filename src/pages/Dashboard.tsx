@@ -112,9 +112,6 @@ export function Dashboard() {
                       {preset.config.quantity && <span> · IIQ≥{preset.config.quantity}</span>}
                     </p>
                   </div>
-                  <span className="shrink-0 font-mono text-xs text-poe-text-muted">
-                    {preset.shareCode}
-                  </span>
                 </Link>
               ))}
             </div>

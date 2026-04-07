@@ -5,7 +5,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
-import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu } from 'lucide-react';
+import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu, Settings } from 'lucide-react';
 
 interface NavItemProps {
   href: string;
@@ -47,6 +47,7 @@ export function AppLayout() {
     { href: '/strategies', icon: <BarChart3 size={18} />, label: 'Strategies' },
     { href: '/atlas-tree', icon: <TreePine size={18} />, label: 'Atlas Tree' },
     { href: '/stash', icon: <Archive size={18} />, label: 'Stash', requiresAuth: true },
+    { href: '/settings', icon: <Settings size={18} />, label: 'Settings' },
   ];
 
   return (
@@ -125,13 +126,19 @@ export function AppLayout() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => { void login(); }}
-              disabled={isLoading}
-              className="w-full border border-poe-gold/40 px-3 py-2 text-xs tracking-wider text-poe-gold transition-colors hover:border-poe-gold/70 hover:bg-poe-gold/5 disabled:opacity-50"
-            >
-              {isLoading ? 'Connecting...' : 'Login with GGG'}
-            </button>
+            <div className="space-y-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm text-poe-text">Exile</p>
+                <p className="truncate text-xs text-poe-text-muted">Not connected</p>
+              </div>
+              <button
+                onClick={() => { void login(); }}
+                disabled={isLoading}
+                className="w-full border border-poe-gold/40 px-3 py-2 text-xs tracking-wider text-poe-gold transition-colors hover:border-poe-gold/70 hover:bg-poe-gold/5 disabled:opacity-50"
+              >
+                {isLoading ? 'Connecting...' : 'Login with GGG'}
+              </button>
+            </div>
           )}
         </div>
       </aside>

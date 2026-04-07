@@ -13,14 +13,15 @@ import {
   useDeleteStrategy,
   useImportStrategy,
   type Strategy,
+  type StrategyParsed,
 } from '@/lib/hooks/use-strategies';
 import {
   StrategyBuilder,
   type StrategyBuilderRef,
 } from '@/components/strategies/strategy-builder';
-import { copyToClipboard } from '@/lib/utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
+import * as ipc from '@/lib/ipc';
 
 function SaveStrategyModal({
   open,
@@ -123,7 +124,6 @@ function StrategyRow({
   onSelect: () => void;
   onDuplicate: () => void;
 }) {
-  const [showCode, setShowCode] = useState(false);
   const deleteStrategy = useDeleteStrategy(strategy.id);
 
   return (
@@ -134,23 +134,9 @@ function StrategyRow({
         className="w-full px-3 py-2 text-left"
       >
         <span className="block truncate text-sm text-poe-text">{strategy.name}</span>
-        <span className="block text-xs text-poe-text-muted">
-          Code: {strategy.shareCode}
-        </span>
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
-          <button
-            onClick={async () => {
-              await copyToClipboard(strategy.shareCode);
-              setShowCode(true);
-              setTimeout(() => setShowCode(false), 2000);
-            }}
-            className={`text-xs ${showCode ? 'text-poe-success' : 'text-poe-text-dim hover:text-poe-gold'}`}
-          >
-            {showCode ? 'Copied!' : 'Share'}
-          </button>
-          <span className="text-poe-border">·</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -192,15 +178,12 @@ export function Strategies() {
     });
   }
 
-  // Phase 2: replace with ipc.updateStrategy() call
-  const overwriteMutation = useMutation<Strategy, Error, { config: StrategyConfig }>({
-    mutationFn: async () => {
-      // stub — Phase 2 wires to IPC
-      return {} as Strategy;
+  const overwriteMutation = useMutation<StrategyParsed, Error, { config: StrategyConfig }>({
+    mutationFn: async ({ config }) => {
+      const strategy = await ipc.updateStrategy(activeStrategyId!, { config: JSON.stringify(config) });
+      return { ...strategy, config: JSON.parse(strategy.config) as StrategyConfig };
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
-    },
+    onSettled: () => { void queryClient.invalidateQueries({ queryKey: ['strategies'] }); },
   });
 
   function handleSaveOverwrite() {
