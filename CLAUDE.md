@@ -92,9 +92,27 @@ GGG's official `league.json` export from [atlastree-export](https://github.com/g
 
 ## Git Workflow
 
-- **NEVER commit directly to `main`**. All work happens on `dev` branch.
-- Release flow: `dev` → PR → `main` → tag.
+- **NEVER commit directly to `main` or `dev`**. Both branches are protected (PR required, no direct push, no force push).
 - Default working branch: `dev`.
+- Branch naming: `feat/N-desc`, `fix/N-desc`, `chore/N-desc`, etc. (see CONTRIBUTING.md).
+
+### Release Flow
+
+```
+feature branch → PR → dev → PR (with semver label) → main → auto tag + release
+```
+
+1. Feature branch from `dev` → PR → merge to `dev`
+2. `dev` → `main` PR with semver label (`patch`/`minor`/`major`)
+3. On merge: `auto-release.yml` bumps version in `package.json` + `tauri.conf.json` + `Cargo.toml`, commits, tags
+4. Tag push triggers `release.yml` → Windows installer build → draft GitHub Release
+
+### CI/CD Workflows
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `auto-release.yml` | PR with semver label merged to `main` | Version bump → commit → tag push |
+| `release.yml` | Tag push (`v*.*.*`) | Tauri build → NSIS installer → GitHub Release (draft) |
 
 ## Placeholders That Need Real Values
 
