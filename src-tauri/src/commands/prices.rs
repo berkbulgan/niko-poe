@@ -152,6 +152,7 @@ pub async fn get_prices(
     // Try compact cache first for simple name lookups
     let actual_category = match category.as_str() {
         "chisel" | "astrolabe" => "currency",
+        "deliriumOrb" => "delirium",
         other => other,
     };
 
@@ -230,8 +231,8 @@ pub async fn get_prices(
 
 fn filter_virtual(category: &str, items: Vec<crate::state::PoeWatchItem>) -> Vec<crate::state::PoeWatchItem> {
     match category {
-        "chisel" => items.into_iter().filter(|i| i.name == "Cartographer's Chisel").collect(),
-        "astrolabe" => items.into_iter().filter(|i| i.name == "Astrolabe").collect(),
+        "chisel" => items.into_iter().filter(|i| i.name.to_lowercase().contains("chisel")).collect(),
+        "astrolabe" => items.into_iter().filter(|i| i.name.to_lowercase().contains("astrolabe")).collect(),
         _ => items,
     }
 }
