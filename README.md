@@ -7,6 +7,7 @@
 - **Strategy Calculator** — Build map strategies with scarabs, delirium orbs, chisels; calculate cost per map and total investment with live prices from [poe.watch](https://poe.watch)
 - **Atlas Tree Helper** — Interactive passive tree viewer for planning atlas strategies
 - **Regex Filter Builder** — Create and test regex patterns for stash tab searching with 313 precomputed optimization patterns (250 char limit)
+- **Trade Search** — Search the PoE Trade API using your built map configurations; find maps matching your strategy filters with rate-limited queries
 - **Map Mod Picker** — Two-column avoid/prefer selection with danger values (data from [poe-vendor-string](https://github.com/veiset/poe-vendor-string))
 - **Stash Viewer** — Browse stash tabs with item details and pricing (requires GGG login)
 - **GGG Account Integration** — OAuth2 PKCE login for account-linked features
