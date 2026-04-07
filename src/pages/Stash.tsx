@@ -8,7 +8,9 @@ import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { useStashTabs, useStashContents } from '@/lib/hooks/use-stash';
+import { useDivinePrice } from '@/lib/hooks/use-prices';
 import { lookupItemPrices } from '@/lib/ipc';
+import { PoeIcon } from '@/components/ui/poe-icon';
 import type { StashTab, StashItem, StashColor } from '@/types/index';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -47,6 +49,18 @@ function parsePrice(note: string | null): { amount: number; currency: string } |
 /** Is this a rare item? frameType 2 = Rare */
 function isRareItem(item: StashItem): boolean {
   return item.frameType === 2;
+}
+
+/** Round to nearest 0.5 */
+function normalizePrice(value: number): number {
+  return Math.round(value * 2) / 2;
+}
+
+/** Format a normalized price: show ".5" but not ".0" */
+function formatPrice(value: number): string {
+  if (value === 0) return '—';
+  const normalized = normalizePrice(value);
+  return normalized % 1 === 0 ? normalized.toFixed(0) : normalized.toFixed(1);
 }
 
 // ── Sort types ───────────────────────────────────────────────────────────────
@@ -184,7 +198,7 @@ interface ProcessedItem {
   total: number;
 }
 
-function StashItemTable({ items, priceMap }: { items: StashItem[]; priceMap: Record<string, number> }) {
+function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; priceMap: Record<string, number>; divinePrice: number }) {
   const [sort, setSort] = useState<SortState>({ column: 'total', direction: 'desc' });
 
   const processedItems = useMemo(() => {
@@ -253,6 +267,15 @@ function StashItemTable({ items, priceMap }: { items: StashItem[]; priceMap: Rec
 
   return (
     <div className="overflow-x-auto">
+      {/* Divine rate indicator */}
+      <div className="flex items-center gap-1.5 border-b border-poe-border/20 px-4 py-2 text-xs text-poe-text-muted">
+        <span>1</span>
+        <PoeIcon name="divine" size={14} />
+        <span>=</span>
+        <span className="text-poe-currency">{formatPrice(divinePrice)}</span>
+        <PoeIcon name="chaos" size={14} />
+      </div>
+
       <table className="w-full">
         <thead>
           <tr className="border-b border-poe-border/30">
@@ -262,43 +285,71 @@ function StashItemTable({ items, priceMap }: { items: StashItem[]; priceMap: Rec
             <th className="w-24 px-4 py-2 text-right">
               <SortHeader label="Qty" column="quantity" sort={sort} onSort={handleSort} align="right" />
             </th>
-            <th className="w-32 px-4 py-2 text-right">
+            <th className="w-36 px-4 py-2 text-right">
               <SortHeader label="Price" column="price" sort={sort} onSort={handleSort} align="right" />
             </th>
-            <th className="w-32 px-4 py-2 text-right">
+            <th className="w-44 px-4 py-2 text-right">
               <SortHeader label="Total" column="total" sort={sort} onSort={handleSort} align="right" />
             </th>
           </tr>
         </thead>
         <tbody>
-          {sortedItems.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b border-poe-border/10 transition-colors hover:bg-poe-panel-light/20"
-            >
-              <td className="px-4 py-1.5">
-                <div className="flex items-center gap-2">
-                  {item.icon !== '' && (
-                    <img src={item.icon} alt="" className="h-6 w-6 object-contain" loading="lazy" />
-                  )}
-                  <span className="truncate text-sm text-poe-text">{item.name}</span>
-                </div>
-              </td>
-              <td className="px-4 py-1.5 text-right text-sm tabular-nums text-poe-text-dim">
-                {item.quantity}
-              </td>
-              <td className="px-4 py-1.5 text-right text-sm tabular-nums text-poe-text-dim">
-                {item.priceAmount > 0 ? (
-                  <span>{item.priceAmount} {item.priceCurrency}</span>
-                ) : (
-                  <span className="text-poe-text-muted">—</span>
-                )}
-              </td>
-              <td className="px-4 py-1.5 text-right text-sm font-medium tabular-nums text-poe-currency">
-                {item.total > 0 ? item.total.toFixed(1) : '—'}
-              </td>
-            </tr>
-          ))}
+          {sortedItems.map((item) => {
+            const normalizedTotal = normalizePrice(item.total);
+            const showDivine = divinePrice > 0 && normalizedTotal >= divinePrice;
+            const divineAmount = showDivine ? normalizePrice(normalizedTotal / divinePrice) : 0;
+
+            return (
+              <tr
+                key={item.id}
+                className="border-b border-poe-border/10 transition-colors hover:bg-poe-panel-light/20"
+              >
+                <td className="px-4 py-1.5">
+                  <div className="flex items-center gap-2">
+                    {item.icon !== '' && (
+                      <img src={item.icon} alt="" className="h-6 w-6 object-contain" loading="lazy" />
+                    )}
+                    <span className="truncate text-sm text-poe-text">{item.name}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-1.5 text-right text-sm tabular-nums text-poe-text-dim">
+                  {item.quantity}
+                </td>
+                <td className="px-4 py-1.5">
+                  <div className="flex items-center justify-end gap-1 text-sm tabular-nums text-poe-text-dim">
+                    {item.priceAmount > 0 ? (
+                      <>
+                        <span>{formatPrice(item.priceAmount)}</span>
+                        <PoeIcon name="chaos" size={14} />
+                      </>
+                    ) : (
+                      <span className="text-poe-text-muted">—</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-1.5">
+                  <div className="flex flex-col items-end gap-0.5">
+                    <div className="flex items-center gap-1 text-sm font-medium tabular-nums text-poe-currency">
+                      {normalizedTotal > 0 ? (
+                        <>
+                          <span>{formatPrice(normalizedTotal)}</span>
+                          <PoeIcon name="chaos" size={14} />
+                        </>
+                      ) : (
+                        <span className="text-poe-text-muted">—</span>
+                      )}
+                    </div>
+                    {showDivine && (
+                      <div className="flex items-center gap-1 text-xs tabular-nums text-poe-text-muted">
+                        <span>{formatPrice(divineAmount)}</span>
+                        <PoeIcon name="divine" size={12} />
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -311,6 +362,8 @@ export function Stash() {
   const { isAuthenticated, isLoading: authLoading, login } = useAuth();
   const { currentLeague } = useLeague();
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
+
+  const divinePrice = useDivinePrice(currentLeague);
 
   const {
     data: tabs,
@@ -461,7 +514,7 @@ export function Stash() {
               <Spinner size="lg" />
             </div>
           ) : (
-            <StashItemTable items={items ?? []} priceMap={priceMap ?? {}} />
+            <StashItemTable items={items ?? []} priceMap={priceMap ?? {}} divinePrice={divinePrice} />
           )}
         </div>
       </main>
