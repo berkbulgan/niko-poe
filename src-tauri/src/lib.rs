@@ -45,14 +45,7 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(
-            tauri_plugin_sql::Builder::new()
-                .add_migrations(
-                    &format!("sqlite:{}", DB_FILENAME),
-                    db::migrations::get_migrations(),
-                )
-                .build(),
-        )
+        .plugin(tauri_plugin_sql::Builder::new().build())
         .setup(|app| {
             let app_data_dir = app
                 .path()
@@ -65,11 +58,17 @@ pub fn run() {
             let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
 
             let pool = tauri::async_runtime::block_on(async {
-                SqlitePoolOptions::new()
+                let p = SqlitePoolOptions::new()
                     .max_connections(5)
                     .connect(&db_url)
                     .await
-                    .expect("failed to open SQLite pool")
+                    .expect("failed to open SQLite pool");
+
+                db::migrations::run_migrations(&p)
+                    .await
+                    .expect("failed to run database migrations");
+
+                p
             });
 
             let http_client = reqwest::Client::builder()
