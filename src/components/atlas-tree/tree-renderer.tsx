@@ -1,7 +1,7 @@
 // ABOUTME: SVG-based atlas skill tree renderer with zoom, pan, and node interaction.
 // ABOUTME: Renders processed atlas nodes with allocation toggling, tooltips, and search highlighting.
 
-'use client';
+
 
 import { useState, useCallback, useRef, useMemo, useEffect, type MouseEvent } from 'react';
 import { cn } from '@/lib/utils';

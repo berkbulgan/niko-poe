@@ -1,7 +1,7 @@
 // ABOUTME: Modal dialog component using React portal with dark PoE-themed overlay.
 // ABOUTME: Supports close on overlay click and Escape key, with accessible ARIA attributes.
 
-'use client';
+
 
 import { useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';

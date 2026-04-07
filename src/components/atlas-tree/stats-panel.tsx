@@ -1,7 +1,7 @@
 // ABOUTME: Right sidebar panel displaying allocated atlas tree stats grouped by node type.
 // ABOUTME: Shows point counter, aggregated small passive totals, and notable/keystone details.
 
-'use client';
+
 
 import type { AtlasNodeData, AggregatedStat } from '@/types/atlas-tree';
 import { aggregateStats } from '@/lib/atlas-tree-utils';

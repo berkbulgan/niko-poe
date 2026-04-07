@@ -25,6 +25,8 @@ const GGG_TOKEN_URL: &str = "https://www.pathofexile.com/oauth/token";
 const GGG_PROFILE_URL: &str = "https://www.pathofexile.com/api/profile";
 
 const OAUTH_TIMEOUT_SECS: u64 = 120;
+const OAUTH_PORT: u16 = 14782;
+const OAUTH_CALLBACK_PATH: &str = "/callback";
 
 /// PKCE parameters generated before opening the browser.
 struct PkceParams {
@@ -151,7 +153,14 @@ pub async fn start_oauth_login(
     let (tx, rx) = tokio::sync::oneshot::channel::<String>();
     let tx = Arc::new(Mutex::new(Some(tx)));
 
-    let port = tauri_plugin_oauth::start(move |url| {
+    let config = tauri_plugin_oauth::OauthConfig {
+        ports: Some(vec![OAUTH_PORT]),
+        response: Some(std::borrow::Cow::Borrowed(
+            "<html><body>Login successful — you can close this tab.</body></html>",
+        )),
+    };
+
+    let port = tauri_plugin_oauth::start_with_config(config, move |url| {
         let tx = Arc::clone(&tx);
         tauri::async_runtime::spawn(async move {
             let mut guard = tx.lock().await;
@@ -162,7 +171,7 @@ pub async fn start_oauth_login(
     })
     .map_err(|e| Error::Auth(format!("failed to start OAuth listener: {}", e)))?;
 
-    let redirect_uri = format!("http://127.0.0.1:{}/", port);
+    let redirect_uri = format!("http://127.0.0.1:{}{}", port, OAUTH_CALLBACK_PATH);
 
     // Build the GGG authorization URL.
     let state_param = URL_SAFE_NO_PAD.encode(rand::thread_rng().gen::<[u8; 16]>());

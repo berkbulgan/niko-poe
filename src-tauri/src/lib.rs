@@ -9,6 +9,7 @@ pub mod state;
 use std::sync::Arc;
 use sqlx::sqlite::SqlitePoolOptions;
 use tauri::Manager;
+use tauri::path::BaseDirectory;
 use tokio::sync::Mutex;
 
 use commands::{
@@ -35,7 +36,7 @@ use commands::{
 };
 use state::AppState;
 
-const DB_URL: &str = "sqlite:niko.db";
+const DB_FILENAME: &str = "niko.db";
 
 pub fn run() {
     tauri::Builder::default()
@@ -46,14 +47,27 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
             tauri_plugin_sql::Builder::new()
-                .add_migrations(DB_URL, db::migrations::get_migrations())
+                .add_migrations(
+                    &format!("sqlite:{}", DB_FILENAME),
+                    db::migrations::get_migrations(),
+                )
                 .build(),
         )
         .setup(|app| {
+            let app_data_dir = app
+                .path()
+                .resolve("", BaseDirectory::AppData)
+                .expect("failed to resolve app data dir");
+            std::fs::create_dir_all(&app_data_dir)
+                .expect("failed to create app data dir");
+
+            let db_path = app_data_dir.join(DB_FILENAME);
+            let db_url = format!("sqlite:{}?mode=rwc", db_path.display());
+
             let pool = tauri::async_runtime::block_on(async {
                 SqlitePoolOptions::new()
                     .max_connections(5)
-                    .connect(DB_URL)
+                    .connect(&db_url)
                     .await
                     .expect("failed to open SQLite pool")
             });

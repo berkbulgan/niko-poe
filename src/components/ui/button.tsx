@@ -1,7 +1,7 @@
 // ABOUTME: Reusable Button component with PoE-themed variants using class-variance-authority.
 // ABOUTME: Supports primary (gold gradient), secondary, danger, and ghost variants with size options.
 
-'use client';
+
 
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
