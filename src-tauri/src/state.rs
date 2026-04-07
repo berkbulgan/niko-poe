@@ -105,6 +105,34 @@ pub struct PoeWatchItem {
     pub icon: String,
 }
 
+/// Compact price entry from poe.watch /compact endpoint.
+/// Only has id and mean — name resolved via the full item list.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CompactPriceEntry {
+    pub id: i64,
+    pub mean: f64,
+}
+
+/// Stores the full compact price dataset fetched at app startup.
+pub struct CompactPriceCache {
+    /// Map of item name (lowercase) → mean chaos price.
+    pub prices: std::collections::HashMap<String, f64>,
+    pub fetched_at: Option<std::time::Instant>,
+    pub ttl_secs: u64,
+    pub is_loading: bool,
+}
+
+impl CompactPriceCache {
+    pub fn new() -> Self {
+        Self {
+            prices: std::collections::HashMap::new(),
+            fetched_at: None,
+            ttl_secs: 900,
+            is_loading: false,
+        }
+    }
+}
+
 /// GGG OAuth2 token state stored in memory and persisted to the secure store.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GggTokenState {
@@ -117,8 +145,10 @@ pub struct GggTokenState {
 
 pub struct AppState {
     pub pool: SqlitePool,
+    pub http_client: reqwest::Client,
     pub rate_limiter: Arc<Mutex<RateLimiter>>,
     pub price_cache: Arc<Mutex<PriceCache>>,
+    pub compact_prices: Arc<Mutex<CompactPriceCache>>,
     pub league_cache: Arc<Mutex<LeagueCache>>,
     pub stat_cache: Arc<Mutex<StatCache>>,
     pub ggg_token: Arc<Mutex<Option<GggTokenState>>>,

@@ -146,9 +146,19 @@ export function getPrices(category: string, league: string): Promise<PriceItem[]
   return invoke<PriceItem[]>('get_prices', { category, league });
 }
 
-/** Looks up prices for a list of item names from poe.watch across multiple categories. */
+/** Fetches the entire poe.watch compact dataset for a league. Returns item count. */
+export function fetchAllPrices(league: string): Promise<number> {
+  return invoke<number>('fetch_all_prices', { league });
+}
+
+/** Looks up prices for a list of item names from the compact price cache. */
 export function lookupItemPrices(itemNames: string[], league: string): Promise<Record<string, number>> {
   return invoke<Record<string, number>>('lookup_item_prices', { itemNames, league });
+}
+
+/** Returns whether compact prices are currently being fetched. */
+export function isPricesLoading(): Promise<boolean> {
+  return invoke<boolean>('is_prices_loading');
 }
 
 // --- GGG Auth ---

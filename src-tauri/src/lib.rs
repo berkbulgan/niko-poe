@@ -21,7 +21,7 @@ use commands::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
         update_filter_preset,
     },
-    prices::{get_prices, lookup_item_prices},
+    prices::{fetch_all_prices, get_prices, is_prices_loading, lookup_item_prices},
     regex_filters::{
         create_regex_filter, delete_regex_filter, get_regex_filter, get_regex_filters,
         update_regex_filter,
@@ -72,10 +72,17 @@ pub fn run() {
                     .expect("failed to open SQLite pool")
             });
 
+            let http_client = reqwest::Client::builder()
+                .user_agent("NIKO-TradeHelper/0.1.0")
+                .build()
+                .expect("failed to build HTTP client");
+
             let app_state = AppState {
                 pool,
+                http_client,
                 rate_limiter: Arc::new(Mutex::new(state::RateLimiter::new())),
                 price_cache: Arc::new(Mutex::new(state::PriceCache::new())),
+                compact_prices: Arc::new(Mutex::new(state::CompactPriceCache::new())),
                 league_cache: Arc::new(Mutex::new(state::LeagueCache::new())),
                 stat_cache: Arc::new(Mutex::new(state::StatCache::new())),
                 ggg_token: Arc::new(Mutex::new(None)),
@@ -121,6 +128,8 @@ pub fn run() {
             // prices (Phase 3)
             get_prices,
             lookup_item_prices,
+            fetch_all_prices,
+            is_prices_loading,
             // auth (Phase 4)
             start_oauth_login,
             get_ggg_profile,

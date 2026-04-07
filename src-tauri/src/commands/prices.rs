@@ -1,116 +1,214 @@
-// ABOUTME: poe.watch price commands with 15-minute TTL cache.
-// ABOUTME: Virtual categories (chisel, astrolabe) filter from the currency category response.
+// ABOUTME: poe.watch price commands — compact endpoint for bulk pricing on startup.
+// ABOUTME: fetch_all_prices loads entire dataset; lookup_prices resolves names from cache.
 
+use std::collections::HashMap;
 use tauri::State;
 
 use crate::error::{Error, Result};
-use crate::state::{AppState, PoeWatchItem};
+use crate::state::AppState;
 
-const POE_WATCH_BASE: &str = "https://api.poe.watch/get";
-const USER_AGENT: &str = "NIKO-TradeHelper/0.1.0";
+const POE_WATCH_COMPACT: &str = "https://api.poe.watch/compact";
+const POE_WATCH_GET: &str = "https://api.poe.watch/get";
 
-/// Maps a virtual category name to the real poe.watch category and an item name filter.
-/// Virtual categories share a real category fetch but expose a filtered subset.
-struct VirtualCategory {
-    real_category: &'static str,
-    filter_name: &'static str,
-}
-
-fn virtual_category(category: &str) -> Option<VirtualCategory> {
-    match category {
-        "chisel" => Some(VirtualCategory {
-            real_category: "currency",
-            filter_name: "Cartographer's Chisel",
-        }),
-        "astrolabe" => Some(VirtualCategory {
-            real_category: "currency",
-            filter_name: "Astrolabe",
-        }),
-        _ => None,
+/// Fetches the entire poe.watch compact dataset for a league.
+/// Called once at app startup. Stores a name→price map in CompactPriceCache.
+/// Returns the number of items loaded.
+#[tauri::command]
+pub async fn fetch_all_prices(
+    league: String,
+    state: State<'_, AppState>,
+) -> Result<u32> {
+    {
+        let mut cache = state.compact_prices.lock().await;
+        // Already loaded and fresh? Return count.
+        if let Some(fetched_at) = cache.fetched_at {
+            if fetched_at.elapsed().as_secs() < cache.ttl_secs {
+                return Ok(cache.prices.len() as u32);
+            }
+        }
+        cache.is_loading = true;
     }
+
+    // Step 1: Fetch compact data (id + mean only)
+    let compact_url = format!(
+        "{}?league={}&all=true",
+        POE_WATCH_COMPACT,
+        urlencoding::encode(&league),
+    );
+
+    let compact_resp = state.http_client
+        .get(&compact_url)
+        .send()
+        .await
+        .map_err(|e| Error::Network(e.to_string()))?;
+
+    if !compact_resp.status().is_success() {
+        let mut cache = state.compact_prices.lock().await;
+        cache.is_loading = false;
+        return Err(Error::Network(format!(
+            "poe.watch compact fetch failed: {}",
+            compact_resp.status()
+        )));
+    }
+
+    let compact_raw: serde_json::Value = compact_resp
+        .json()
+        .await
+        .map_err(|e| Error::Parse(e.to_string()))?;
+
+    // Build id→mean map from compact data
+    let mut id_to_mean: HashMap<i64, f64> = HashMap::new();
+    if let Some(arr) = compact_raw.as_array() {
+        for entry in arr {
+            if let (Some(id), Some(mean)) = (entry["id"].as_i64(), entry["mean"].as_f64()) {
+                if mean > 0.0 {
+                    id_to_mean.insert(id, mean);
+                }
+            }
+        }
+    }
+
+    // Step 2: Fetch itemdata (id + name mapping) from the get endpoint with category=all
+    let itemdata_url = format!(
+        "{}?league={}&category=all",
+        POE_WATCH_GET,
+        urlencoding::encode(&league),
+    );
+
+    let itemdata_resp = state.http_client
+        .get(&itemdata_url)
+        .send()
+        .await;
+
+    let mut name_to_price: HashMap<String, f64> = HashMap::new();
+
+    match itemdata_resp {
+        Ok(resp) if resp.status().is_success() => {
+            let raw: serde_json::Value = resp
+                .json()
+                .await
+                .map_err(|e| Error::Parse(e.to_string()))?;
+
+            if let Some(arr) = raw.as_array() {
+                for item in arr {
+                    if let (Some(id), Some(name)) = (item["id"].as_i64(), item["name"].as_str()) {
+                        if let Some(&mean) = id_to_mean.get(&id) {
+                            let key = name.to_lowercase();
+                            // Keep the first (usually more relevant) entry per name
+                            name_to_price.entry(key).or_insert(mean);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            // If itemdata fails, fall back to compact-only (no name resolution)
+            // Still usable but lookup_prices won't find matches
+        }
+    }
+
+    let count = name_to_price.len() as u32;
+
+    {
+        let mut cache = state.compact_prices.lock().await;
+        cache.prices = name_to_price;
+        cache.fetched_at = Some(std::time::Instant::now());
+        cache.is_loading = false;
+    }
+
+    Ok(count)
 }
 
-fn cache_key(league: &str, category: &str) -> String {
-    format!("{}:{}", league, category)
+/// Looks up prices for a list of item names from the compact cache.
+/// Must call fetch_all_prices first. Returns name→chaos price map.
+#[tauri::command]
+pub async fn lookup_item_prices(
+    item_names: Vec<String>,
+    _league: String,
+    state: State<'_, AppState>,
+) -> Result<HashMap<String, f64>> {
+    let cache = state.compact_prices.lock().await;
+    let mut result = HashMap::new();
+
+    for name in &item_names {
+        let key = name.to_lowercase();
+        if let Some(&price) = cache.prices.get(&key) {
+            result.insert(name.clone(), price);
+        }
+    }
+
+    Ok(result)
 }
 
-/// Fetches item prices from poe.watch for the given league and category.
-/// Results are cached for 15 minutes (900 seconds). Virtual categories (chisel, astrolabe)
-/// are fetched as `currency` and filtered by item name before returning.
-/// On network failure, stale cache is served if available (graceful degradation).
+/// Returns whether compact prices are currently being fetched.
+#[tauri::command]
+pub async fn is_prices_loading(
+    state: State<'_, AppState>,
+) -> Result<bool> {
+    let cache = state.compact_prices.lock().await;
+    Ok(cache.is_loading)
+}
+
+/// Legacy per-category price fetch — kept for strategy builder item picker.
 #[tauri::command]
 pub async fn get_prices(
     category: String,
     league: String,
     state: State<'_, AppState>,
-) -> Result<Vec<PoeWatchItem>> {
-    let virtual_cat = virtual_category(&category);
-    let actual_category = virtual_cat
-        .as_ref()
-        .map(|v| v.real_category)
-        .unwrap_or(category.as_str());
+) -> Result<Vec<crate::state::PoeWatchItem>> {
+    // Try compact cache first for simple name lookups
+    let actual_category = match category.as_str() {
+        "chisel" | "astrolabe" => "currency",
+        other => other,
+    };
 
-    let key = cache_key(&league, actual_category);
+    let key = format!("{}:{}", league, actual_category);
 
-    // Check cache — serve hit without touching the network
+    // Check per-category cache
     {
         let cache = state.price_cache.lock().await;
         if let Some(entry) = cache.entries.get(&key) {
             if entry.fetched_at.elapsed().as_secs() < cache.ttl_secs {
-                let items = if let Some(ref vcat) = virtual_cat {
-                    entry
-                        .items
-                        .iter()
-                        .filter(|item| item.name == vcat.filter_name)
-                        .cloned()
-                        .collect()
-                } else {
-                    entry.items.clone()
-                };
+                let items = filter_virtual(&category, entry.items.clone());
                 return Ok(items);
             }
         }
     }
 
-    // Cache miss — fetch from poe.watch
+    // Fetch from poe.watch per-category endpoint
     let url = format!(
         "{}?league={}&category={}",
-        POE_WATCH_BASE,
+        POE_WATCH_GET,
         urlencoding::encode(&league),
-        urlencoding::encode(actual_category)
+        urlencoding::encode(actual_category),
     );
 
-    let client = reqwest::Client::new();
-    let resp = client
+    let resp = state.http_client
         .get(&url)
-        .header("User-Agent", USER_AGENT)
         .send()
         .await
         .map_err(|e| Error::Network(e.to_string()))?;
 
     if !resp.status().is_success() {
-        // Serve stale cache on error rather than propagating failure
         let cache = state.price_cache.lock().await;
         if let Some(entry) = cache.entries.get(&key) {
-            return Ok(entry.items.clone());
+            return Ok(filter_virtual(&category, entry.items.clone()));
         }
-        return Err(Error::Network(format!(
-            "poe.watch fetch failed: {}",
-            resp.status()
-        )));
+        return Err(Error::Network(format!("poe.watch fetch failed: {}", resp.status())));
     }
 
-    // poe.watch returns a bare array (no envelope wrapper)
     let raw: serde_json::Value = resp
         .json()
         .await
         .map_err(|e| Error::Parse(e.to_string()))?;
-    let raw_arr = raw.as_array().cloned().unwrap_or_default();
 
-    let items: Vec<PoeWatchItem> = raw_arr
+    let items: Vec<crate::state::PoeWatchItem> = raw
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
         .into_iter()
         .filter_map(|obj| {
-            Some(PoeWatchItem {
+            Some(crate::state::PoeWatchItem {
                 id: obj["id"].as_i64()?,
                 name: obj["name"].as_str()?.to_owned(),
                 category: obj["category"].as_str().unwrap_or("").to_owned(),
@@ -123,7 +221,6 @@ pub async fn get_prices(
         })
         .collect();
 
-    // Store in cache before applying virtual filter
     {
         let mut cache = state.price_cache.lock().await;
         cache.entries.insert(
@@ -135,143 +232,13 @@ pub async fn get_prices(
         );
     }
 
-    let result = if let Some(ref vcat) = virtual_cat {
-        items
-            .into_iter()
-            .filter(|item| item.name == vcat.filter_name)
-            .collect()
-    } else {
-        items
-    };
-
-    Ok(result)
+    Ok(filter_virtual(&category, items))
 }
 
-/// Categories to search when looking up item prices by name.
-const LOOKUP_CATEGORIES: &[&str] = &[
-    "currency",
-    "essence",
-    "card",
-    "scarab",
-    "fossil",
-    "resonator",
-    "oil",
-    "catalyst",
-    "fragment",
-    "delirium-orb",
-    "vial",
-    "incubator",
-    "map",
-];
-
-/// Looks up prices for a list of item names across multiple poe.watch categories.
-/// Returns a map of item name → price (chaos). Uses cached data when available.
-/// Items not found in any category are omitted from the result.
-#[tauri::command]
-pub async fn lookup_item_prices(
-    item_names: Vec<String>,
-    league: String,
-    state: State<'_, AppState>,
-) -> Result<std::collections::HashMap<String, f64>> {
-    let mut result = std::collections::HashMap::new();
-    if item_names.is_empty() {
-        return Ok(result);
+fn filter_virtual(category: &str, items: Vec<crate::state::PoeWatchItem>) -> Vec<crate::state::PoeWatchItem> {
+    match category {
+        "chisel" => items.into_iter().filter(|i| i.name == "Cartographer's Chisel").collect(),
+        "astrolabe" => items.into_iter().filter(|i| i.name == "Astrolabe").collect(),
+        _ => items,
     }
-
-    // Build a set for O(1) lookups
-    let name_set: std::collections::HashSet<String> = item_names
-        .iter()
-        .map(|n| n.to_lowercase())
-        .collect();
-
-    for &cat in LOOKUP_CATEGORIES {
-        let key = cache_key(&league, cat);
-
-        // Try cache first
-        let cached_items = {
-            let cache = state.price_cache.lock().await;
-            cache.entries.get(&key).and_then(|entry| {
-                if entry.fetched_at.elapsed().as_secs() < cache.ttl_secs {
-                    Some(entry.items.clone())
-                } else {
-                    None
-                }
-            })
-        };
-
-        let items = if let Some(cached) = cached_items {
-            cached
-        } else {
-            // Fetch from poe.watch
-            let url = format!(
-                "{}?league={}&category={}",
-                POE_WATCH_BASE,
-                urlencoding::encode(&league),
-                urlencoding::encode(cat)
-            );
-
-            let client = reqwest::Client::new();
-            let resp = client
-                .get(&url)
-                .header("User-Agent", USER_AGENT)
-                .send()
-                .await;
-
-            match resp {
-                Ok(r) if r.status().is_success() => {
-                    let raw: serde_json::Value = r
-                        .json()
-                        .await
-                        .map_err(|e| Error::Parse(e.to_string()))?;
-                    let raw_arr = raw.as_array().cloned().unwrap_or_default();
-
-                    let fetched: Vec<PoeWatchItem> = raw_arr
-                        .into_iter()
-                        .filter_map(|obj| {
-                            Some(PoeWatchItem {
-                                id: obj["id"].as_i64()?,
-                                name: obj["name"].as_str()?.to_owned(),
-                                category: obj["category"].as_str().unwrap_or("").to_owned(),
-                                mean: obj["mean"].as_f64().unwrap_or(0.0),
-                                daily: obj["daily"].as_f64().unwrap_or(0.0),
-                                change: obj["change"].as_f64().unwrap_or(0.0),
-                                low_confidence: obj["lowConfidence"].as_bool().unwrap_or(true),
-                                icon: obj["icon"].as_str().unwrap_or("").to_owned(),
-                            })
-                        })
-                        .collect();
-
-                    // Cache it
-                    {
-                        let mut cache = state.price_cache.lock().await;
-                        cache.entries.insert(
-                            key,
-                            crate::state::PriceCacheEntry {
-                                items: fetched.clone(),
-                                fetched_at: std::time::Instant::now(),
-                            },
-                        );
-                    }
-
-                    fetched
-                }
-                _ => continue, // Skip this category on error
-            }
-        };
-
-        // Match items by name (case-insensitive)
-        for item in &items {
-            let lower = item.name.to_lowercase();
-            if name_set.contains(&lower) && !result.contains_key(&item.name) && item.mean > 0.0 {
-                result.insert(item.name.clone(), item.mean);
-            }
-        }
-
-        // Early exit if all names found
-        if result.len() >= item_names.len() {
-            break;
-        }
-    }
-
-    Ok(result)
 }

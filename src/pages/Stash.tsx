@@ -2,14 +2,14 @@
 // ABOUTME: Requires authentication; filters out rare items; shows Name, Quantity, Price, Total columns.
 
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { useStashTabs, useStashContents } from '@/lib/hooks/use-stash';
 import { useDivinePrice } from '@/lib/hooks/use-prices';
-import { lookupItemPrices } from '@/lib/ipc';
+import { lookupItemPrices, fetchAllPrices } from '@/lib/ipc';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import type { StashTab, StashItem, StashColor } from '@/types/index';
 
@@ -51,16 +51,15 @@ function isRareItem(item: StashItem): boolean {
   return item.frameType === 2;
 }
 
-/** Round to nearest 0.5 */
+/** Round to 1 decimal place */
 function normalizePrice(value: number): number {
-  return Math.round(value * 2) / 2;
+  return Math.round(value * 10) / 10;
 }
 
-/** Format a normalized price: show ".5" but not ".0" */
+/** Format a normalized price to 1 decimal */
 function formatPrice(value: number): string {
   if (value === 0) return '—';
-  const normalized = normalizePrice(value);
-  return normalized % 1 === 0 ? normalized.toFixed(0) : normalized.toFixed(1);
+  return normalizePrice(value).toFixed(1);
 }
 
 // ── Sort types ───────────────────────────────────────────────────────────────
@@ -362,8 +361,21 @@ export function Stash() {
   const { isAuthenticated, isLoading: authLoading, login } = useAuth();
   const { currentLeague } = useLeague();
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
+  const queryClient = useQueryClient();
 
   const divinePrice = useDivinePrice(currentLeague);
+
+  async function handleRefreshPrices() {
+    setRefreshingPrices(true);
+    try {
+      await fetchAllPrices(currentLeague);
+      // Invalidate all item-price queries so stash re-fetches from new cache
+      void queryClient.invalidateQueries({ queryKey: ['item-prices'] });
+    } finally {
+      setRefreshingPrices(false);
+    }
+  }
 
   const {
     data: tabs,
@@ -493,13 +505,29 @@ export function Stash() {
 
       {/* ── Right panel: Tab contents ── */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex items-center border-b border-poe-border/20 px-4 py-3 lg:px-6">
-          <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">
-            {selectedTab ? selectedTab.name : 'Select a tab'}
-          </h3>
-          {itemsLoading && (
-            <Spinner size="sm" className="ml-3" />
-          )}
+        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
+          <div className="flex items-center">
+            <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">
+              {selectedTab ? selectedTab.name : 'Select a tab'}
+            </h3>
+            {itemsLoading && (
+              <Spinner size="sm" className="ml-3" />
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { void handleRefreshPrices(); }}
+            disabled={refreshingPrices}
+          >
+            {refreshingPrices ? (
+              <span className="flex items-center gap-1.5">
+                <Spinner size="sm" /> Refreshing prices...
+              </span>
+            ) : (
+              'Refresh Prices'
+            )}
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
