@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLeague } from '@/lib/league-context';
 import { openExternal, copyToClipboard } from '@/lib/platform';
+import { proxySearch } from '@/lib/ipc';
 import { useTradeStats, matchModTexts } from '@/lib/hooks/use-trade-stats';
 import { MAP_MODS, type MapMod, NIGHTMARE_THRESHOLD } from '@/data';
 import { generateNumberRegex } from '@/lib/generate-number-regex';
@@ -32,7 +33,7 @@ const EMPTY_FILTERS: MapStatFilters = {
   quantity: '',
   packSize: '',
   rarity: '',
-  mapTier: '',
+  mapTier: '16',
   quality: '',
   qualityType: 'pack_size',
   moreCurrency: '',
@@ -408,11 +409,16 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
     };
   }
 
-  // Phase 2: replace stub with ipc.proxyTradeSearch() then openExternal(result.url)
   async function handleOpenTrade() {
     if (!hasAnyFilter) return;
     setSearching(true);
     try {
+      const tradeQuery = buildTradeQuery();
+      const result = await proxySearch(tradeQuery, currentLeague);
+      await openExternal(result.url);
+    } catch (err) {
+      console.error('[StatPicker] proxySearch failed:', err);
+      // Fallback: open empty trade page so the user isn't stuck
       const fallbackUrl = `https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`;
       await openExternal(fallbackUrl);
     } finally {
@@ -427,9 +433,9 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* Header checkboxes */}
-      <div className="flex flex-wrap items-center justify-end gap-4">
+      <div className="flex flex-wrap items-center justify-end gap-4 px-4 pt-4 lg:px-6 lg:pt-6">
         <label className="flex items-center gap-1.5 text-sm text-poe-text-muted">
           <input
             type="checkbox"
@@ -451,7 +457,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
       </div>
 
       {/* ── Map stat filters — 3 rows ── */}
-      <div className="mt-4 space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4">
+      <div className="mx-4 mt-4 shrink-0 space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4 lg:mx-6">
         <h4 className="text-xs font-medium tracking-wide text-poe-text-dim">
           Map Stats
         </h4>
@@ -523,13 +529,13 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Filter mods... (e.g. reflect, regen, life)"
-        className="mt-4 text-xs"
+        className="mx-4 mt-4 text-xs lg:mx-6"
       />
 
       {/* ── Two columns: Avoid / Prefer ── */}
-      <div className="mt-4 grid flex-1 gap-3 lg:grid-cols-2">
+      <div className="mt-4 grid min-h-0 flex-1 gap-3 px-4 lg:grid-cols-2 lg:px-6">
         {/* Avoid — high scary first */}
-        <div>
+        <div className="flex min-h-0 flex-col">
           <div className="mb-2 flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-poe-error" />
             <h4 className="text-sm font-semibold text-poe-error/80">
@@ -539,7 +545,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
           <p className="mb-2 text-xs text-poe-text-muted">
             Mods you don&apos;t want — most dangerous first
           </p>
-          <div className="max-h-[400px] space-y-px overflow-y-auto">
+          <div className="flex-1 space-y-px overflow-y-auto">
             {avoidSorted.map((mod) => (
               <ModRow key={mod.id} mod={mod} selected={avoidIds.has(mod.id)} onToggle={() => toggleAvoid(mod.id)} />
             ))}
@@ -547,7 +553,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
         </div>
 
         {/* Prefer — low scary first */}
-        <div>
+        <div className="flex min-h-0 flex-col">
           <div className="mb-2 flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-poe-success" />
             <h4 className="text-sm font-semibold text-poe-success/80">
@@ -557,7 +563,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
           <p className="mb-2 text-xs text-poe-text-muted">
             Mods you want — safest first
           </p>
-          <div className="max-h-[400px] space-y-px overflow-y-auto">
+          <div className="flex-1 space-y-px overflow-y-auto">
             {preferSorted.map((mod) => (
               <ModRow key={mod.id} mod={mod} selected={preferIds.has(mod.id)} onToggle={() => togglePrefer(mod.id)} />
             ))}
@@ -565,8 +571,8 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
         </div>
       </div>
 
-      {/* ── Sticky bottom bar: vendor regex + actions ── */}
-      <div className="sticky bottom-0 z-10 -mx-4 mt-4 border-t border-poe-border/30 bg-poe-bg/95 px-4 py-3 backdrop-blur-sm lg:-mx-6 lg:px-6">
+      {/* ── Bottom bar: vendor regex + actions ── */}
+      <div className="shrink-0 mt-auto border-t border-poe-border/30 bg-poe-bg px-4 py-3 lg:px-6">
         {hasAnyFilter && vendorRegex.length > 0 && (
           <div className="mb-3 border border-poe-gold/30 bg-poe-panel/40 p-3">
             <div className="mb-1.5 flex items-center justify-between">

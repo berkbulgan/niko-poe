@@ -8,38 +8,33 @@ use tauri::State;
 use crate::error::{Error, Result};
 use crate::state::{AppState, League, TradeStat};
 
-const BASE_URL: &str = "https://www.pathofexile.com/api/trade2";
+const BASE_URL: &str = "https://www.pathofexile.com/api/trade";
 const USER_AGENT: &str = "NIKO-TradeHelper/0.1.0";
 
 // ---- Fallback stat definitions (subset of GGG stats for offline/error resilience) ----
 
 static FALLBACK_STATS: Lazy<Vec<TradeStat>> = Lazy::new(|| {
     vec![
-        TradeStat { id: "explicit.stat_1940865751".into(), text: "#% increased Pack Size".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2250533757".into(), text: "Monsters deal #% extra Physical Damage as Fire".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_4067062422".into(), text: "Monsters deal #% extra Physical Damage as Cold".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_1290399200".into(), text: "Monsters deal #% extra Physical Damage as Lightning".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_3885634897".into(), text: "#% increased Monster Movement Speed".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_3624393862".into(), text: "#% increased Monster Attack Speed".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2576092029".into(), text: "#% increased Monster Cast Speed".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2064510181".into(), text: "Monsters have #% chance to Avoid Elemental Ailments".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_1368271171".into(), text: "Monsters are Hexproof".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_1419165587".into(), text: "Monsters Reflect #% of Physical Damage".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_3218988041".into(), text: "Monsters Reflect #% of Elemental Damage".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_3814876171".into(), text: "#% more Monster Life".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_409449205".into(), text: "#% more Monster Damage".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_840020580".into(), text: "Area contains # additional packs of Skeletons".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2276619579".into(), text: "Area contains # additional packs with a Bloodlines mod".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_3885913183".into(), text: "Area is inhabited by # additional Rogue Exiles".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2823618833".into(), text: "Area is inhabited by Abominations".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2451621471".into(), text: "Players have Elemental Equilibrium".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_741827531".into(), text: "Players have Enfeeble".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2730469406".into(), text: "Players have Temporal Chains".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2435536724".into(), text: "Players have Vulnerability".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_2585100369".into(), text: "Players are Cursed with Elemental Weakness".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_3639275092".into(), text: "#% less effect of Curses on Monsters".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_696707710".into(), text: "Monsters gain #% of Maximum Life as Extra Maximum Energy Shield".into(), stat_type: "explicit".into() },
-        TradeStat { id: "explicit.stat_1681332047".into(), text: "Area has increased monster variety".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_1497673356".into(), text: "Monsters deal #% extra Physical Damage as Fire".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_3448216135".into(), text: "Monsters deal #% extra Physical Damage as Cold".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_3416853625".into(), text: "Monsters deal #% extra Physical Damage as Lightning".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_2306522833".into(), text: "#% increased Monster Movement Speed".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_1913583994".into(), text: "#% increased Monster Attack Speed".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_2488361432".into(), text: "#% increased Monster Cast Speed".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_322206271".into(), text: "Monsters have #% chance to Avoid Elemental Ailments".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_4154059009".into(), text: "Monsters are Hexproof".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_3464419871".into(), text: "Monsters reflect #% of Physical Damage".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_2764017512".into(), text: "Monsters reflect #% of Elemental Damage".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_95249895".into(), text: "#% more Monster Life".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_1263311755".into(), text: "#% more Monster Damage".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_2961018200".into(), text: "Area is inhabited by Abominations".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_4103440490".into(), text: "Players are Cursed with Enfeeble".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_2326202293".into(), text: "Players are Cursed with Temporal Chains".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_1366534040".into(), text: "Players are Cursed with Vulnerability".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_558910024".into(), text: "Players are Cursed with Elemental Weakness".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_3796523155".into(), text: "#% less effect of Curses on Monsters".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_2887760183".into(), text: "Monsters gain #% of Maximum Life as Extra Maximum Energy Shield".into(), stat_type: "explicit".into() },
+        TradeStat { id: "explicit.stat_3561450806".into(), text: "Area has increased monster variety".into(), stat_type: "explicit".into() },
     ]
 });
 
@@ -124,7 +119,7 @@ pub struct FilterMatch {
 #[serde(rename_all = "camelCase")]
 pub struct ProxySearchArgs {
     pub league: String,
-    pub query: TradeQuery,
+    pub query: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -387,7 +382,7 @@ pub async fn get_trade_stats(state: State<'_, AppState>) -> Result<Vec<TradeStat
     // Cache miss — stats endpoint is not trade-rate-limited, fetch directly
     let client = reqwest::Client::new();
     let resp = client
-        .get("https://www.pathofexile.com/api/trade2/data/stats")
+        .get(&format!("{}/data/stats", BASE_URL))
         .header("User-Agent", USER_AGENT)
         .send()
         .await
@@ -653,7 +648,7 @@ pub async fn proxy_search(
         id: search_resp.id.clone(),
         total: search_resp.total,
         url: format!(
-            "https://www.pathofexile.com/trade2/search/{}/{}",
+            "https://www.pathofexile.com/trade/search/{}/{}",
             urlencoding::encode(&args.league),
             search_resp.id
         ),

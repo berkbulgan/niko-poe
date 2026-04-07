@@ -137,7 +137,7 @@ export function fetchTradeResults(queryId: string, resultIds: string[]): Promise
 }
 
 export function proxySearch(query: object, league: string): Promise<ProxySearchResult> {
-  return invoke<ProxySearchResult>('proxy_search', { query, league });
+  return invoke<ProxySearchResult>('proxy_search', { args: { query, league } });
 }
 
 // --- Prices ---
