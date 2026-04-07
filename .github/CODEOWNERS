@@ -1,0 +1,4 @@
+# ABOUTME: Code ownership rules — all PRs require review from repo owner.
+# ABOUTME: Used by GitHub branch protection "require code owner reviews" setting.
+
+* @berkbulgan
