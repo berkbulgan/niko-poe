@@ -1,18 +1,15 @@
 # N.I.K.O.
 
-**Path of Exile 1 trade helper** — a native desktop app for regex-powered item filtering, trade search, strategy cost calculation, and GGG account integration.
+**Path of Exile 1 strategy helper & profit tracker** — a native desktop app for map strategy optimization, cost analysis, and stash-based profit tracking.
 
 ## Features
 
-- **Regex Filter Builder** — Create and test regex patterns against PoE mod database, organize with categories
+- **Strategy Calculator** — Build map strategies with scarabs, delirium orbs, chisels; calculate cost per map and total investment with live prices from [poe.watch](https://poe.watch)
+- **Atlas Tree Helper** — Interactive passive tree viewer for planning atlas strategies
+- **Regex Filter Builder** — Create and test regex patterns for stash tab searching with 313 precomputed optimization patterns (250 char limit)
 - **Map Mod Picker** — Two-column avoid/prefer selection with danger values (data from [poe-vendor-string](https://github.com/veiset/poe-vendor-string))
-- **Regex Optimization** — 313 precomputed patterns for shorter stash search strings (250 char limit)
-- **Trade Search** — Search PoE Trade API with rate limiting, view results with pricing
-- **Strategy Calculator** — Pick scarabs, delirium orbs, chisels with live prices from [poe.watch](https://poe.watch)
-- **Atlas Tree Helper** — Interactive passive tree viewer
-- **Filter Presets** — Save and load full filter configurations
-- **GGG Account Login** — OAuth2 PKCE integration for account features
 - **Stash Viewer** — Browse stash tabs with item details and pricing (requires GGG login)
+- **GGG Account Integration** — OAuth2 PKCE login for account-linked features
 - **League Selector** — Auto-fetches PC leagues from PoE API
 
 ## Tech Stack
@@ -21,17 +18,17 @@
 |-------|-------|
 | Desktop Shell | Tauri v2 (Rust) |
 | Frontend | React 19, React Router v6, TanStack Query, Tailwind CSS |
-| Database | SQLite (local, via sqlx) |
-| Trade API | pathofexile.com/api/trade (rate limited, Rust proxy) |
+| Database | SQLite (local) |
 | Prices | poe.watch API (15min cache) |
-| Auth | GGG OAuth2 PKCE (tauri-plugin-oauth) |
+| Trade | pathofexile.com/api/trade (rate limited, Rust proxy) |
+| Auth | GGG OAuth2 PKCE |
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
-- Rust toolchain (rustup)
+- Rust toolchain ([rustup](https://rustup.rs))
 - Platform build tools (Visual Studio Build Tools on Windows)
 
 ### Setup
@@ -77,18 +74,25 @@ niko-poe/
 └── scripts/                    # Updater key generation
 ```
 
+## Contributing
+
+Found a bug or have a feature request? Please [open an issue](https://github.com/berkbulgan/niko-poe/issues/new/choose) using one of our templates:
+
+- **Bug Report** — Something isn't working as expected
+- **Feature Request** — Suggest a new feature or improvement
+
 ## Roadmap
 
-- [x] Regex filter builder + presets
-- [x] Trade search with rate limiting
-- [x] Strategy cost calculator
+- [x] Strategy cost calculator with live pricing
 - [x] Atlas passive tree helper
+- [x] Regex filter builder + presets
+- [x] PoE Trade search with rate limiting
 - [x] Tauri v2 desktop migration
 - [x] GGG OAuth2 PKCE login
 - [x] Stash tab viewer
-- [ ] Filter push to PoE account (account:item_filter)
-- [ ] Stash snapshots + ROI tracking
-- [ ] Net worth estimation
+- [ ] Stash snapshots + ROI tracking per strategy
+- [ ] Net worth estimation from stash contents
+- [ ] Strategy profit history over time
 - [ ] macOS / Linux builds
 
 ## License
