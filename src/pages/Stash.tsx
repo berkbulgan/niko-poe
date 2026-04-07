@@ -11,6 +11,7 @@ import { useStashTabs, useStashContents } from '@/lib/hooks/use-stash';
 import { useDivinePrice } from '@/lib/hooks/use-prices';
 import { lookupItemPrices, fetchAllPrices } from '@/lib/ipc';
 import { PoeIcon } from '@/components/ui/poe-icon';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import type { StashTab, StashItem, StashColor } from '@/types/index';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -195,9 +196,15 @@ interface ProcessedItem {
   priceAmount: number;
   priceCurrency: string;
   total: number;
+  lowConfidence: boolean;
 }
 
-function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; priceMap: Record<string, number>; divinePrice: number }) {
+interface PriceMapEntry {
+  mean: number;
+  lowConfidence: boolean;
+}
+
+function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; priceMap: Record<string, PriceMapEntry>; divinePrice: number }) {
   const [sort, setSort] = useState<SortState>({ column: 'total', direction: 'desc' });
 
   const processedItems = useMemo(() => {
@@ -207,10 +214,11 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
         const displayName = item.name !== '' ? item.name : item.typeLine;
         const quantity = item.stackSize ?? 1;
         // Try poe.watch price first (by name or typeLine), fall back to player note
-        const watchPrice = priceMap[displayName] ?? priceMap[item.typeLine] ?? 0;
+        const watchEntry = priceMap[displayName] ?? priceMap[item.typeLine];
         const notePrice = parsePrice(item.note);
-        const priceAmount = watchPrice > 0 ? watchPrice : (notePrice?.amount ?? 0);
-        const priceCurrency = watchPrice > 0 ? 'chaos' : (notePrice?.currency ?? '');
+        const priceAmount = watchEntry ? watchEntry.mean : (notePrice?.amount ?? 0);
+        const priceCurrency = watchEntry ? 'chaos' : (notePrice?.currency ?? '');
+        const lowConfidence = watchEntry?.lowConfidence ?? false;
         const total = priceAmount * quantity;
 
         return {
@@ -221,6 +229,7 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
           priceAmount,
           priceCurrency,
           total,
+          lowConfidence,
         };
       });
   }, [items, priceMap]);
@@ -316,9 +325,12 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
                 </td>
                 <td className="px-4 py-1.5">
                   <div className="flex items-center justify-end gap-1 text-sm tabular-nums text-poe-text-dim">
+                    {item.lowConfidence && (
+                      <AlertTriangle size={12} className="shrink-0 text-red-500" title="Low confidence — unreliable price" />
+                    )}
                     {item.priceAmount > 0 ? (
                       <>
-                        <span>{formatPrice(item.priceAmount)}</span>
+                        <span className={item.lowConfidence ? 'text-poe-text-muted' : ''}>{formatPrice(item.priceAmount)}</span>
                         <PoeIcon name="chaos" size={14} />
                       </>
                     ) : (
@@ -520,13 +532,10 @@ export function Stash() {
             onClick={() => { void handleRefreshPrices(); }}
             disabled={refreshingPrices}
           >
-            {refreshingPrices ? (
-              <span className="flex items-center gap-1.5">
-                <Spinner size="sm" /> Refreshing prices...
-              </span>
-            ) : (
-              'Refresh Prices'
-            )}
+            <span className="flex items-center gap-1.5">
+              <RefreshCw size={14} className={refreshingPrices ? 'animate-spin' : ''} />
+              {refreshingPrices ? 'Refreshing...' : 'Refresh Prices'}
+            </span>
           </Button>
         </div>
 

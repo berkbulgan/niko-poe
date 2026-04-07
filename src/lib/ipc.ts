@@ -151,9 +151,14 @@ export function fetchAllPrices(league: string): Promise<number> {
   return invoke<number>('fetch_all_prices', { league });
 }
 
+export interface PriceLookupEntry {
+  mean: number;
+  lowConfidence: boolean;
+}
+
 /** Looks up prices for a list of item names from the compact price cache. */
-export function lookupItemPrices(itemNames: string[], league: string): Promise<Record<string, number>> {
-  return invoke<Record<string, number>>('lookup_item_prices', { itemNames, league });
+export function lookupItemPrices(itemNames: string[], league: string): Promise<Record<string, PriceLookupEntry>> {
+  return invoke<Record<string, PriceLookupEntry>>('lookup_item_prices', { itemNames, league });
 }
 
 /** Returns whether compact prices are currently being fetched. */

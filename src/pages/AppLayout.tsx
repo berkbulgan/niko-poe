@@ -1,14 +1,15 @@
 // ABOUTME: Authenticated app shell — sidebar navigation, league selector, user section.
 // ABOUTME: Rendered as the root layout route; child routes render via <Outlet />.
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
+import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu } from 'lucide-react';
 
 interface NavItemProps {
   href: string;
-  icon: string;
+  icon: ReactNode;
   label: string;
   active: boolean;
   dimmed?: boolean;
@@ -28,7 +29,7 @@ function NavItem({ href, icon, label, active, dimmed = false }: NavItemProps) {
         }
       `}
     >
-      <span className="text-base" aria-hidden="true">{icon}</span>
+      <span aria-hidden="true">{icon}</span>
       <span className="tracking-wide">{label}</span>
     </Link>
   );
@@ -41,11 +42,11 @@ export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navItems = [
-    { href: '/dashboard', icon: '⚡', label: 'Dashboard' },
-    { href: '/filters', icon: '⚔️', label: 'Regex Filters' },
-    { href: '/strategies', icon: '📊', label: 'Strategies' },
-    { href: '/atlas-tree', icon: '🌳', label: 'Atlas Tree' },
-    { href: '/stash', icon: '🗄️', label: 'Stash', requiresAuth: true },
+    { href: '/dashboard', icon: <Zap size={18} />, label: 'Dashboard' },
+    { href: '/filters', icon: <Sword size={18} />, label: 'Regex Filters' },
+    { href: '/strategies', icon: <BarChart3 size={18} />, label: 'Strategies' },
+    { href: '/atlas-tree', icon: <TreePine size={18} />, label: 'Atlas Tree' },
+    { href: '/stash', icon: <Archive size={18} />, label: 'Stash', requiresAuth: true },
   ];
 
   return (
@@ -120,9 +121,7 @@ export function AppLayout() {
                 className="shrink-0 rounded p-1.5 text-poe-text-muted transition-colors hover:bg-poe-panel-light hover:text-poe-error"
                 title="Logout"
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l3-3-3-3M5.5 8H14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <LogOut size={16} aria-hidden="true" />
               </button>
             </div>
           ) : (
@@ -146,9 +145,7 @@ export function AppLayout() {
             className="rounded p-1.5 text-poe-text-dim hover:bg-poe-panel-light hover:text-poe-text"
             aria-label="Open menu"
           >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-              <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
+            <Menu size={20} aria-hidden="true" />
           </button>
           <span className="ml-3 font-display text-xs tracking-[0.2em] text-poe-gold">
             N.I.K.O.

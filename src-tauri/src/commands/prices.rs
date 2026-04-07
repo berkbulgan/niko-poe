@@ -63,7 +63,8 @@ pub async fn fetch_all_prices(
         .cloned()
         .unwrap_or_default();
 
-    let mut name_to_price: HashMap<String, (f64, f64)> = HashMap::new();
+    // (mean, daily, low_confidence) per name — keep highest daily volume entry
+    let mut name_entries: HashMap<String, (f64, f64, bool)> = HashMap::new();
 
     for item in &items_arr {
         let name = match item["name"].as_str() {
@@ -75,24 +76,20 @@ pub async fn fetch_all_prices(
             _ => continue,
         };
 
-        // Skip low confidence entries — unreliable prices from thin markets
-        if item["lowConfidence"].as_bool().unwrap_or(true) {
-            continue;
-        }
-
-        let key = name.to_lowercase();
-        // For duplicate names, keep the entry with more daily volume (more reliable)
+        let low_confidence = item["lowConfidence"].as_bool().unwrap_or(true);
         let daily = item["daily"].as_f64().unwrap_or(0.0);
-        let existing_daily = name_to_price.get(&key).map(|(_, d)| *d).unwrap_or(0.0);
+        let key = name.to_lowercase();
+
+        let existing_daily = name_entries.get(&key).map(|(_, d, _)| *d).unwrap_or(0.0);
         if daily > existing_daily {
-            name_to_price.insert(key, (mean, daily));
+            name_entries.insert(key, (mean, daily, low_confidence));
         }
     }
 
-    // Flatten to name→price (drop daily volume tracking)
-    let name_to_price: HashMap<String, f64> = name_to_price
+    // Store name → (price, low_confidence) in cache
+    let name_to_price: HashMap<String, (f64, bool)> = name_entries
         .into_iter()
-        .map(|(k, (mean, _))| (k, mean))
+        .map(|(k, (mean, _, low_conf))| (k, (mean, low_conf)))
         .collect();
 
     let count = name_to_price.len() as u32;
@@ -107,21 +104,29 @@ pub async fn fetch_all_prices(
     Ok(count)
 }
 
+/// Price lookup result for a single item.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PriceLookupEntry {
+    pub mean: f64,
+    pub low_confidence: bool,
+}
+
 /// Looks up prices for a list of item names from the compact cache.
-/// Must call fetch_all_prices first. Returns name→chaos price map.
+/// Must call fetch_all_prices first. Returns name→{mean, lowConfidence} map.
 #[tauri::command]
 pub async fn lookup_item_prices(
     item_names: Vec<String>,
     _league: String,
     state: State<'_, AppState>,
-) -> Result<HashMap<String, f64>> {
+) -> Result<HashMap<String, PriceLookupEntry>> {
     let cache = state.compact_prices.lock().await;
     let mut result = HashMap::new();
 
     for name in &item_names {
         let key = name.to_lowercase();
-        if let Some(&price) = cache.prices.get(&key) {
-            result.insert(name.clone(), price);
+        if let Some(&(mean, low_confidence)) = cache.prices.get(&key) {
+            result.insert(name.clone(), PriceLookupEntry { mean, low_confidence });
         }
     }
 

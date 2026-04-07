@@ -115,8 +115,8 @@ pub struct CompactPriceEntry {
 
 /// Stores the full compact price dataset fetched at app startup.
 pub struct CompactPriceCache {
-    /// Map of item name (lowercase) → mean chaos price.
-    pub prices: std::collections::HashMap<String, f64>,
+    /// Map of item name (lowercase) → (mean chaos price, low_confidence flag).
+    pub prices: std::collections::HashMap<String, (f64, bool)>,
     pub fetched_at: Option<std::time::Instant>,
     pub ttl_secs: u64,
     pub is_loading: bool,
