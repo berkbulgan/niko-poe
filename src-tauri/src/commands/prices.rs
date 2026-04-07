@@ -63,7 +63,7 @@ pub async fn fetch_all_prices(
         .cloned()
         .unwrap_or_default();
 
-    let mut name_to_price: HashMap<String, f64> = HashMap::new();
+    let mut name_to_price: HashMap<String, (f64, f64)> = HashMap::new();
 
     for item in &items_arr {
         let name = match item["name"].as_str() {
@@ -75,13 +75,25 @@ pub async fn fetch_all_prices(
             _ => continue,
         };
 
+        // Skip low confidence entries — unreliable prices from thin markets
+        if item["lowConfidence"].as_bool().unwrap_or(true) {
+            continue;
+        }
+
         let key = name.to_lowercase();
-        // Keep highest-mean entry when duplicates exist (e.g. different gem levels)
-        let entry = name_to_price.entry(key).or_insert(0.0);
-        if mean > *entry {
-            *entry = mean;
+        // For duplicate names, keep the entry with more daily volume (more reliable)
+        let daily = item["daily"].as_f64().unwrap_or(0.0);
+        let existing_daily = name_to_price.get(&key).map(|(_, d)| *d).unwrap_or(0.0);
+        if daily > existing_daily {
+            name_to_price.insert(key, (mean, daily));
         }
     }
+
+    // Flatten to name→price (drop daily volume tracking)
+    let name_to_price: HashMap<String, f64> = name_to_price
+        .into_iter()
+        .map(|(k, (mean, _))| (k, mean))
+        .collect();
 
     let count = name_to_price.len() as u32;
 
