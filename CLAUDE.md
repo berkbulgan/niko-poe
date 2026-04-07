@@ -34,8 +34,25 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 - **`lib/auth-context.tsx`** — GGG OAuth state. App works fully without login; OAuth unlocks stash features only.
 - **`lib/league-context.tsx`** — Active PoE league selection, persisted via platform.storage.
 - **`lib/hooks/`** — TanStack Query hooks for each data domain. Pattern: `useQuery({ queryFn: () => ipc.commandName() })`.
+- **`lib/atlas-sprite-loader.ts`** — Loads GGG sprite sheets by zoom level, caches images, provides drawSprite API for Canvas rendering.
+- **`lib/atlas-canvas-renderer.ts`** — Canvas-based atlas tree renderer with 6 layers: background, group bg, start node, connections (orbit arcs + straight lines), node icons/frames, highlights. Handles hit testing, path/prune previews, mastery group highlights, blinking animations, off-screen arrows.
+- **`lib/atlas-tree-utils.ts`** — Pure utility functions: node positioning, stat aggregation, BFS pathfinding, hub node detection, allocatable neighbor computation, connectivity pruning, connection building.
 - **`pages/`** — Route-level components. React Router v6 HashRouter (required for Tauri production builds).
 - **`providers.tsx`** — Provider composition order matters: QueryClient → Auth → League.
+
+### Atlas Tree Data (`src/data/atlas-tree-data.json`)
+
+GGG's official `league.json` export from [atlastree-export](https://github.com/grindinggear/atlastree-export). Contains node definitions, group positions, sprite sheet coordinates, orbit constants, wormhole data, and tree bounds. Sprite assets served from `public/atlas/` (41 files, ~10MB).
+
+### Atlas Tree Architecture
+
+- **Canvas renderer** — Not SVG. Uses GGG sprite sheets with 5 zoom levels (0.1246–0.5).
+- **Hub nodes** — Nameless structural connectors (root → hub → starting nodes). Treated as transparent bridges — never rendered or allocated.
+- **Orbit arcs** — Same-group + same-orbit connections use arc geometry. Cross-orbit connections use straight lines.
+- **Wormholes** — Gateway nodes connecting distant tree branches. Links visible only on hover or when allocated.
+- **Path allocation** — Click any node to auto-allocate shortest path from current allocation (or from hub if nothing allocated).
+- **Deallocation pruning** — Removing a node also removes all nodes disconnected from root.
+- **Mastery group highlight** — Hovering a mastery highlights all same-name masteries across the tree with blinking animation.
 
 ### Backend (`src-tauri/src/`)
 

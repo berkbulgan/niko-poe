@@ -1,19 +1,30 @@
-// ABOUTME: SVG-based atlas skill tree renderer with zoom, pan, and node interaction.
-// ABOUTME: Renders processed atlas nodes with allocation toggling, tooltips, and search highlighting.
+// ABOUTME: Canvas-based atlas skill tree renderer with zoom, pan, and node interaction.
+// ABOUTME: Uses GGG sprite sheets for authentic rendering with hit-test based tooltips.
 
-
-
-import { useState, useCallback, useRef, useMemo, useEffect, type MouseEvent } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
 import { cn } from '@/lib/utils';
-import type { ProcessedAtlasNode, AtlasNodeData } from '@/types/atlas-tree';
-import { getAllocatableNeighbors, canDeallocate } from '@/lib/atlas-tree-utils';
+import type {
+  ProcessedAtlasNode,
+  AtlasNodeData,
+  AtlasSprites,
+  AtlasConnection,
+} from '@/types/atlas-tree';
+import { getAllocatableNeighbors, getStartingNodeIds, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected } from '@/lib/atlas-tree-utils';
+import { renderAtlasTree, hitTestNode, type RenderState } from '@/lib/atlas-canvas-renderer';
+import { initZoomLevels, preloadSprites, pickZoomLevel } from '@/lib/atlas-sprite-loader';
 
 interface TreeRendererProps {
   nodes: ProcessedAtlasNode[];
   rawNodes: Record<string, AtlasNodeData>;
   allocatedIds: Set<number>;
   onToggleNode: (nodeId: number) => void;
+  /** Allocate a list of node skills at once (for shortest-path selection). */
+  onAllocatePath: (nodeIds: number[]) => void;
   searchHighlight?: string;
+  sprites: AtlasSprites;
+  imageZoomLevels: number[];
+  bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  groups: Record<string, { x: number; y: number; background?: { image: string; offsetX?: number; offsetY?: number } }>;
 }
 
 interface TooltipState {
@@ -30,17 +41,41 @@ interface PanState {
   startPanY: number;
 }
 
-const MIN_ZOOM = 0.05;
-const MAX_ZOOM = 4;
-const ZOOM_SPEED = 0.003;
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 0.5;
+const ZOOM_SPEED = 0.002;
 
-function getNodeRadius(node: ProcessedAtlasNode): number {
-  switch (node.nodeType) {
-    case 'keystone': return 16;
-    case 'notable': return 14;
-    case 'mastery': return 10;
-    default: return 8;
-  }
+/**
+ * Clamps pan so the tree background never leaves the viewport.
+ * The tree world-space rect (bounds) scaled by zoom must cover the container.
+ */
+function clampPan(
+  px: number,
+  py: number,
+  currentZoom: number,
+  containerW: number,
+  containerH: number,
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+): { x: number; y: number } {
+  // Scaled tree edges in screen space = pan + worldCoord * zoom
+  // We want: pan + bounds.minX * zoom >= 0  (left edge stays in view)
+  //          pan + bounds.maxX * zoom <= containerW (right edge stays in view)
+  // => pan in [containerW - maxX*zoom, -minX*zoom]
+  // 10% margin so nodes near the edge aren't clipped
+  const treeW = (bounds.maxX - bounds.minX) * currentZoom;
+  const treeH = (bounds.maxY - bounds.minY) * currentZoom;
+  const marginX = treeW * 0.1;
+  const marginY = treeH * 0.1;
+
+  const minPanX = containerW - bounds.maxX * currentZoom - marginX;
+  const maxPanX = -bounds.minX * currentZoom + marginX;
+  const minPanY = containerH - bounds.maxY * currentZoom - marginY;
+  const maxPanY = -bounds.minY * currentZoom + marginY;
+
+  return {
+    x: Math.min(maxPanX, Math.max(minPanX, px)),
+    y: Math.min(maxPanY, Math.max(minPanY, py)),
+  };
 }
 
 function matchesSearch(node: ProcessedAtlasNode, query: string): boolean {
@@ -50,202 +85,30 @@ function matchesSearch(node: ProcessedAtlasNode, query: string): boolean {
   return node.stats.some((s) => s.toLowerCase().includes(lower));
 }
 
-function NodeShape({
-  node,
-  isAllocated,
-  isAllocatable,
-  isSearchMatch,
-  onMouseEnter,
-  onMouseLeave,
-  onClick,
-}: {
-  node: ProcessedAtlasNode;
-  isAllocated: boolean;
-  isAllocatable: boolean;
-  isSearchMatch: boolean;
-  onMouseEnter: (e: MouseEvent<SVGElement>) => void;
-  onMouseLeave: () => void;
-  onClick: () => void;
-}) {
-  const r = getNodeRadius(node);
-  const isMastery = node.nodeType === 'mastery';
-  const isClickable = !isMastery && (isAllocated || isAllocatable);
-
-  const fillColor = isAllocated ? '#AF6025' : '#3a3a3a';
-  const strokeColor = isAllocated
-    ? '#c8a862'
-    : isAllocatable
-      ? '#7a6d3a'
-      : '#555';
-  const strokeWidth = node.nodeType === 'notable' ? 2.5 : 1.5;
-
-  const searchGlow = isSearchMatch && !isAllocated
-    ? 'drop-shadow(0 0 6px #FFD700) drop-shadow(0 0 12px #FFD700)'
-    : undefined;
-  const allocatableGlow = isAllocatable && !isAllocated && !isSearchMatch
-    ? 'drop-shadow(0 0 4px #7a6d3a)'
-    : undefined;
-  const filterStyle = searchGlow ?? allocatableGlow;
-
-  const iconUrl = getIconUrl(node.icon);
-  const iconSize = r * 2;
-
-  if (node.nodeType === 'keystone') {
-    const half = r;
-    const points = `${node.x},${node.y - half} ${node.x + half},${node.y} ${node.x},${node.y + half} ${node.x - half},${node.y}`;
-    return (
-      <g
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        onClick={isClickable ? onClick : undefined}
-        className={cn(
-          'transition-colors duration-150',
-          isClickable && 'cursor-pointer',
-          isAllocatable && !isAllocated && 'animate-pulse',
-        )}
-        style={filterStyle ? { filter: filterStyle } : undefined}
-      >
-        <polygon
-          points={points}
-          fill={fillColor}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-        />
-        {iconUrl && (
-          <image
-            href={iconUrl}
-            x={node.x - r * 0.6}
-            y={node.y - r * 0.6}
-            width={r * 1.2}
-            height={r * 1.2}
-            style={{ pointerEvents: 'none', opacity: isAllocated ? 1 : 0.6 }}
-          />
-        )}
-      </g>
-    );
-  }
-
-  if (node.nodeType === 'mastery') {
-    return (
-      <g
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-      >
-        <circle
-          cx={node.x}
-          cy={node.y}
-          r={r}
-          fill="#2a1a3a"
-          stroke="#6a4a8a"
-          strokeWidth={1.5}
-          strokeDasharray="3 2"
-          className="transition-colors duration-150"
-        />
-        {iconUrl && (
-          <image
-            href={iconUrl}
-            x={node.x - r * 0.7}
-            y={node.y - r * 0.7}
-            width={r * 1.4}
-            height={r * 1.4}
-            style={{ pointerEvents: 'none', opacity: 0.7 }}
-          />
-        )}
-      </g>
-    );
-  }
-
-  return (
-    <g
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onClick={isClickable ? onClick : undefined}
-      className={cn(
-        'transition-colors duration-150',
-        isClickable && 'cursor-pointer',
-        isAllocatable && !isAllocated && 'animate-pulse',
-      )}
-      style={filterStyle ? { filter: filterStyle } : undefined}
-    >
-      <circle
-        cx={node.x}
-        cy={node.y}
-        r={r}
-        fill={fillColor}
-        stroke={strokeColor}
-        strokeWidth={strokeWidth}
-      />
-      {iconUrl && (
-        <image
-          href={iconUrl}
-          x={node.x - iconSize * 0.35}
-          y={node.y - iconSize * 0.35}
-          width={iconSize * 0.7}
-          height={iconSize * 0.7}
-          style={{ pointerEvents: 'none', opacity: isAllocated ? 1 : 0.5 }}
-        />
-      )}
-    </g>
-  );
-}
-
-// Tree coordinate bounds from GGG data
-const TREE_MIN_X = -6200;
-const TREE_MAX_X = 5900;
-const TREE_MIN_Y = -11200;
-const TREE_MAX_Y = 400;
-const TREE_WIDTH = TREE_MAX_X - TREE_MIN_X;
-const TREE_HEIGHT = TREE_MAX_Y - TREE_MIN_Y;
-const TREE_CENTER_X = (TREE_MIN_X + TREE_MAX_X) / 2;
-const TREE_CENTER_Y = (TREE_MIN_Y + TREE_MAX_Y) / 2;
-
-// GGG sprite base URL for node icons
-const SPRITE_BASE = 'https://web.poecdn.com/image';
-
-function getIconUrl(icon: string): string {
-  if (!icon) return '';
-  return `${SPRITE_BASE}/${icon}`;
-}
-
-function clampPan(
-  newPanX: number,
-  newPanY: number,
-  currentZoom: number,
-  containerWidth: number,
-  containerHeight: number,
-): { panX: number; panY: number } {
-  const scaledWidth = TREE_WIDTH * currentZoom;
-  const scaledHeight = TREE_HEIGHT * currentZoom;
-
-  // Allow panning only so tree edges stay at container edges (with some margin)
-  const margin = 100;
-  const offsetX = TREE_CENTER_X * currentZoom;
-  const offsetY = TREE_CENTER_Y * currentZoom;
-
-  const minPanX = containerWidth / 2 - scaledWidth / 2 - offsetX - margin;
-  const maxPanX = containerWidth / 2 + scaledWidth / 2 - offsetX + margin;
-  const minPanY = containerHeight / 2 - scaledHeight / 2 - offsetY - margin;
-  const maxPanY = containerHeight / 2 + scaledHeight / 2 - offsetY + margin;
-
-  return {
-    panX: Math.max(minPanX, Math.min(maxPanX, newPanX)),
-    panY: Math.max(minPanY, Math.min(maxPanY, newPanY)),
-  };
-}
-
 export function TreeRenderer({
   nodes,
   rawNodes,
   allocatedIds,
   onToggleNode,
+  onAllocatePath,
   searchHighlight,
+  sprites,
+  imageZoomLevels,
+  bounds,
+  groups,
 }: TreeRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(0.08);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [zoom, setZoom] = useState(MIN_ZOOM);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [initialized, setInitialized] = useState(false);
+  const [spritesReady, setSpritesReady] = useState(false);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const animTimeRef = useRef(0);
+  const rafIdRef = useRef(0);
+
   const panStateRef = useRef<PanState>({
     isPanning: false,
     startX: 0,
@@ -254,43 +117,29 @@ export function TreeRenderer({
     startPanY: 0,
   });
   const didDragRef = useRef(false);
-  const zoomRef = useRef(0.08);
+  const zoomRef = useRef(MIN_ZOOM);
+  const panRef = useRef({ x: 0, y: 0 });
+  // Tree dimensions from data
+  const treeWidth = bounds.maxX - bounds.minX;
+  const treeHeight = bounds.maxY - bounds.minY;
+  const treeCenterX = (bounds.minX + bounds.maxX) / 2;
+  const treeCenterY = (bounds.minY + bounds.maxY) / 2;
 
-  // Auto-fit tree to container on mount
+  // Initialize sprite system and preload
   useEffect(() => {
-    if (initialized || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const scaleX = rect.width / TREE_WIDTH;
-    const scaleY = rect.height / TREE_HEIGHT;
-    const fitZoom = Math.min(scaleX, scaleY) * 0.85;
-    const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, fitZoom));
+    initZoomLevels(imageZoomLevels, sprites);
+    const zoomKey = pickZoomLevel(MIN_ZOOM);
+    preloadSprites(sprites, zoomKey).then(() => {
+      setSpritesReady(true);
+    });
+  }, [sprites, imageZoomLevels]);
 
-    const centerX = rect.width / 2 - TREE_CENTER_X * clampedZoom;
-    const centerY = rect.height / 2 - TREE_CENTER_Y * clampedZoom;
-
-    zoomRef.current = clampedZoom;
-    setZoom(clampedZoom);
-    setPanX(centerX);
-    setPanY(centerY);
-    setInitialized(true);
-  }, [initialized]);
-
-  // Native wheel event listener with passive: false so we can preventDefault
+  // Preload next zoom level when zoom changes
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    function onWheel(e: globalThis.WheelEvent) {
-      e.preventDefault();
-      const delta = -e.deltaY * ZOOM_SPEED;
-      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current + delta * zoomRef.current));
-      zoomRef.current = newZoom;
-      setZoom(newZoom);
-    }
-
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, []);
+    if (!spritesReady) return;
+    const zoomKey = pickZoomLevel(zoom);
+    preloadSprites(sprites, zoomKey);
+  }, [zoom, sprites, spritesReady]);
 
   const allocatedStringIds = useMemo(
     () => new Set(Array.from(allocatedIds).map(String)),
@@ -304,144 +153,334 @@ export function TreeRenderer({
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, ProcessedAtlasNode>();
-    for (const n of nodes) {
-      map.set(n.id, n);
+    for (const n of nodes) map.set(n.id, n);
+    return map;
+  }, [nodes]);
+
+  const connections: AtlasConnection[] = useMemo(
+    () => buildConnections(nodes, nodeMap),
+    [nodes, nodeMap],
+  );
+
+  const searchMatchIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!searchHighlight) return ids;
+    for (const node of nodes) {
+      if (matchesSearch(node, searchHighlight)) ids.add(node.id);
+    }
+    return ids;
+  }, [nodes, searchHighlight]);
+
+  // Mastery group mapping — same name across different groups
+  const masteryGroupMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const node of nodes) {
+      if (!node.isMastery || !node.name) continue;
+      const list = map.get(node.name);
+      if (list) list.push(node.id);
+      else map.set(node.name, [node.id]);
     }
     return map;
   }, [nodes]);
 
-  // Build connection lines from the `out` edges
-  const connections = useMemo(() => {
-    const lines: Array<{ fromId: string; toId: string; x1: number; y1: number; x2: number; y2: number }> = [];
-    const seen = new Set<string>();
-    for (const node of nodes) {
-      for (const outId of node.out) {
-        const key = [node.id, outId].sort().join('-');
-        if (seen.has(key)) continue;
-        seen.add(key);
-        const target = nodeMap.get(outId);
-        if (!target) continue;
-        lines.push({
-          fromId: node.id,
-          toId: outId,
-          x1: node.x,
-          y1: node.y,
-          x2: target.x,
-          y2: target.y,
-        });
+  const hoveredMasteryName = useMemo(() => {
+    if (!hoveredNodeId) return null;
+    const node = nodeMap.get(hoveredNodeId);
+    if (!node?.isMastery) return null;
+    return node.name || null;
+  }, [hoveredNodeId, nodeMap]);
+
+  // Build render state for the canvas renderer
+  const startingNodeIds = useMemo(
+    () => getStartingNodeIds(rawNodes),
+    [rawNodes],
+  );
+
+  const hubNodeIds = useMemo(
+    () => getHubNodeIds(rawNodes),
+    [rawNodes],
+  );
+
+  // Compute hover preview: path that would be allocated or nodes that would be pruned
+  const { pathPreviewIds, prunePreviewIds } = useMemo(() => {
+    const emptySet = new Set<string>();
+    if (!hoveredNodeId) return { pathPreviewIds: emptySet, prunePreviewIds: emptySet };
+
+    const hoveredNode = nodeMap.get(hoveredNodeId);
+    if (!hoveredNode || hoveredNode.nodeType === 'mastery') return { pathPreviewIds: emptySet, prunePreviewIds: emptySet };
+
+    const isAllocated = allocatedIds.has(hoveredNode.skill);
+    const isAllocatable = allocatableNeighbors.has(hoveredNodeId);
+
+    if (isAllocated) {
+      // Preview: which nodes would be pruned if this is removed
+      const reachable = pruneDisconnected(hoveredNodeId, allocatedStringIds, rawNodes);
+      const wouldPrune = new Set<string>();
+      for (const id of allocatedStringIds) {
+        if (id !== hoveredNodeId && !reachable.has(id)) wouldPrune.add(id);
+      }
+      wouldPrune.add(hoveredNodeId);
+      return { pathPreviewIds: emptySet, prunePreviewIds: wouldPrune };
+    }
+
+    if (isAllocatable) {
+      // Single node allocation — just highlight that node
+      return { pathPreviewIds: new Set([hoveredNodeId]), prunePreviewIds: emptySet };
+    }
+
+    // Preview: shortest path that would be allocated
+    const fromSet = new Set(allocatedStringIds);
+    for (const h of hubNodeIds) fromSet.add(h);
+    const path = findShortestPath(rawNodes, fromSet, hoveredNodeId);
+    return { pathPreviewIds: new Set(path), prunePreviewIds: emptySet };
+  }, [hoveredNodeId, allocatedIds, allocatedStringIds, allocatableNeighbors, rawNodes, hubNodeIds, nodeMap]);
+
+  const renderState = useMemo((): RenderState => ({
+    nodes,
+    connections,
+    allocatedIds,
+    allocatableIds: allocatableNeighbors,
+    sprites,
+    bounds,
+    groups,
+    zoom,
+    panX,
+    panY,
+    hoveredNodeId,
+    searchMatchIds,
+    startingNodeIds,
+    pathPreviewIds,
+    prunePreviewIds,
+    hoveredMasteryName,
+    masteryGroupMap,
+    animTime: 0,
+    viewportWidth: 0,
+    viewportHeight: 0,
+  }), [nodes, connections, allocatedIds, allocatableNeighbors, sprites, bounds, groups, zoom, panX, panY, hoveredNodeId, searchMatchIds, startingNodeIds, pathPreviewIds, prunePreviewIds, hoveredMasteryName, masteryGroupMap]);
+
+  // Auto-fit tree to container on mount
+  useEffect(() => {
+    if (initialized || !containerRef.current || !spritesReady) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const scaleX = rect.width / treeWidth;
+    const scaleY = rect.height / treeHeight;
+    const fitZoom = Math.min(scaleX, scaleY) * 0.85;
+    const clampedZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, fitZoom));
+
+    const centerX = rect.width / 2 - treeCenterX * clampedZoom;
+    const centerY = rect.height / 2 - treeCenterY * clampedZoom;
+    const initPan = clampPan(centerX, centerY, clampedZoom, rect.width, rect.height, bounds);
+
+    zoomRef.current = clampedZoom;
+    panRef.current = initPan;
+    setZoom(clampedZoom);
+    setPanX(initPan.x);
+    setPanY(initPan.y);
+    setInitialized(true);
+  }, [initialized, spritesReady, treeWidth, treeHeight, treeCenterX, treeCenterY]);
+
+  // Resize canvas to match container
+  useEffect(() => {
+    const container = containerRef.current;
+    const canvas = canvasRef.current;
+    if (!container || !canvas) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // Determine if animation is needed (search or mastery highlight active)
+  const needsAnimation = searchMatchIds.size > 0 || hoveredMasteryName !== null;
+  const renderStateRef = useRef(renderState);
+  renderStateRef.current = renderState;
+
+  // Main render loop — runs rAF when animating, single frame otherwise
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container || !spritesReady) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+
+    function frame(timestamp: number) {
+      animTimeRef.current = timestamp;
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const rect = container!.getBoundingClientRect();
+      renderAtlasTree(ctx!, canvas!, {
+        ...renderStateRef.current,
+        animTime: timestamp,
+        viewportWidth: rect.width,
+        viewportHeight: rect.height,
+      });
+      if (needsAnimation) {
+        rafIdRef.current = requestAnimationFrame(frame);
       }
     }
-    return lines;
-  }, [nodes, nodeMap]);
 
-  const handleMouseDown = useCallback((e: MouseEvent<HTMLDivElement>) => {
+    rafIdRef.current = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(rafIdRef.current);
+  }, [renderState, spritesReady, needsAnimation]);
+
+  // Wheel zoom with zoom-toward-cursor
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    function onWheel(e: globalThis.WheelEvent) {
+      e.preventDefault();
+      const rect = el!.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const oldZoom = zoomRef.current;
+      const delta = -e.deltaY * ZOOM_SPEED;
+      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, oldZoom + delta * oldZoom));
+
+      // Zoom toward cursor
+      const worldX = (mouseX - panRef.current.x) / oldZoom;
+      const worldY = (mouseY - panRef.current.y) / oldZoom;
+      const rawPanX = mouseX - worldX * newZoom;
+      const rawPanY = mouseY - worldY * newZoom;
+
+      const clamped = clampPan(rawPanX, rawPanY, newZoom, rect.width, rect.height, bounds);
+      zoomRef.current = newZoom;
+      panRef.current = clamped;
+      setZoom(newZoom);
+      setPanX(clamped.x);
+      setPanY(clamped.y);
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  const handleMouseDown = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     didDragRef.current = false;
     panStateRef.current = {
       isPanning: true,
       startX: e.clientX,
       startY: e.clientY,
-      startPanX: panX,
-      startPanY: panY,
+      startPanX: panRef.current.x,
+      startPanY: panRef.current.y,
     };
-  }, [panX, panY]);
+  }, []);
 
-  const handleMouseMove = useCallback((e: MouseEvent<HTMLDivElement>) => {
-    if (!panStateRef.current.isPanning) return;
-    const dx = e.clientX - panStateRef.current.startX;
-    const dy = e.clientY - panStateRef.current.startY;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-      didDragRef.current = true;
-    }
+  const handleMouseMove = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    const clamped = clampPan(
-      panStateRef.current.startPanX + dx,
-      panStateRef.current.startPanY + dy,
-      zoomRef.current,
-      rect.width,
-      rect.height,
-    );
-    setPanX(clamped.panX);
-    setPanY(clamped.panY);
-  }, []);
 
-  const handleMouseUp = useCallback(() => {
+    if (panStateRef.current.isPanning) {
+      const dx = e.clientX - panStateRef.current.startX;
+      const dy = e.clientY - panStateRef.current.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        didDragRef.current = true;
+      }
+      const rawPanX = panStateRef.current.startPanX + dx;
+      const rawPanY = panStateRef.current.startPanY + dy;
+      const clamped = clampPan(rawPanX, rawPanY, zoomRef.current, rect.width, rect.height, bounds);
+      panRef.current = clamped;
+      setPanX(clamped.x);
+      setPanY(clamped.y);
+      setTooltip(null);
+      return;
+    }
+
+    // Hover hit test
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const hit = hitTestNode(mouseX, mouseY, renderState);
+
+    if (hit) {
+      setHoveredNodeId(hit.id);
+      setTooltip({ node: hit, screenX: e.clientX, screenY: e.clientY });
+    } else {
+      setHoveredNodeId(null);
+      setTooltip(null);
+    }
+  }, [renderState]);
+
+  const handleMouseUp = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
+    const wasPanning = panStateRef.current.isPanning;
     panStateRef.current.isPanning = false;
-  }, []);
 
-  const handleNodeEnter = useCallback((node: ProcessedAtlasNode, e: MouseEvent<SVGElement>) => {
-    setTooltip({
-      node,
-      screenX: e.clientX,
-      screenY: e.clientY,
-    });
-  }, []);
+    if (!wasPanning || didDragRef.current) return;
 
-  const handleNodeLeave = useCallback(() => {
+    // Click — check if a node was hit
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const hit = hitTestNode(mouseX, mouseY, renderState);
+
+    if (hit && hit.nodeType !== 'mastery') {
+      const isAllocated = allocatedIds.has(hit.skill);
+      const isAllocatable = allocatableNeighbors.has(hit.id);
+      if (isAllocated) {
+        onToggleNode(hit.skill);
+      } else if (isAllocatable) {
+        onToggleNode(hit.skill);
+      } else {
+        // Find shortest path — use hubs as root when nothing is allocated
+        const fromSet = new Set(allocatedStringIds);
+        for (const h of hubNodeIds) fromSet.add(h);
+        const path = findShortestPath(rawNodes, fromSet, hit.id);
+        if (path.length > 0) {
+          const pathSkills = path
+            .map((id) => rawNodes[id]?.skill)
+            .filter((s): s is number => s != null);
+          if (pathSkills.length > 0) {
+            onAllocatePath(pathSkills);
+          }
+        }
+      }
+    }
+  }, [renderState, allocatedIds, allocatedStringIds, allocatableNeighbors, hubNodeIds, onToggleNode, onAllocatePath, rawNodes]);
+
+  const handleMouseLeave = useCallback(() => {
+    panStateRef.current.isPanning = false;
     setTooltip(null);
+    setHoveredNodeId(null);
   }, []);
-
-  const handleNodeClick = useCallback((nodeId: number) => {
-    if (didDragRef.current) return;
-    onToggleNode(nodeId);
-  }, [onToggleNode]);
 
   return (
     <div
       ref={containerRef}
-      className="relative h-full w-full overflow-hidden bg-poe-bg"
+      className="relative h-full w-full overflow-hidden bg-[#060911]"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+      style={{ cursor: panStateRef.current.isPanning ? 'grabbing' : hoveredNodeId ? 'pointer' : 'grab', userSelect: 'none' }}
     >
-      <svg
+      <canvas
+        ref={canvasRef}
         className="h-full w-full"
         style={{ userSelect: 'none' }}
-      >
-        <g transform={`translate(${panX}, ${panY}) scale(${zoom})`}>
-          {/* Connection lines */}
-          {connections.map((conn) => {
-            const bothAllocated =
-              allocatedStringIds.has(conn.fromId) && allocatedStringIds.has(conn.toId);
-            return (
-              <line
-                key={`${conn.fromId}-${conn.toId}`}
-                x1={conn.x1}
-                y1={conn.y1}
-                x2={conn.x2}
-                y2={conn.y2}
-                stroke={bothAllocated ? '#AF6025' : '#333'}
-                strokeWidth={bothAllocated ? 2 : 1}
-                strokeOpacity={bothAllocated ? 0.9 : 0.4}
-                className="transition-colors duration-200"
-              />
-            );
-          })}
+      />
 
-          {/* Nodes */}
-          {nodes.map((node) => {
-            const isAllocated = allocatedIds.has(node.skill);
-            const isAllocatable = allocatableNeighbors.has(node.id);
-            const isSearchMatch = matchesSearch(node, searchHighlight ?? '');
-
-            return (
-              <NodeShape
-                key={node.id}
-                node={node}
-                isAllocated={isAllocated}
-                isAllocatable={isAllocatable}
-                isSearchMatch={isSearchMatch}
-                onMouseEnter={(e) => handleNodeEnter(node, e)}
-                onMouseLeave={handleNodeLeave}
-                onClick={() => handleNodeClick(node.skill)}
-              />
-            );
-          })}
-        </g>
-      </svg>
+      {/* Loading overlay */}
+      {!spritesReady && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#060911]">
+          <p className="text-sm text-poe-text-muted">Loading atlas tree...</p>
+        </div>
+      )}
 
       {/* Tooltip overlay */}
       {tooltip && (
@@ -456,6 +495,7 @@ export function TreeRenderer({
             'text-sm font-semibold',
             tooltip.node.isKeystone ? 'text-poe-currency' :
             tooltip.node.isNotable ? 'text-poe-gold' :
+            tooltip.node.isWormhole ? 'text-poe-unique' :
             'text-poe-text',
           )}>
             {tooltip.node.name}
@@ -467,6 +507,11 @@ export function TreeRenderer({
               ))}
             </ul>
           )}
+          {tooltip.node.reminderText && tooltip.node.reminderText.length > 0 && (
+            <p className="mt-1 text-xs italic text-poe-text-muted">
+              {tooltip.node.reminderText.join(' ')}
+            </p>
+          )}
           {tooltip.node.flavourText && tooltip.node.flavourText.length > 0 && (
             <p className="mt-1.5 border-t border-poe-border/30 pt-1.5 text-xs italic text-poe-unique">
               {tooltip.node.flavourText.join(' ')}
@@ -477,7 +522,7 @@ export function TreeRenderer({
 
       {/* Zoom indicator */}
       <div className="absolute bottom-3 right-3 rounded bg-poe-panel/80 px-2 py-1 text-xs text-poe-text-muted">
-        {Math.round(zoom * 100)}%
+        {Math.round(((zoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)) * 100)}%
       </div>
     </div>
   );
