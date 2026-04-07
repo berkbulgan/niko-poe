@@ -124,7 +124,7 @@ export function aggregateStats(nodes: AtlasNodeData[]): AggregatedStat[] {
 
       const existing = statMap.get(parsed.template);
       if (existing) {
-        existing.total += parsed.value;
+        existing.total = Math.round((existing.total + parsed.value) * 1e10) / 1e10;
         existing.count += 1;
       } else {
         statMap.set(parsed.template, {

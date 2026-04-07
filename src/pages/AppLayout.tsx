@@ -1,11 +1,11 @@
 // ABOUTME: Authenticated app shell — sidebar navigation, league selector, user section.
 // ABOUTME: Rendered as the root layout route; child routes render via <Outlet />.
 
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
-import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu, Settings } from 'lucide-react';
+import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface NavItemProps {
   href: string;
@@ -40,6 +40,7 @@ export function AppLayout() {
   const { leagues, currentLeague, setLeague } = useLeague();
   const { pathname } = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(() => window.innerWidth < 1280);
 
   const navItems = [
     { href: '/dashboard', icon: <Zap size={18} />, label: 'Dashboard' },
@@ -64,59 +65,108 @@ export function AppLayout() {
       {/* Sidebar */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-40 flex h-screen w-56 flex-col overflow-hidden border-r border-poe-border/40 bg-poe-bg
-          transition-transform duration-200 lg:static lg:translate-x-0
+          fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-poe-border/40 bg-poe-bg
+          transition-all duration-200 lg:static lg:translate-x-0
+          ${navCollapsed ? 'w-14' : 'w-56'}
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        {/* Logo */}
-        <div className="flex h-14 items-center border-b border-poe-border/30 px-4">
-          <Link to="/dashboard" className="font-display text-sm tracking-[0.25em] text-poe-gold">
-            N.I.K.O.
-          </Link>
+        {/* Logo + collapse toggle */}
+        <div className="flex h-14 items-center justify-between border-b border-poe-border/30 px-3">
+          {!navCollapsed && (
+            <Link to="/dashboard" className="font-display text-sm tracking-[0.25em] text-poe-gold">
+              N.I.K.O.
+            </Link>
+          )}
+          <button
+            onClick={() => setNavCollapsed((prev) => !prev)}
+            className="hidden rounded p-1 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-text lg:block"
+            title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {navCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          </button>
         </div>
 
         {/* Navigation */}
         <nav className="mt-4 flex-1 space-y-0.5 overflow-y-auto" aria-label="Main navigation">
           {navItems.map((item) => (
-            <NavItem
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              label={item.label}
-              active={pathname === item.href}
-              dimmed={'requiresAuth' in item && item.requiresAuth && !isAuthenticated}
-            />
+            navCollapsed ? (
+              <Link
+                key={item.href}
+                to={item.href}
+                title={item.label}
+                className={`
+                  flex items-center justify-center py-2.5 transition-all duration-150
+                  ${pathname === item.href
+                    ? 'border-r-2 border-poe-gold bg-poe-gold/5 text-poe-gold'
+                    : 'requiresAuth' in item && item.requiresAuth && !isAuthenticated
+                      ? 'text-poe-text-muted opacity-50 hover:bg-poe-panel-light hover:opacity-70'
+                      : 'text-poe-text-dim hover:bg-poe-panel-light hover:text-poe-text'
+                  }
+                `}
+              >
+                {item.icon}
+              </Link>
+            ) : (
+              <NavItem
+                key={item.href}
+                href={item.href}
+                icon={item.icon}
+                label={item.label}
+                active={pathname === item.href}
+                dimmed={'requiresAuth' in item && item.requiresAuth && !isAuthenticated}
+              />
+            )
           ))}
         </nav>
 
         {/* League selector */}
-        <div className="mx-4 mt-auto">
-          <label className="mb-1 block text-[10px] tracking-wider text-poe-text-muted">
-            LEAGUE
-          </label>
-          <select
-            value={currentLeague}
-            onChange={(e) => setLeague(e.target.value)}
-            className="w-full border border-poe-border/40 bg-poe-panel px-2 py-1.5 text-xs text-poe-text focus:border-poe-gold/50 focus:outline-none"
-          >
-            {leagues.map((l) => (
-              <option key={l.id} value={l.id}>{l.text}</option>
-            ))}
-          </select>
-        </div>
+        {!navCollapsed && (
+          <div className="mx-4 mt-auto">
+            <label className="mb-1 block text-[10px] tracking-wider text-poe-text-muted">
+              LEAGUE
+            </label>
+            <select
+              value={currentLeague}
+              onChange={(e) => setLeague(e.target.value)}
+              className="w-full border border-poe-border/40 bg-poe-panel px-2 py-1.5 text-xs text-poe-text focus:border-poe-gold/50 focus:outline-none"
+            >
+              {leagues.map((l) => (
+                <option key={l.id} value={l.id}>{l.text}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Divider */}
-        <div className="mx-4 mt-3 h-px bg-poe-border/30" aria-hidden="true" />
+        {!navCollapsed && <div className="mx-4 mt-3 h-px bg-poe-border/30" aria-hidden="true" />}
 
         {/* User section */}
-        <div className="p-4">
-          {isAuthenticated && user !== null ? (
+        <div className={navCollapsed ? 'p-2' : 'p-4'}>
+          {navCollapsed ? (
+            <div className="flex justify-center">
+              {isAuthenticated ? (
+                <button
+                  onClick={() => { void logout(); }}
+                  className="rounded p-1.5 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-error"
+                  title="Logout"
+                >
+                  <LogOut size={16} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => { void login(); }}
+                  disabled={isLoading}
+                  className="rounded p-1.5 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-gold disabled:opacity-50"
+                  title="Login with GGG"
+                >
+                  <Zap size={16} />
+                </button>
+              )}
+            </div>
+          ) : isAuthenticated && user !== null ? (
             <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className="truncate text-sm text-poe-text">{user.displayName}</p>
-                <p className="truncate text-xs text-poe-text-muted">@{user.username}</p>
-              </div>
+              <p className="min-w-0 truncate text-xs text-poe-text-muted">@<span className="text-poe-text">{user.username}</span></p>
               <button
                 onClick={() => { void logout(); }}
                 className="shrink-0 rounded p-1.5 text-poe-text-muted transition-colors hover:bg-poe-panel-light hover:text-poe-error"

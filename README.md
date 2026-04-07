@@ -5,7 +5,7 @@
 ## Features
 
 - **Strategy Calculator** — Build map strategies with scarabs, delirium orbs, chisels; calculate cost per map and total investment with live prices from [poe.watch](https://poe.watch)
-- **Atlas Tree Helper** — Interactive passive tree viewer for planning atlas strategies
+- **Atlas Tree Planner** — Canvas-based interactive atlas passive tree with GGG sprite sheets, shortest-path allocation, deallocation pruning, mastery group highlighting, wormhole visualization, and saved build management
 - **Regex Filter Builder** — Create and test regex patterns for stash tab searching with 313 precomputed optimization patterns (250 char limit)
 - **Trade Search** — Search the PoE Trade API using your built map configurations; find maps matching your strategy filters with rate-limited queries
 - **Map Mod Picker** — Two-column avoid/prefer selection with danger values (data from [poe-vendor-string](https://github.com/veiset/poe-vendor-string))
@@ -55,24 +55,33 @@ npm run build
 
 ```
 niko-poe/
-├── src/                        # React frontend
-│   ├── pages/                  # Route pages (Dashboard, Filters, Strategies, AtlasTree, Stash)
-│   ├── components/             # UI + feature components
+├── public/atlas/                       # GGG sprite sheets (5 zoom levels, ~10MB)
+├── src/                                # React frontend
+│   ├── pages/                          # Route pages (Dashboard, Filters, Strategies, AtlasTree, Stash)
+│   ├── components/
+│   │   ├── atlas-tree/                 # Canvas tree renderer + stats panel
+│   │   ├── filters/                    # Map mod picker
+│   │   ├── strategies/                 # Strategy cost builder
+│   │   └── ui/                         # Shared UI primitives
+│   ├── data/atlas-tree-data.json       # GGG league.json (nodes, sprites, groups)
 │   ├── lib/
-│   │   ├── ipc.ts              # Typed Tauri IPC wrappers
-│   │   ├── platform.ts         # Browser API abstraction
-│   │   ├── auth-context.tsx    # GGG OAuth state
-│   │   ├── league-context.tsx  # Active league selection
-│   │   └── hooks/              # TanStack Query data hooks
-│   └── types/                  # Shared TypeScript types
-├── src-tauri/                  # Rust backend
+│   │   ├── ipc.ts                      # Typed Tauri IPC wrappers
+│   │   ├── platform.ts                 # Browser API abstraction
+│   │   ├── atlas-canvas-renderer.ts    # Canvas rendering engine (6 layers)
+│   │   ├── atlas-sprite-loader.ts      # Sprite sheet loading + caching
+│   │   ├── atlas-tree-utils.ts         # Tree processing, BFS, pruning
+│   │   ├── auth-context.tsx            # GGG OAuth state
+│   │   ├── league-context.tsx          # Active league selection
+│   │   └── hooks/                      # TanStack Query data hooks
+│   └── types/                          # Shared TypeScript types
+├── src-tauri/                          # Rust backend
 │   └── src/
-│       ├── commands/           # IPC command handlers (CRUD, trade, auth, stash)
-│       ├── db/                 # SQLite migrations
-│       ├── state.rs            # Shared app state (DB, caches, tokens)
-│       └── lib.rs              # Plugin registration
-├── .github/workflows/          # Release CI/CD
-└── scripts/                    # Updater key generation
+│       ├── commands/                   # IPC command handlers (CRUD, trade, auth, stash)
+│       ├── db/                         # SQLite migrations
+│       ├── state.rs                    # Shared app state (DB, caches, tokens)
+│       └── lib.rs                      # Plugin registration
+├── .github/workflows/                  # Release CI/CD
+└── scripts/                            # Updater key generation
 ```
 
 ## Contributing
@@ -85,7 +94,7 @@ Found a bug or have a feature request? Please [open an issue](https://github.com
 ## Roadmap
 
 - [x] Strategy cost calculator with live pricing
-- [x] Atlas passive tree helper
+- [x] Atlas passive tree planner (Canvas + GGG sprites)
 - [x] Regex filter builder + presets
 - [x] PoE Trade search with rate limiting
 - [x] Tauri v2 desktop migration

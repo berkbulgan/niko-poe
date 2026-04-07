@@ -54,6 +54,7 @@ struct ProfileResponse {
 
 /// Public profile info returned to the frontend after login.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GggProfile {
     pub account_name: String,
     pub expires_at: i64,
