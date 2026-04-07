@@ -26,9 +26,11 @@ const LeagueContext = createContext<LeagueContextValue | null>(null);
 const LEAGUE_STORAGE_KEY = 'niko_league';
 
 // Fallback used when the IPC call fails or returns an empty list.
+const DEFAULT_LEAGUE = 'Mirage';
+
 const FALLBACK_LEAGUES: League[] = [
+  { id: 'Mirage', text: 'Mirage' },
   { id: 'Standard', text: 'Standard' },
-  { id: 'Settlers', text: 'Settlers of Kalguur' },
 ];
 
 const ONE_HOUR = 60 * 60 * 1000;
@@ -45,7 +47,7 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
     : FALLBACK_LEAGUES;
 
   const [currentLeague, setCurrentLeague] = useState(() => {
-    return storage.get(LEAGUE_STORAGE_KEY) ?? FALLBACK_LEAGUES[0].id;
+    return storage.get(LEAGUE_STORAGE_KEY) ?? DEFAULT_LEAGUE;
   });
 
   // When the league list loads, validate the stored selection against it.
