@@ -1,7 +1,7 @@
-// ABOUTME: Stash page — displays GGG stash tabs and their item contents.
-// ABOUTME: Requires authentication; shows a login prompt when user is not signed in.
+// ABOUTME: Stash page — displays GGG stash tabs with expandable folders and sortable item table.
+// ABOUTME: Requires authentication; filters out rare items; shows Name, Quantity, Price, Total columns.
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
@@ -22,6 +22,7 @@ function stashTypeIcon(stashType: string): string {
     case 'UniqueStash': return '⭐';
     case 'PremiumStash': return '📦';
     case 'QuadStash': return '🗃️';
+    case 'Folder': return '📁';
     default: return '📋';
   }
 }
@@ -31,7 +32,32 @@ function colorStyle(colour: StashColor | null): string {
   return `bg-[rgb(${colour.r},${colour.g},${colour.b})]`;
 }
 
-// ── StashTabList ──────────────────────────────────────────────────────────────
+/** Parse price from note like "~price 1 chaos" or "~b/o 5 divine" */
+function parsePrice(note: string | null): { amount: number; currency: string } | null {
+  if (!note) return null;
+  const match = note.match(/~(?:price|b\/o)\s+([\d.]+)\s+(\S+)/);
+  if (!match) return null;
+  const amount = parseFloat(match[1]);
+  if (Number.isNaN(amount)) return null;
+  return { amount, currency: match[2] };
+}
+
+/** Is this a rare item? frameType 2 = Rare */
+function isRareItem(item: StashItem): boolean {
+  return item.frameType === 2;
+}
+
+// ── Sort types ───────────────────────────────────────────────────────────────
+
+type SortColumn = 'name' | 'quantity' | 'price' | 'total';
+type SortDirection = 'asc' | 'desc';
+
+interface SortState {
+  column: SortColumn;
+  direction: SortDirection;
+}
+
+// ── StashTabList (with expandable folders) ───────────────────────────────────
 
 interface StashTabListProps {
   tabs: StashTab[];
@@ -39,104 +65,238 @@ interface StashTabListProps {
   onSelect: (id: string) => void;
 }
 
+function StashTabItem({
+  tab,
+  depth,
+  selectedId,
+  onSelect,
+}: {
+  tab: StashTab;
+  depth: number;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = tab.children.length > 0;
+  const isFolder = tab.stashType === 'Folder' || hasChildren;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          if (isFolder) {
+            setExpanded((prev) => !prev);
+          } else {
+            onSelect(tab.id);
+          }
+        }}
+        className={`
+          flex w-full items-center gap-2 px-3 py-1.5 text-left transition-all duration-100
+          ${selectedId === tab.id && !isFolder
+            ? 'border-r-2 border-poe-gold bg-poe-gold/8 text-poe-gold'
+            : 'border-r-2 border-transparent text-poe-text-dim hover:bg-poe-panel-light/30 hover:text-poe-text'
+          }
+        `}
+        style={{ paddingLeft: `${12 + depth * 16}px` }}
+      >
+        {isFolder && (
+          <span className="shrink-0 text-xs text-poe-text-muted">
+            {expanded ? '▾' : '▸'}
+          </span>
+        )}
+        <span
+          className={`h-2.5 w-2.5 shrink-0 rounded-sm ${colorStyle(tab.colour)}`}
+          aria-hidden="true"
+        />
+        <span className="text-xs" aria-hidden="true">
+          {stashTypeIcon(tab.stashType)}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-sm">{tab.name}</span>
+      </button>
+      {isFolder && expanded && tab.children.map((child) => (
+        <StashTabItem
+          key={child.id}
+          tab={child}
+          depth={depth + 1}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
+      ))}
+    </>
+  );
+}
+
 function StashTabList({ tabs, selectedId, onSelect }: StashTabListProps) {
   return (
     <div className="space-y-px p-1">
       {tabs.map((tab) => (
-        <button
+        <StashTabItem
           key={tab.id}
-          type="button"
-          onClick={() => onSelect(tab.id)}
-          className={`
-            flex w-full items-center gap-2.5 px-3 py-2 text-left transition-all duration-100
-            ${selectedId === tab.id
-              ? 'border-r-2 border-poe-gold bg-poe-gold/8 text-poe-gold'
-              : 'border-r-2 border-transparent text-poe-text-dim hover:bg-poe-panel-light/30 hover:text-poe-text'
-            }
-          `}
-        >
-          {/* Colour indicator */}
-          <span
-            className={`h-3 w-3 shrink-0 rounded-sm ${colorStyle(tab.colour)}`}
-            aria-hidden="true"
-          />
-          {/* Type icon */}
-          <span className="text-xs" aria-hidden="true">
-            {stashTypeIcon(tab.stashType)}
-          </span>
-          {/* Name */}
-          <span className="min-w-0 flex-1 truncate text-sm">{tab.name}</span>
-          {/* Index */}
-          <span className="shrink-0 text-xs text-poe-text-muted">{tab.index}</span>
-        </button>
+          tab={tab}
+          depth={0}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );
 }
 
-// ── StashItemGrid ─────────────────────────────────────────────────────────────
+// ── StashItemTable (sortable, no rares) ──────────────────────────────────────
 
-interface StashItemGridProps {
-  items: StashItem[];
-}
-
-function StashItemCard({ item }: { item: StashItem }) {
-  const displayName = item.name !== '' ? item.name : item.typeLine;
+function SortHeader({
+  label,
+  column,
+  sort,
+  onSort,
+  align,
+}: {
+  label: string;
+  column: SortColumn;
+  sort: SortState;
+  onSort: (col: SortColumn) => void;
+  align?: 'left' | 'right';
+}) {
+  const active = sort.column === column;
+  const arrow = active ? (sort.direction === 'desc' ? ' ▾' : ' ▴') : '';
 
   return (
-    <div className="group relative flex flex-col gap-1.5 border border-poe-border/20 bg-poe-panel p-2 transition-colors hover:border-poe-gold/30 hover:bg-poe-panel-light">
-      {/* Icon */}
-      <div className="flex items-center justify-center">
-        {item.icon !== '' ? (
-          <img
-            src={item.icon}
-            alt={displayName}
-            className="h-10 w-10 object-contain"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-10 w-10 items-center justify-center text-xl text-poe-text-muted">
-            ?
-          </div>
-        )}
-      </div>
-
-      {/* Stack size badge */}
-      {item.stackSize !== null && item.stackSize > 1 && (
-        <span className="absolute right-1 top-1 text-xs font-semibold text-poe-currency">
-          {item.stackSize}
-        </span>
-      )}
-
-      {/* Name */}
-      <p className="truncate text-center text-xs text-poe-text" title={displayName}>
-        {displayName}
-      </p>
-
-      {/* Price note */}
-      {item.note !== null && item.note !== '' && (
-        <p className="truncate text-center text-xs text-poe-currency" title={item.note}>
-          {item.note}
-        </p>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={() => onSort(column)}
+      className={`text-xs font-medium ${active ? 'text-poe-gold' : 'text-poe-text-dim hover:text-poe-text'} ${align === 'right' ? 'text-right' : 'text-left'}`}
+    >
+      {label}{arrow}
+    </button>
   );
 }
 
-function StashItemGrid({ items }: StashItemGridProps) {
-  if (items.length === 0) {
+interface ProcessedItem {
+  id: string;
+  name: string;
+  icon: string;
+  quantity: number;
+  priceAmount: number;
+  priceCurrency: string;
+  total: number;
+}
+
+function StashItemTable({ items }: { items: StashItem[] }) {
+  const [sort, setSort] = useState<SortState>({ column: 'total', direction: 'desc' });
+
+  const processedItems = useMemo(() => {
+    return items
+      .filter((item) => !isRareItem(item))
+      .map((item): ProcessedItem => {
+        const displayName = item.name !== '' ? item.name : item.typeLine;
+        const quantity = item.stackSize ?? 1;
+        const price = parsePrice(item.note);
+        const priceAmount = price?.amount ?? 0;
+        const priceCurrency = price?.currency ?? '';
+        const total = priceAmount * quantity;
+
+        return {
+          id: item.id,
+          name: displayName,
+          icon: item.icon,
+          quantity,
+          priceAmount,
+          priceCurrency,
+          total,
+        };
+      });
+  }, [items]);
+
+  const sortedItems = useMemo(() => {
+    const sorted = [...processedItems];
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      switch (sort.column) {
+        case 'name':
+          cmp = a.name.localeCompare(b.name);
+          break;
+        case 'quantity':
+          cmp = a.quantity - b.quantity;
+          break;
+        case 'price':
+          cmp = a.priceAmount - b.priceAmount;
+          break;
+        case 'total':
+          cmp = a.total - b.total;
+          break;
+      }
+      return sort.direction === 'desc' ? -cmp : cmp;
+    });
+    return sorted;
+  }, [processedItems, sort]);
+
+  function handleSort(column: SortColumn) {
+    setSort((prev) => ({
+      column,
+      direction: prev.column === column && prev.direction === 'desc' ? 'asc' : 'desc',
+    }));
+  }
+
+  if (processedItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-sm text-poe-text-dim">This tab is empty</p>
+        <p className="text-sm text-poe-text-dim">No items to display</p>
+        <p className="mt-1 text-xs text-poe-text-muted">This tab is empty or contains only rare items</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-2 p-4">
-      {items.map((item) => (
-        <StashItemCard key={item.id} item={item} />
-      ))}
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-poe-border/30">
+            <th className="px-4 py-2 text-left">
+              <SortHeader label="Item" column="name" sort={sort} onSort={handleSort} />
+            </th>
+            <th className="w-24 px-4 py-2 text-right">
+              <SortHeader label="Qty" column="quantity" sort={sort} onSort={handleSort} align="right" />
+            </th>
+            <th className="w-32 px-4 py-2 text-right">
+              <SortHeader label="Price" column="price" sort={sort} onSort={handleSort} align="right" />
+            </th>
+            <th className="w-32 px-4 py-2 text-right">
+              <SortHeader label="Total" column="total" sort={sort} onSort={handleSort} align="right" />
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedItems.map((item) => (
+            <tr
+              key={item.id}
+              className="border-b border-poe-border/10 transition-colors hover:bg-poe-panel-light/20"
+            >
+              <td className="px-4 py-1.5">
+                <div className="flex items-center gap-2">
+                  {item.icon !== '' && (
+                    <img src={item.icon} alt="" className="h-6 w-6 object-contain" loading="lazy" />
+                  )}
+                  <span className="truncate text-sm text-poe-text">{item.name}</span>
+                </div>
+              </td>
+              <td className="px-4 py-1.5 text-right text-sm tabular-nums text-poe-text-dim">
+                {item.quantity}
+              </td>
+              <td className="px-4 py-1.5 text-right text-sm tabular-nums text-poe-text-dim">
+                {item.priceAmount > 0 ? (
+                  <span>{item.priceAmount} {item.priceCurrency}</span>
+                ) : (
+                  <span className="text-poe-text-muted">—</span>
+                )}
+              </td>
+              <td className="px-4 py-1.5 text-right text-sm font-medium tabular-nums text-poe-currency">
+                {item.total > 0 ? item.total.toFixed(1) : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -226,6 +386,7 @@ export function Stash() {
   // ── Main layout ───────────────────────────────────────────────────────────
 
   const tabList = tabs ?? [];
+  const selectedTab = findTab(tabList, selectedTabId);
 
   return (
     <div className="flex h-full gap-0 overflow-hidden">
@@ -233,7 +394,7 @@ export function Stash() {
       <aside className="flex w-56 shrink-0 flex-col border-r border-poe-border/30 xl:w-64">
         <div className="flex items-center justify-between border-b border-poe-border/20 px-3 py-3">
           <h2 className="text-sm font-semibold text-poe-text-dim">Stash Tabs</h2>
-          <span className="text-xs text-poe-text-muted">{tabList.length}</span>
+          <span className="text-xs text-poe-text-muted">{countLeafTabs(tabList)}</span>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -258,9 +419,7 @@ export function Stash() {
       <main className="flex flex-1 flex-col overflow-hidden">
         <div className="flex items-center border-b border-poe-border/20 px-4 py-3 lg:px-6">
           <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">
-            {selectedTabId !== null
-              ? (tabList.find((t) => t.id === selectedTabId)?.name ?? 'Tab Contents')
-              : 'Select a tab'}
+            {selectedTab ? selectedTab.name : 'Select a tab'}
           </h3>
           {itemsLoading && (
             <Spinner size="sm" className="ml-3" />
@@ -279,10 +438,34 @@ export function Stash() {
               <Spinner size="lg" />
             </div>
           ) : (
-            <StashItemGrid items={items ?? []} />
+            <StashItemTable items={items ?? []} />
           )}
         </div>
       </main>
     </div>
   );
+}
+
+// ── Tree utilities ───────────────────────────────────────────────────────────
+
+function findTab(tabs: StashTab[], id: string | null): StashTab | undefined {
+  if (!id) return undefined;
+  for (const tab of tabs) {
+    if (tab.id === id) return tab;
+    const found = findTab(tab.children, id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function countLeafTabs(tabs: StashTab[]): number {
+  let count = 0;
+  for (const tab of tabs) {
+    if (tab.children.length > 0) {
+      count += countLeafTabs(tab.children);
+    } else {
+      count += 1;
+    }
+  }
+  return count;
 }

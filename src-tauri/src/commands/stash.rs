@@ -62,6 +62,9 @@ pub struct StashItem {
     pub identified: Option<bool>,
     pub corrupted: Option<bool>,
     pub ilvl: Option<u32>,
+    /// Item rarity frame type: 0=Normal, 1=Magic, 2=Rare, 3=Unique, 4=Gem, 5=Currency, 6=Divination, 7=Quest, 8=Prophecy, 9=Foil
+    #[serde(default)]
+    pub frame_type: Option<u32>,
 }
 
 /// GGG stash tabs list response shape.

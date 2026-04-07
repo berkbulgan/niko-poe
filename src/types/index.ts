@@ -229,4 +229,6 @@ export interface StashItem {
   identified: boolean | null;
   corrupted: boolean | null;
   ilvl: number | null;
+  /** Item rarity: 0=Normal, 1=Magic, 2=Rare, 3=Unique, 4=Gem, 5=Currency, 6=Divination, 7=Quest, 8=Prophecy, 9=Foil */
+  frameType: number | null;
 }
