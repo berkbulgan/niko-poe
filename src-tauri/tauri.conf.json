@@ -1,6 +1,6 @@
 {
   "productName": "niko",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "identifier": "com.niko.app",
   "build": {
     "frontendDist": "../dist",
@@ -26,7 +26,9 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,7 +41,9 @@
       "nsis": {
         "displayLanguageSelector": false,
         "installMode": "currentUser",
-        "languages": ["English"]
+        "languages": [
+          "English"
+        ]
       },
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
