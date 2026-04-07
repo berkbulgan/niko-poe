@@ -2,11 +2,13 @@
 // ABOUTME: Requires authentication; filters out rare items; shows Name, Quantity, Price, Total columns.
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { useStashTabs, useStashContents } from '@/lib/hooks/use-stash';
+import { lookupItemPrices } from '@/lib/ipc';
 import type { StashTab, StashItem, StashColor } from '@/types/index';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -182,7 +184,7 @@ interface ProcessedItem {
   total: number;
 }
 
-function StashItemTable({ items }: { items: StashItem[] }) {
+function StashItemTable({ items, priceMap }: { items: StashItem[]; priceMap: Record<string, number> }) {
   const [sort, setSort] = useState<SortState>({ column: 'total', direction: 'desc' });
 
   const processedItems = useMemo(() => {
@@ -191,9 +193,11 @@ function StashItemTable({ items }: { items: StashItem[] }) {
       .map((item): ProcessedItem => {
         const displayName = item.name !== '' ? item.name : item.typeLine;
         const quantity = item.stackSize ?? 1;
-        const price = parsePrice(item.note);
-        const priceAmount = price?.amount ?? 0;
-        const priceCurrency = price?.currency ?? '';
+        // Try poe.watch price first (by name or typeLine), fall back to player note
+        const watchPrice = priceMap[displayName] ?? priceMap[item.typeLine] ?? 0;
+        const notePrice = parsePrice(item.note);
+        const priceAmount = watchPrice > 0 ? watchPrice : (notePrice?.amount ?? 0);
+        const priceCurrency = watchPrice > 0 ? 'chaos' : (notePrice?.currency ?? '');
         const total = priceAmount * quantity;
 
         return {
@@ -206,7 +210,7 @@ function StashItemTable({ items }: { items: StashItem[] }) {
           total,
         };
       });
-  }, [items]);
+  }, [items, priceMap]);
 
   const sortedItems = useMemo(() => {
     const sorted = [...processedItems];
@@ -319,6 +323,25 @@ export function Stash() {
     data: items,
     isLoading: itemsLoading,
   } = useStashContents(currentLeague, selectedTabId ?? '');
+
+  // Collect unique item names from non-rare items and look up poe.watch prices
+  const itemNames = useMemo(() => {
+    if (!items) return [];
+    const names = new Set<string>();
+    for (const item of items) {
+      if (isRareItem(item)) continue;
+      const name = item.name !== '' ? item.name : item.typeLine;
+      if (name) names.add(name);
+    }
+    return Array.from(names);
+  }, [items]);
+
+  const { data: priceMap } = useQuery({
+    queryKey: ['item-prices', currentLeague, itemNames],
+    queryFn: () => lookupItemPrices(itemNames, currentLeague),
+    enabled: itemNames.length > 0,
+    staleTime: 15 * 60 * 1000,
+  });
 
   // ── Not authenticated ─────────────────────────────────────────────────────
 
@@ -438,7 +461,7 @@ export function Stash() {
               <Spinner size="lg" />
             </div>
           ) : (
-            <StashItemTable items={items ?? []} />
+            <StashItemTable items={items ?? []} priceMap={priceMap ?? {}} />
           )}
         </div>
       </main>

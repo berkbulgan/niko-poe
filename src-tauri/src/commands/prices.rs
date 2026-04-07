@@ -146,3 +146,132 @@ pub async fn get_prices(
 
     Ok(result)
 }
+
+/// Categories to search when looking up item prices by name.
+const LOOKUP_CATEGORIES: &[&str] = &[
+    "currency",
+    "essence",
+    "card",
+    "scarab",
+    "fossil",
+    "resonator",
+    "oil",
+    "catalyst",
+    "fragment",
+    "delirium-orb",
+    "vial",
+    "incubator",
+    "map",
+];
+
+/// Looks up prices for a list of item names across multiple poe.watch categories.
+/// Returns a map of item name → price (chaos). Uses cached data when available.
+/// Items not found in any category are omitted from the result.
+#[tauri::command]
+pub async fn lookup_item_prices(
+    item_names: Vec<String>,
+    league: String,
+    state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<String, f64>> {
+    let mut result = std::collections::HashMap::new();
+    if item_names.is_empty() {
+        return Ok(result);
+    }
+
+    // Build a set for O(1) lookups
+    let name_set: std::collections::HashSet<String> = item_names
+        .iter()
+        .map(|n| n.to_lowercase())
+        .collect();
+
+    for &cat in LOOKUP_CATEGORIES {
+        let key = cache_key(&league, cat);
+
+        // Try cache first
+        let cached_items = {
+            let cache = state.price_cache.lock().await;
+            cache.entries.get(&key).and_then(|entry| {
+                if entry.fetched_at.elapsed().as_secs() < cache.ttl_secs {
+                    Some(entry.items.clone())
+                } else {
+                    None
+                }
+            })
+        };
+
+        let items = if let Some(cached) = cached_items {
+            cached
+        } else {
+            // Fetch from poe.watch
+            let url = format!(
+                "{}?league={}&category={}",
+                POE_WATCH_BASE,
+                urlencoding::encode(&league),
+                urlencoding::encode(cat)
+            );
+
+            let client = reqwest::Client::new();
+            let resp = client
+                .get(&url)
+                .header("User-Agent", USER_AGENT)
+                .send()
+                .await;
+
+            match resp {
+                Ok(r) if r.status().is_success() => {
+                    let raw: serde_json::Value = r
+                        .json()
+                        .await
+                        .map_err(|e| Error::Parse(e.to_string()))?;
+                    let raw_arr = raw.as_array().cloned().unwrap_or_default();
+
+                    let fetched: Vec<PoeWatchItem> = raw_arr
+                        .into_iter()
+                        .filter_map(|obj| {
+                            Some(PoeWatchItem {
+                                id: obj["id"].as_i64()?,
+                                name: obj["name"].as_str()?.to_owned(),
+                                category: obj["category"].as_str().unwrap_or("").to_owned(),
+                                mean: obj["mean"].as_f64().unwrap_or(0.0),
+                                daily: obj["daily"].as_f64().unwrap_or(0.0),
+                                change: obj["change"].as_f64().unwrap_or(0.0),
+                                low_confidence: obj["lowConfidence"].as_bool().unwrap_or(true),
+                                icon: obj["icon"].as_str().unwrap_or("").to_owned(),
+                            })
+                        })
+                        .collect();
+
+                    // Cache it
+                    {
+                        let mut cache = state.price_cache.lock().await;
+                        cache.entries.insert(
+                            key,
+                            crate::state::PriceCacheEntry {
+                                items: fetched.clone(),
+                                fetched_at: std::time::Instant::now(),
+                            },
+                        );
+                    }
+
+                    fetched
+                }
+                _ => continue, // Skip this category on error
+            }
+        };
+
+        // Match items by name (case-insensitive)
+        for item in &items {
+            let lower = item.name.to_lowercase();
+            if name_set.contains(&lower) && !result.contains_key(&item.name) && item.mean > 0.0 {
+                result.insert(item.name.clone(), item.mean);
+            }
+        }
+
+        // Early exit if all names found
+        if result.len() >= item_names.len() {
+            break;
+        }
+    }
+
+    Ok(result)
+}

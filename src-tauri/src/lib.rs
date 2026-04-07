@@ -21,7 +21,7 @@ use commands::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
         update_filter_preset,
     },
-    prices::get_prices,
+    prices::{get_prices, lookup_item_prices},
     regex_filters::{
         create_regex_filter, delete_regex_filter, get_regex_filter, get_regex_filters,
         update_regex_filter,
@@ -120,6 +120,7 @@ pub fn run() {
             proxy_search,
             // prices (Phase 3)
             get_prices,
+            lookup_item_prices,
             // auth (Phase 4)
             start_oauth_login,
             get_ggg_profile,

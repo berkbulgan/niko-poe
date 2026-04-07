@@ -146,6 +146,11 @@ export function getPrices(category: string, league: string): Promise<PriceItem[]
   return invoke<PriceItem[]>('get_prices', { category, league });
 }
 
+/** Looks up prices for a list of item names from poe.watch across multiple categories. */
+export function lookupItemPrices(itemNames: string[], league: string): Promise<Record<string, number>> {
+  return invoke<Record<string, number>>('lookup_item_prices', { itemNames, league });
+}
+
 // --- GGG Auth ---
 
 /** Opens the GGG OAuth PKCE flow in the system browser. Resolves when login completes. */
