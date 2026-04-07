@@ -210,9 +210,9 @@ export function Filters() {
   }
 
   return (
-    <div className="flex h-full gap-0 overflow-hidden">
+    <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
       {/* ── Left panel: Presets ── */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-poe-border/30 xl:w-72">
+      <aside className="flex w-48 shrink-0 flex-col border-r border-poe-border/30 xl:w-56">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-poe-border/20 px-3 py-3">
           <h2 className="text-sm font-semibold text-poe-text-dim">Presets</h2>

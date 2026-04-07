@@ -23,6 +23,10 @@ import type { StrategyConfig, StrategyItem } from '@/lib/hooks/use-strategies';
 import { useFilterPresets, type FilterPreset } from '@/lib/hooks/use-filter-presets';
 import { useAtlasTrees, type AtlasTreeParsed } from '@/lib/hooks/use-atlas-trees';
 import { openExternal } from '@/lib/platform';
+import rawTreeData from '@/data/atlas-tree-data.json';
+import type { AtlasTreeRawData } from '@/types/atlas-tree';
+
+const treeData = rawTreeData as unknown as AtlasTreeRawData;
 
 // ── Types ──
 
@@ -352,7 +356,23 @@ function LinkedAtlasTreeSection({
   onSelect: (id: string | null) => void;
 }) {
   const selectedTree = trees.find((t) => t.id === selectedTreeId);
-  const nodeCount = selectedTree?.config?.allocatedNodes?.length ?? 0;
+  const nodeCount = selectedTree?.config?.allocatedNodeIds?.length ?? 0;
+  const maxPoints = treeData.points?.totalPoints ?? 138;
+
+  // Resolve keystone and notable data from allocated IDs
+  const { keystones, notables } = useMemo(() => {
+    if (!selectedTree) return { keystones: [], notables: [] };
+    const ks: Array<{ name: string; stats: string[] }> = [];
+    const ns: Array<{ name: string; stats: string[] }> = [];
+    for (const id of selectedTree.config.allocatedNodeIds) {
+      const node = treeData.nodes[String(id)];
+      if (!node?.name) continue;
+      if (node.isKeystone) ks.push({ name: node.name, stats: node.stats });
+      else if (node.isNotable) ns.push({ name: node.name, stats: node.stats });
+    }
+    return { keystones: ks, notables: ns };
+  }, [selectedTree]);
+
 
   return (
     <div className="space-y-2 border border-poe-border/20 bg-poe-panel/20 p-4">
@@ -372,13 +392,39 @@ function LinkedAtlasTreeSection({
       </select>
 
       {selectedTree && (
-        <div className="flex items-center justify-between border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
-          <div className="text-xs text-poe-text-dim">
-            <span className="text-poe-text">{selectedTree.name}</span>
-            <span className="ml-2 text-poe-text-muted">
-              ({nodeCount} node{nodeCount !== 1 ? 's' : ''} allocated)
+        <div className="border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
+          <div className="flex items-center justify-between">
+            <span className={`text-sm font-semibold tabular-nums ${nodeCount > maxPoints ? 'text-poe-error' : 'text-poe-gold'}`}>
+              {nodeCount}/{maxPoints}
             </span>
+            <span className="text-xs text-poe-text-muted">Nodes Allocated</span>
           </div>
+          {keystones.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {keystones.map((ks) => (
+                <span
+                  key={ks.name}
+                  title={ks.stats.join('\n')}
+                  className="cursor-help rounded border border-poe-currency/30 bg-poe-currency/10 px-1.5 py-0.5 text-[10px] font-medium text-poe-currency"
+                >
+                  {ks.name}
+                </span>
+              ))}
+            </div>
+          )}
+          {notables.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {notables.map((n) => (
+                <span
+                  key={n.name}
+                  title={n.stats.join('\n')}
+                  className="cursor-help rounded border border-poe-gold/25 bg-poe-gold/8 px-1.5 py-0.5 text-[10px] text-poe-gold"
+                >
+                  {n.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

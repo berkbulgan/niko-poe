@@ -32,7 +32,7 @@ export function Settings() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
 
   return (
-    <div className="flex h-full gap-0 overflow-hidden">
+    <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
       {/* Left sidebar */}
       <aside className="flex w-48 shrink-0 flex-col border-r border-poe-border/30 xl:w-56">
         <div className="border-b border-poe-border/20 px-3 py-3">
