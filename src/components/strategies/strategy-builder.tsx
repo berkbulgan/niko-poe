@@ -21,6 +21,7 @@ import {
 } from '@/lib/hooks/use-prices';
 import type { StrategyConfig, StrategyItem } from '@/lib/hooks/use-strategies';
 import { useFilterPresets, type FilterPreset } from '@/lib/hooks/use-filter-presets';
+import { useAtlasTrees, type AtlasTreeParsed } from '@/lib/hooks/use-atlas-trees';
 import { openExternal } from '@/lib/platform';
 
 // ── Types ──
@@ -341,6 +342,49 @@ function LinkedPresetSection({
   );
 }
 
+function LinkedAtlasTreeSection({
+  trees,
+  selectedTreeId,
+  onSelect,
+}: {
+  trees: AtlasTreeParsed[];
+  selectedTreeId: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  const selectedTree = trees.find((t) => t.id === selectedTreeId);
+  const nodeCount = selectedTree?.config?.allocatedNodes?.length ?? 0;
+
+  return (
+    <div className="space-y-2 border border-poe-border/20 bg-poe-panel/20 p-4">
+      <h4 className="text-xs font-medium tracking-wide text-poe-text-dim">
+        Linked Atlas Tree
+      </h4>
+
+      <select
+        value={selectedTreeId ?? ''}
+        onChange={(e) => onSelect(e.target.value || null)}
+        className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
+      >
+        <option value="">No atlas tree linked</option>
+        {trees.map((t) => (
+          <option key={t.id} value={t.id}>{t.name}</option>
+        ))}
+      </select>
+
+      {selectedTree && (
+        <div className="flex items-center justify-between border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
+          <div className="text-xs text-poe-text-dim">
+            <span className="text-poe-text">{selectedTree.name}</span>
+            <span className="ml-2 text-poe-text-muted">
+              ({nodeCount} node{nodeCount !== 1 ? 's' : ''} allocated)
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ──
 
 export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyBuilder(_props, ref) {
@@ -352,13 +396,16 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
   const [mapCount, setMapCount] = useState(100);
   const [showPicker, setShowPicker] = useState(false);
   const [filterPresetId, setFilterPresetId] = useState<string | null>(null);
+  const [atlasTreeId, setAtlasTreeId] = useState<string | null>(null);
 
   const { data: priceData, isLoading: pricesLoading } = usePrices(category, currentLeague);
   const { data: filterPresets } = useFilterPresets();
+  const { data: atlasTrees } = useAtlasTrees();
   const divinePrice = useDivinePrice(currentLeague);
 
   const items = priceData ?? [];
   const presets = filterPresets ?? [];
+  const trees = atlasTrees ?? [];
 
   // ── Calculations ──
 
@@ -430,6 +477,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
       averageMapCost,
       mapCount,
       filterPresetId,
+      atlasTreeId,
     }),
     loadConfig: (config: StrategyConfig) => {
       setSelectedItems(
@@ -446,6 +494,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
       setAverageMapCost(config.averageMapCost);
       setMapCount(config.mapCount);
       setFilterPresetId(config.filterPresetId ?? null);
+      setAtlasTreeId(config.atlasTreeId ?? null);
     },
   }));
 
@@ -458,6 +507,13 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
         presets={presets}
         selectedPresetId={filterPresetId}
         onSelect={setFilterPresetId}
+      />
+
+      {/* ── Linked Atlas Tree ── */}
+      <LinkedAtlasTreeSection
+        trees={trees}
+        selectedTreeId={atlasTreeId}
+        onSelect={setAtlasTreeId}
       />
 
       {/* ── Item Picker ── */}

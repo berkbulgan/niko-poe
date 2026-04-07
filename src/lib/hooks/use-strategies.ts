@@ -20,6 +20,7 @@ export interface StrategyConfig {
   averageMapCost: number;
   mapCount: number;
   filterPresetId: string | null;
+  atlasTreeId: string | null;
 }
 
 // Parsed view of a Strategy — config as an object instead of a JSON string.
