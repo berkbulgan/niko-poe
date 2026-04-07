@@ -27,6 +27,8 @@ const GGG_PROFILE_URL: &str = "https://www.pathofexile.com/api/profile";
 const OAUTH_TIMEOUT_SECS: u64 = 120;
 const OAUTH_PORT: u16 = 14782;
 const OAUTH_CALLBACK_PATH: &str = "/callback";
+const USER_AGENT: &str = "OAuth niko/0.1.0 (contact: berkbulgan@gmail.com)";
+const OAUTH_SCOPES: &str = "account:profile account:stashes account:leagues";
 
 /// PKCE parameters generated before opening the browser.
 struct PkceParams {
@@ -87,6 +89,7 @@ async fn exchange_code_for_tokens(
         ("redirect_uri", redirect_uri),
         ("client_id", GGG_CLIENT_ID),
         ("code_verifier", code_verifier),
+        ("scope", OAUTH_SCOPES),
     ];
 
     let response = client
@@ -176,9 +179,10 @@ pub async fn start_oauth_login(
     // Build the GGG authorization URL.
     let state_param = URL_SAFE_NO_PAD.encode(rand::thread_rng().gen::<[u8; 16]>());
     let auth_url = format!(
-        "{}?client_id={}&response_type=code&scope=account:profile+account:stashes+account:item_filter&redirect_uri={}&state={}&code_challenge={}&code_challenge_method=S256",
+        "{}?client_id={}&response_type=code&scope={}&redirect_uri={}&state={}&code_challenge={}&code_challenge_method=S256",
         GGG_AUTH_URL,
         GGG_CLIENT_ID,
+        urlencoding::encode(OAUTH_SCOPES),
         urlencoding::encode(&redirect_uri),
         state_param,
         pkce.code_challenge,
@@ -209,13 +213,12 @@ pub async fn start_oauth_login(
         .ok_or_else(|| Error::Auth("callback URL missing 'code' parameter".into()))?;
 
     // Exchange the authorization code for tokens.
-    let http_client = reqwest::Client::new();
+    let http_client = reqwest::Client::builder()
+        .user_agent(USER_AGENT)
+        .build()
+        .map_err(|e| Error::Network(e.to_string()))?;
     let token_response =
         exchange_code_for_tokens(&code, &redirect_uri, &pkce.code_verifier, &http_client).await?;
-
-    let refresh_token = token_response
-        .refresh_token
-        .ok_or_else(|| Error::Auth("GGG did not return a refresh_token".into()))?;
 
     let expires_at =
         chrono::Utc::now().timestamp() + token_response.expires_in;
@@ -226,7 +229,7 @@ pub async fn start_oauth_login(
 
     let token_state = GggTokenState {
         access_token: token_response.access_token,
-        refresh_token,
+        refresh_token: token_response.refresh_token,
         expires_at,
         account_name: account_name.clone(),
     };
@@ -281,11 +284,14 @@ pub async fn refresh_ggg_token(
         let guard = state.ggg_token.lock().await;
         guard
             .as_ref()
-            .map(|t| t.refresh_token.clone())
-            .ok_or_else(|| Error::Auth("not logged in — no refresh token available".into()))?
+            .and_then(|t| t.refresh_token.clone())
+            .ok_or_else(|| Error::Auth("no refresh token available".into()))?
     };
 
-    let http_client = reqwest::Client::new();
+    let http_client = reqwest::Client::builder()
+        .user_agent(USER_AGENT)
+        .build()
+        .map_err(|e| Error::Network(e.to_string()))?;
     let params = [
         ("grant_type", "refresh_token"),
         ("refresh_token", refresh_token.as_str()),
@@ -315,7 +321,7 @@ pub async fn refresh_ggg_token(
 
     let new_refresh = token_response
         .refresh_token
-        .unwrap_or(refresh_token);
+        .or(Some(refresh_token));
 
     let expires_at = chrono::Utc::now().timestamp() + token_response.expires_in;
 

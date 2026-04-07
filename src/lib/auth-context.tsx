@@ -48,9 +48,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async () => {
-    await startOAuthLogin();
-    const profile = await getGggProfile();
-    setUser(profile !== null ? profileToUser(profile) : null);
+    try {
+      await startOAuthLogin();
+      const profile = await getGggProfile();
+      setUser(profile !== null ? profileToUser(profile) : null);
+    } catch (err: unknown) {
+      console.error('[auth] login failed:', JSON.stringify(err));
+      throw err;
+    }
   }, []);
 
   const logout = useCallback(async () => {

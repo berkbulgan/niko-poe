@@ -109,7 +109,7 @@ pub struct PoeWatchItem {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GggTokenState {
     pub access_token: String,
-    pub refresh_token: String,
+    pub refresh_token: Option<String>,
     /// Unix timestamp (seconds) when the access token expires.
     pub expires_at: i64,
     pub account_name: String,
