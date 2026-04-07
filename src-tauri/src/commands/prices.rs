@@ -29,81 +29,57 @@ pub async fn fetch_all_prices(
         cache.is_loading = true;
     }
 
-    // Step 1: Fetch compact data (id + mean only)
-    let compact_url = format!(
+    // Fetch all items from compact endpoint — returns { items: [{id, name, mean, ...}] }
+    let url = format!(
         "{}?league={}&all=true",
         POE_WATCH_COMPACT,
         urlencoding::encode(&league),
     );
 
-    let compact_resp = state.http_client
-        .get(&compact_url)
+    let resp = state.http_client
+        .get(&url)
         .send()
         .await
         .map_err(|e| Error::Network(e.to_string()))?;
 
-    if !compact_resp.status().is_success() {
+    if !resp.status().is_success() {
         let mut cache = state.compact_prices.lock().await;
         cache.is_loading = false;
         return Err(Error::Network(format!(
             "poe.watch compact fetch failed: {}",
-            compact_resp.status()
+            resp.status()
         )));
     }
 
-    let compact_raw: serde_json::Value = compact_resp
+    let raw: serde_json::Value = resp
         .json()
         .await
         .map_err(|e| Error::Parse(e.to_string()))?;
 
-    // Build id→mean map from compact data
-    let mut id_to_mean: HashMap<i64, f64> = HashMap::new();
-    if let Some(arr) = compact_raw.as_array() {
-        for entry in arr {
-            if let (Some(id), Some(mean)) = (entry["id"].as_i64(), entry["mean"].as_f64()) {
-                if mean > 0.0 {
-                    id_to_mean.insert(id, mean);
-                }
-            }
-        }
-    }
-
-    // Step 2: Fetch itemdata (id + name mapping) from the get endpoint with category=all
-    let itemdata_url = format!(
-        "{}?league={}&category=all",
-        POE_WATCH_GET,
-        urlencoding::encode(&league),
-    );
-
-    let itemdata_resp = state.http_client
-        .get(&itemdata_url)
-        .send()
-        .await;
+    // Response is { items: [ {id, name, mean, category, frame, ...}, ... ] }
+    let items_arr = raw
+        .get("items")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
 
     let mut name_to_price: HashMap<String, f64> = HashMap::new();
 
-    match itemdata_resp {
-        Ok(resp) if resp.status().is_success() => {
-            let raw: serde_json::Value = resp
-                .json()
-                .await
-                .map_err(|e| Error::Parse(e.to_string()))?;
+    for item in &items_arr {
+        let name = match item["name"].as_str() {
+            Some(n) if !n.is_empty() => n,
+            _ => continue,
+        };
+        let mean = match item["mean"].as_f64() {
+            Some(m) if m > 0.0 => m,
+            _ => continue,
+        };
 
-            if let Some(arr) = raw.as_array() {
-                for item in arr {
-                    if let (Some(id), Some(name)) = (item["id"].as_i64(), item["name"].as_str()) {
-                        if let Some(&mean) = id_to_mean.get(&id) {
-                            let key = name.to_lowercase();
-                            // Keep the first (usually more relevant) entry per name
-                            name_to_price.entry(key).or_insert(mean);
-                        }
-                    }
-                }
-            }
-        }
-        _ => {
-            // If itemdata fails, fall back to compact-only (no name resolution)
-            // Still usable but lookup_prices won't find matches
+        let key = name.to_lowercase();
+        // Keep highest-mean entry when duplicates exist (e.g. different gem levels)
+        let entry = name_to_price.entry(key).or_insert(0.0);
+        if mean > *entry {
+            *entry = mean;
         }
     }
 
