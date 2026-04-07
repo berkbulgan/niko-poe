@@ -68,10 +68,16 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 
 ## External APIs
 
-- **PoE Trade**: `www.pathofexile.com/api/trade2/` — rate limited, proxied through Rust
+- **PoE Trade**: `www.pathofexile.com/api/trade/` — rate limited, proxied through Rust (PoE 1 uses `/api/trade/`, NOT `/api/trade2/`)
 - **poe.watch**: `poe.watch/api` — price data, 15-min cache
 - **GGG OAuth**: `oauth.pathofexile.com` — PKCE flow, localhost callback via tauri-plugin-oauth
 - **GGG Stash**: `api.pathofexile.com/stash/` — requires OAuth token
+
+## Git Workflow
+
+- **NEVER commit directly to `main`**. All work happens on `dev` branch.
+- Release flow: `dev` → PR → `main` → tag.
+- Default working branch: `dev`.
 
 ## Placeholders That Need Real Values
 
