@@ -1,4 +1,4 @@
-// ABOUTME: Atlas skill tree planner page with saved build sidebar, SVG tree canvas, and stats panel.
+// ABOUTME: Atlas skill tree planner page with saved build sidebar, Canvas tree, and stats panel.
 // ABOUTME: Manages allocated node state, undo history, save/load/import/share/delete operations.
 
 import { useState, useMemo, useCallback, type FormEvent } from 'react';
@@ -15,14 +15,13 @@ import {
   useDuplicateAtlasTree,
   useImportAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
-import { processTreeData } from '@/lib/atlas-tree-utils';
-import { canDeallocate } from '@/lib/atlas-tree-utils';
+import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type {
   AtlasTreeRawData,
-  AtlasTree,
+  AtlasTree as AtlasTreeType,
   AtlasTreeConfig,
   AtlasNodeData,
 } from '@/types/atlas-tree';
@@ -126,7 +125,7 @@ function AtlasTreeRow({
   onSelect,
   onDuplicate,
 }: {
-  tree: AtlasTree;
+  tree: AtlasTreeType;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
@@ -195,23 +194,29 @@ export function AtlasTree() {
     return result;
   }, [allocatedIds, rawNodes]);
 
+  // Bounds from GGG data
+  const bounds = useMemo(() => ({
+    minX: treeData.min_x,
+    minY: treeData.min_y,
+    maxX: treeData.max_x,
+    maxY: treeData.max_y,
+  }), []);
+
   const pushHistory = useCallback((current: Set<number>) => {
     setHistory((prev) => [...prev.slice(-49), current]);
   }, []);
 
   const handleToggleNode = useCallback((nodeId: number) => {
     setAllocatedIds((prev) => {
-      const next = new Set(prev);
       if (prev.has(nodeId)) {
-        // Deallocate: check tree connectivity
+        // Deallocate: remove node and prune anything disconnected from root
         const stringIds = new Set(Array.from(prev).map(String));
-        if (!canDeallocate(String(nodeId), stringIds, rawNodes)) {
-          return prev;
-        }
-        next.delete(nodeId);
-      } else {
-        next.add(nodeId);
+        const reachable = pruneDisconnected(String(nodeId), stringIds, rawNodes);
+        pushHistory(prev);
+        return new Set(Array.from(reachable).map(Number));
       }
+      const next = new Set(prev);
+      next.add(nodeId);
       pushHistory(prev);
       return next;
     });
@@ -230,6 +235,16 @@ export function AtlasTree() {
     setAllocatedIds(new Set());
   }, [allocatedIds, pushHistory]);
 
+  const handleAllocatePath = useCallback((nodeIds: number[]) => {
+    if (nodeIds.length === 0) return;
+    setAllocatedIds((prev) => {
+      pushHistory(prev);
+      const next = new Set(prev);
+      for (const id of nodeIds) next.add(id);
+      return next;
+    });
+  }, [pushHistory]);
+
   function buildConfig(): AtlasTreeConfig {
     return {
       allocatedNodeIds: Array.from(allocatedIds),
@@ -244,9 +259,9 @@ export function AtlasTree() {
     });
   }
 
-  const overwriteMutation = useMutation<AtlasTree, Error, { config: AtlasTreeConfig }>({
+  const overwriteMutation = useMutation<AtlasTreeType, Error, { config: AtlasTreeConfig }>({
     mutationFn: async ({ config }) => {
-      return ipc.updateAtlasTree(activeTreeId!, { config: JSON.stringify(config) }) as Promise<AtlasTree>;
+      return ipc.updateAtlasTree(activeTreeId!, { config: JSON.stringify(config) }) as Promise<AtlasTreeType>;
     },
     onSettled: () => { void queryClient.invalidateQueries({ queryKey: ['atlas-trees'] }); },
   });
@@ -257,7 +272,7 @@ export function AtlasTree() {
     overwriteMutation.mutate({ config });
   }
 
-  function handleDuplicate(tree: AtlasTree) {
+  function handleDuplicate(tree: AtlasTreeType) {
     duplicateTree.mutate(
       { name: `${tree.name} (copy)`, config: tree.config },
       {
@@ -270,7 +285,7 @@ export function AtlasTree() {
     );
   }
 
-  function handleLoadTree(tree: AtlasTree) {
+  function handleLoadTree(tree: AtlasTreeType) {
     setActiveTreeId(tree.id);
     setAllocatedIds(new Set(tree.config.allocatedNodeIds));
     setHistory([]);
@@ -321,7 +336,7 @@ export function AtlasTree() {
         <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-2">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Atlas Skill Tree</h3>
-            <span className="text-xs text-poe-text-muted">
+            <span className={`text-xs ${allocatedIds.size > MAX_POINTS ? 'text-poe-error font-semibold' : 'text-poe-text-muted'}`}>
               {allocatedIds.size} / {MAX_POINTS} pts
             </span>
           </div>
@@ -360,8 +375,22 @@ export function AtlasTree() {
             rawNodes={rawNodes}
             allocatedIds={allocatedIds}
             onToggleNode={handleToggleNode}
+            onAllocatePath={handleAllocatePath}
             searchHighlight={searchQuery}
+            sprites={treeData.sprites}
+            imageZoomLevels={treeData.imageZoomLevels}
+            bounds={bounds}
+            groups={treeData.groups}
           />
+
+          {/* Over-limit toast */}
+          {allocatedIds.size > MAX_POINTS && (
+            <div className="absolute right-4 top-4 rounded border border-poe-error/40 bg-poe-panel/95 px-4 py-2 shadow-lg backdrop-blur-sm">
+              <p className="text-sm font-semibold text-poe-error">
+                {allocatedIds.size - MAX_POINTS} point{allocatedIds.size - MAX_POINTS > 1 ? 's' : ''} over limit
+              </p>
+            </div>
+          )}
 
           {/* Search bar overlay at bottom */}
           <div className="absolute bottom-4 left-1/2 w-80 -translate-x-1/2">

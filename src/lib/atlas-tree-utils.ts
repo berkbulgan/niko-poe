@@ -8,6 +8,7 @@ import type {
   AtlasTreeConstants,
   AtlasTreeRawData,
   ProcessedAtlasNode,
+  AtlasConnection,
   AggregatedStat,
 } from '@/types/atlas-tree';
 
@@ -44,6 +45,7 @@ export function calculateNodePosition(
 // ---------------------------------------------------------------------------
 
 function resolveNodeType(node: AtlasNodeData): AtlasNodeType {
+  if (node.isWormhole) return 'wormhole';
   if (node.isKeystone) return 'keystone';
   if (node.isNotable) return 'notable';
   if (node.isMastery) return 'mastery';
@@ -52,14 +54,19 @@ function resolveNodeType(node: AtlasNodeData): AtlasNodeType {
 
 /**
  * Converts the raw GGG tree export into a flat array of processed nodes with
- * calculated x,y positions and resolved node types.
+ * calculated x,y positions and resolved node types. Hub nodes (nameless
+ * structural connectors) are excluded — they are handled transparently
+ * by getAllocatableNeighbors.
  */
 export function processTreeData(raw: AtlasTreeRawData): ProcessedAtlasNode[] {
+  const hubs = getHubNodeIds(raw.nodes);
   const processed: ProcessedAtlasNode[] = [];
 
   for (const [id, node] of Object.entries(raw.nodes)) {
     // Skip special nodes like "root" that lack standard fields
     if (!node.skill && !node.name) continue;
+    // Skip hub nodes — invisible structural connectors
+    if (hubs.has(id)) continue;
     const group = raw.groups[String(node.group)];
     if (!group) continue;
 
@@ -224,17 +231,17 @@ export function findShortestPath(
 // ---------------------------------------------------------------------------
 
 /**
- * Finds the starting node IDs reachable from "root" through hidden hub nodes.
- * In GGG data, root → hub (no name) → starting small passives.
+ * Returns the set of hidden hub node IDs — nodes reachable from root that have
+ * no visible name. These are structural connectors in the GGG data, not real
+ * passives the player allocates. Hub nodes may still carry a `skill` number.
  */
-export function getStartingNodeIds(
+export function getHubNodeIds(
   nodes: Record<string, AtlasNodeData>,
 ): Set<string> {
-  const starting = new Set<string>();
+  const hubs = new Set<string>();
   const root = nodes['root'];
-  if (!root) return starting;
+  if (!root) return hubs;
 
-  // BFS through nodes with no name (hidden hubs) to find first real nodes
   const queue = [...root.out];
   const visited = new Set<string>(['root']);
 
@@ -246,11 +253,43 @@ export function getStartingNodeIds(
     const node = nodes[id];
     if (!node) continue;
 
-    if (!node.name && !node.skill) {
-      // Hidden hub — keep traversing
+    if (!node.name) {
+      hubs.add(id);
       queue.push(...node.out);
-    } else {
-      starting.add(id);
+    }
+  }
+
+  return hubs;
+}
+
+/**
+ * Finds the starting node IDs reachable from "root" through hidden hub nodes.
+ * In GGG data, root → hub (no name) → starting small passives.
+ */
+export function getStartingNodeIds(
+  nodes: Record<string, AtlasNodeData>,
+): Set<string> {
+  const hubs = getHubNodeIds(nodes);
+  const starting = new Set<string>();
+
+  for (const hubId of hubs) {
+    const hub = nodes[hubId];
+    if (!hub) continue;
+
+    for (const neighborId of hub.out) {
+      if (!hubs.has(neighborId) && neighborId !== 'root' && nodes[neighborId]) {
+        starting.add(neighborId);
+      }
+    }
+  }
+
+  // Also check root's direct children that aren't hubs
+  const root = nodes['root'];
+  if (root) {
+    for (const id of root.out) {
+      if (!hubs.has(id) && nodes[id]) {
+        starting.add(id);
+      }
     }
   }
 
@@ -261,6 +300,8 @@ export function getStartingNodeIds(
  * Returns the set of node IDs that are adjacent to any currently allocated node
  * but are not themselves allocated. These are the valid next allocations.
  * When nothing is allocated, returns the starting nodes from root.
+ * Hub nodes (nameless structural connectors) are treated as always-allocated so
+ * they act as transparent bridges between tree branches.
  */
 export function getAllocatableNeighbors(
   nodes: Record<string, AtlasNodeData>,
@@ -271,24 +312,33 @@ export function getAllocatableNeighbors(
     return getStartingNodeIds(nodes);
   }
 
+  const hubs = getHubNodeIds(nodes);
+
+  // Effective allocated = real allocations + all hub nodes (transparent connectors)
+  const effective = new Set(allocatedIds);
+  for (const h of hubs) effective.add(h);
+
   const neighbors = new Set<string>();
 
-  for (const id of allocatedIds) {
+  for (const id of effective) {
     const node = nodes[id];
     if (!node) continue;
 
     for (const out of node.out) {
-      if (!allocatedIds.has(out) && nodes[out]) {
+      if (!effective.has(out) && nodes[out]) {
         neighbors.add(out);
       }
     }
 
     for (const inp of node.in) {
-      if (!allocatedIds.has(inp) && nodes[inp]) {
+      if (!effective.has(inp) && nodes[inp]) {
         neighbors.add(inp);
       }
     }
   }
+
+  // Never offer hub nodes themselves as allocatable
+  for (const h of hubs) neighbors.delete(h);
 
   return neighbors;
 }
@@ -300,7 +350,8 @@ export function getAllocatableNeighbors(
 /**
  * Checks whether removing `nodeId` from `allocatedIds` would leave the
  * remaining allocated nodes connected. If deallocating would disconnect the
- * tree, returns false.
+ * tree, returns false. Hub nodes are treated as transparent connectors —
+ * BFS can traverse through them even though they are never user-allocated.
  */
 export function canDeallocate(
   nodeId: string,
@@ -315,7 +366,10 @@ export function canDeallocate(
   // Empty tree or single node left is always valid
   if (remaining.size <= 1) return true;
 
-  // BFS from an arbitrary remaining node — all remaining nodes must be reachable
+  const hubs = getHubNodeIds(nodes);
+
+  // BFS from an arbitrary remaining node — all remaining nodes must be reachable.
+  // Hub nodes act as transparent bridges (BFS can pass through them).
   const adj = buildAdjacencyList(nodes);
   const startId = remaining.values().next().value as string;
   const visited = new Set<string>();
@@ -329,12 +383,118 @@ export function canDeallocate(
     if (!neighbors) continue;
 
     for (const neighbor of neighbors) {
-      if (!visited.has(neighbor) && remaining.has(neighbor)) {
+      if (visited.has(neighbor)) continue;
+      if (remaining.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      } else if (hubs.has(neighbor)) {
+        // Traverse through hub without counting it as allocated
         visited.add(neighbor);
         queue.push(neighbor);
       }
     }
   }
 
-  return visited.size === remaining.size;
+  // Check that all remaining allocated nodes were reached
+  for (const id of remaining) {
+    if (!visited.has(id)) return false;
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// 3g. Prune disconnected nodes after removal
+// ---------------------------------------------------------------------------
+
+/**
+ * After removing a node from the allocated set, returns only the nodes that
+ * are still reachable from the tree root (via hub nodes). Nodes that become
+ * disconnected are pruned.
+ */
+export function pruneDisconnected(
+  removedNodeId: string,
+  allocatedIds: Set<string>,
+  nodes: Record<string, AtlasNodeData>,
+): Set<string> {
+  const remaining = new Set(allocatedIds);
+  remaining.delete(removedNodeId);
+
+  if (remaining.size === 0) return remaining;
+
+  const hubs = getHubNodeIds(nodes);
+  const adj = buildAdjacencyList(nodes);
+
+  // BFS from hub nodes through (remaining allocated + hub nodes)
+  const visited = new Set<string>();
+  const queue: string[] = [];
+
+  for (const h of hubs) {
+    visited.add(h);
+    queue.push(h);
+  }
+
+  // Also seed from root
+  if (nodes['root']) {
+    visited.add('root');
+    queue.push('root');
+  }
+
+  let head = 0;
+  while (head < queue.length) {
+    const current = queue[head++];
+    const neighbors = adj.get(current);
+    if (!neighbors) continue;
+
+    for (const neighbor of neighbors) {
+      if (visited.has(neighbor)) continue;
+      if (remaining.has(neighbor) || hubs.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  // Return only remaining nodes that were reached from root/hubs
+  const reachable = new Set<string>();
+  for (const id of remaining) {
+    if (visited.has(id)) reachable.add(id);
+  }
+  return reachable;
+}
+
+// ---------------------------------------------------------------------------
+// 3h. Build connections list
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds a deduplicated list of connections from the processed nodes.
+ * Each connection knows whether both nodes share a group (for orbit arc rendering).
+ */
+export function buildConnections(
+  nodes: ProcessedAtlasNode[],
+  nodeMap: Map<string, ProcessedAtlasNode>,
+): AtlasConnection[] {
+  const connections: AtlasConnection[] = [];
+  const seen = new Set<string>();
+
+  for (const node of nodes) {
+    for (const outId of node.out) {
+      const key = [node.id, outId].sort().join('-');
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const target = nodeMap.get(outId);
+      if (!target) continue;
+
+      connections.push({
+        fromId: node.id,
+        toId: outId,
+        fromNode: node,
+        toNode: target,
+        sameOrbit: node.group === target.group && node.orbit === target.orbit,
+      });
+    }
+  }
+
+  return connections;
 }
