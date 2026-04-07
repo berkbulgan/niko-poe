@@ -172,9 +172,16 @@ export function Strategies() {
 
   function handleSaveAs(name: string) {
     const config = builderRef.current?.getConfig();
-    if (!config) return;
+    if (!config) {
+      console.error('[Strategies] getConfig() returned null — StrategyBuilder ref not attached');
+      return;
+    }
     createStrategy.mutate({ name, config }, {
-      onSuccess: (saved) => { setActiveStrategyId(saved.id); },
+      onSuccess: (saved) => {
+        setActiveStrategyId(saved.id);
+        void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      },
+      onError: (err) => { console.error('[Strategies] createStrategy failed:', err); },
     });
   }
 

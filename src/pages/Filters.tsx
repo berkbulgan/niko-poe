@@ -168,9 +168,16 @@ export function Filters() {
 
   function handleSaveAs(name: string) {
     const config = pickerRef.current?.getConfig();
-    if (!config) return;
+    if (!config) {
+      console.error('[Filters] getConfig() returned null — StatPicker ref not attached');
+      return;
+    }
     createPreset.mutate({ name, config }, {
-      onSuccess: (saved) => { setActivePresetId(saved.id); },
+      onSuccess: (saved) => {
+        setActivePresetId(saved.id);
+        void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
+      },
+      onError: (err) => { console.error('[Filters] createPreset failed:', err); },
     });
   }
 

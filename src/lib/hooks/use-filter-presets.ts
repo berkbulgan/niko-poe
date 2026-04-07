@@ -27,6 +27,9 @@ export interface FilterPresetParsed extends Omit<FilterPreset, 'config'> {
   config: FilterPresetConfig;
 }
 
+// Re-export so pages can import FilterPreset from hook file
+export type { FilterPreset };
+
 function parsePreset(preset: FilterPreset): FilterPresetParsed {
   return { ...preset, config: JSON.parse(preset.config) as FilterPresetConfig };
 }
