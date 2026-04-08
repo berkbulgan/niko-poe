@@ -152,7 +152,6 @@ pub async fn get_prices(
     // Try compact cache first for simple name lookups
     let actual_category = match category.as_str() {
         "chisel" | "astrolabe" => "currency",
-        "deliriumOrb" => "delirium",
         other => other,
     };
 
@@ -207,6 +206,7 @@ pub async fn get_prices(
                 name: obj["name"].as_str()?.to_owned(),
                 category: obj["category"].as_str().unwrap_or("").to_owned(),
                 mean: obj["mean"].as_f64().unwrap_or(0.0),
+                min: obj["min"].as_f64().unwrap_or(0.0),
                 daily: obj["daily"].as_f64().unwrap_or(0.0),
                 change: obj["change"].as_f64().unwrap_or(0.0),
                 low_confidence: obj["lowConfidence"].as_bool().unwrap_or(true),

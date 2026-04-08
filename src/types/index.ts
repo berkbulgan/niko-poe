@@ -191,6 +191,7 @@ export interface PriceItem {
   name: string;
   category: string;
   mean: number;
+  min: number;
   daily: number;
   change: number;
   lowConfidence: boolean;

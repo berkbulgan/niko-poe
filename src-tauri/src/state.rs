@@ -99,6 +99,7 @@ pub struct PoeWatchItem {
     pub name: String,
     pub category: String,
     pub mean: f64,
+    pub min: f64,
     pub daily: f64,
     pub change: f64,
     pub low_confidence: bool,

@@ -28,5 +28,7 @@ export function usePrices(category: PriceCategory, league: string) {
 export function useDivinePrice(league: string) {
   const { data } = usePrices('currency', league);
   const divine = data?.find((item) => item.name === 'Divine Orb');
-  return divine?.mean ?? 150;
+  if (!divine) return 150;
+  // poe.watch "mean" for Divine Orb can be unreliable; "min" reflects the actual chaos price
+  return divine.min > 0 ? divine.min : divine.mean;
 }
