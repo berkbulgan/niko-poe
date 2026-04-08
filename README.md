@@ -84,6 +84,10 @@ niko-poe/
 └── scripts/                            # Updater key generation
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes per release.
+
 ## Contributing
 
 Found a bug or have a feature request? Please [open an issue](https://github.com/berkbulgan/niko-poe/issues/new/choose) using one of our templates:
