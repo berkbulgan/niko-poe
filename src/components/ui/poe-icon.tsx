@@ -17,6 +17,10 @@ interface PoeIconProps {
 
 const ICON_ALIAS: Partial<Record<PoeIconName, PoeIconName>> = {
   quality: 'chisel',
+  rarity: 'alchemy',
+  corrupted: 'vaal',
+  currency: 'chaos',
+  tier: 'map',
 };
 
 export function PoeIcon({ name, size = 16, className }: PoeIconProps) {

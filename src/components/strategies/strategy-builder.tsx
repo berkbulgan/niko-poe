@@ -56,7 +56,7 @@ const CATEGORY_OPTIONS: Array<{ value: PriceCategory; label: string }> = [
 
 // Categories where 1 unit covers multiple maps
 const MAPS_PER_USE: Partial<Record<PriceCategory, number>> = {
-  astrolabe: 8,
+  astrolabe: 5,
 };
 
 // ── Sub-components ──
@@ -534,7 +534,7 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           icon: item.icon,
-          mapsPerUse: item.mapsPerUse ?? 1,
+          mapsPerUse: MAPS_PER_USE[item.category as PriceCategory] ?? item.mapsPerUse ?? 1,
         })),
       );
       setAverageMapCost(config.averageMapCost);
