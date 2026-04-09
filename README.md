@@ -4,7 +4,7 @@
 
 ## Features
 
-- **Strategy Calculator** — Build map strategies with scarabs, delirium orbs, chisels; calculate cost per map and total investment with live prices from [poe.watch](https://poe.watch)
+- **Strategy Calculator** — Build map strategies with scarabs, delirium orbs, chisels; calculate cost per map and total investment with live prices from [poe.ninja](https://poe.ninja)
 - **Atlas Tree Planner** — Canvas-based interactive atlas passive tree with GGG sprite sheets, shortest-path allocation, deallocation pruning, mastery group highlighting, wormhole visualization, and saved build management
 - **Regex Filter Builder** — Create and test regex patterns for stash tab searching with 313 precomputed optimization patterns (250 char limit)
 - **Trade Search** — Search the PoE Trade API using your built map configurations; find maps matching your strategy filters with rate-limited queries
@@ -20,7 +20,7 @@
 | Desktop Shell | Tauri v2 (Rust) |
 | Frontend | React 19, React Router v6, TanStack Query, Tailwind CSS |
 | Database | SQLite (local) |
-| Prices | poe.watch API (15min cache) |
+| Prices | poe.ninja API (1hr cache) |
 | Trade | pathofexile.com/api/trade (rate limited, Rust proxy) |
 | Auth | GGG OAuth2 PKCE |
 
@@ -84,6 +84,10 @@ niko-poe/
 └── scripts/                            # Updater key generation
 ```
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes per release.
+
 ## Contributing
 
 Found a bug or have a feature request? Please [open an issue](https://github.com/berkbulgan/niko-poe/issues/new/choose) using one of our templates:
@@ -104,6 +108,12 @@ Found a bug or have a feature request? Please [open an issue](https://github.com
 - [ ] Net worth estimation from stash contents
 - [ ] Strategy profit history over time
 - [ ] macOS / Linux builds
+
+## Support
+
+If N.I.K.O. helps your mapping, consider buying me a coffee:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/berkbulgan)
 
 ## License
 

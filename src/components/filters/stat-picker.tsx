@@ -1,7 +1,7 @@
 // ABOUTME: Scary-inspired two-column mod picker with map stat filters.
 // ABOUTME: Quantity/packsize/rarity/quality/bonus filters affect both vendor regex and trade search.
 
-import { useState, useMemo, useImperativeHandle, forwardRef } from 'react';
+import { useState, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLeague } from '@/lib/league-context';
@@ -12,36 +12,8 @@ import { MAP_MODS, type MapMod, NIGHTMARE_THRESHOLD } from '@/data';
 import { generateNumberRegex } from '@/lib/generate-number-regex';
 import { buildOptimizedVendorRegex } from '@/lib/optimize-regex';
 import { PoeIcon, type PoeIconName } from '@/components/ui/poe-icon';
-
-type QualityType = 'pack_size' | 'rarity' | 'currency' | 'scarabs' | 'cards';
-
-interface MapStatFilters {
-  quantity: string;
-  packSize: string;
-  rarity: string;
-  mapTier: string;
-  quality: string;
-  qualityType: QualityType;
-  moreCurrency: string;
-  moreMaps: string;
-  moreScarabs: string;
-  moreDivination: string;
-  corrupted: 'natural' | 'prefer' | 'avoid';
-}
-
-const EMPTY_FILTERS: MapStatFilters = {
-  quantity: '',
-  packSize: '',
-  rarity: '',
-  mapTier: '16',
-  quality: '',
-  qualityType: 'pack_size',
-  moreCurrency: '',
-  moreMaps: '',
-  moreScarabs: '',
-  moreDivination: '',
-  corrupted: 'natural',
-};
+import { useFiltersStore } from '@/lib/stores/filters-store';
+import type { MapStatFilters, QualityType } from '@/types/filters';
 
 const QUALITY_TYPE_OPTIONS: Array<{ value: QualityType; label: string }> = [
   { value: 'pack_size', label: 'Pack Size' },
@@ -88,10 +60,7 @@ const QUALITY_REGEX_MAP: Record<QualityType, string> = {
 };
 
 
-export interface StatPickerRef {
-  getConfig: () => import('@/lib/hooks/use-filter-presets').FilterPresetConfig;
-  loadConfig: (config: import('@/lib/hooks/use-filter-presets').FilterPresetConfig) => void;
-}
+// StatPickerRef removed — store handles get/load config directly
 
 function buildStatParts(filters: MapStatFilters): string[] {
   const parts: string[] = [];
@@ -213,15 +182,15 @@ function ModRow({
 
 // ── Main component ──
 
-export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, ref) {
+export function StatPicker() {
   const { currentLeague } = useLeague();
   const { data: tradeStats } = useTradeStats();
-  const [avoidIds, setAvoidIds] = useState<Set<number>>(new Set());
-  const [preferIds, setPreferIds] = useState<Set<number>>(new Set());
-  const [filters, setFilters] = useState<MapStatFilters>(EMPTY_FILTERS);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showNightmare, setShowNightmare] = useState(false);
-  const [isNightmareMap, setIsNightmareMap] = useState(false);
+  const store = useFiltersStore();
+  const {
+    avoidIds, preferIds, filters, searchQuery, showNightmare, isNightmareMap,
+    setSearchQuery, setShowNightmare, setIsNightmareMap,
+    toggleAvoid, togglePrefer, updateFilter, setFilters, clearAll,
+  } = store;
   const [copied, setCopied] = useState(false);
   const [searching, setSearching] = useState(false);
 
@@ -254,60 +223,7 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
     filters.moreCurrency !== '' || filters.moreMaps !== '' ||
     filters.moreScarabs !== '' || filters.moreDivination !== '';
 
-  useImperativeHandle(ref, () => ({
-    getConfig: () => ({
-      ...filters,
-      isNightmareMap,
-      avoidModIds: Array.from(avoidIds),
-      preferModIds: Array.from(preferIds),
-    }),
-    loadConfig: (config) => {
-      setFilters({
-        quantity: config.quantity ?? '',
-        packSize: config.packSize ?? '',
-        rarity: config.rarity ?? '',
-        mapTier: config.mapTier ?? '',
-        quality: config.quality ?? '',
-        qualityType: (config.qualityType as QualityType) ?? 'pack_size',
-        moreCurrency: config.moreCurrency ?? '',
-        moreMaps: config.moreMaps ?? '',
-        moreScarabs: config.moreScarabs ?? '',
-        moreDivination: config.moreDivination ?? '',
-        corrupted: config.corrupted ?? 'natural',
-      });
-      setIsNightmareMap(config.isNightmareMap ?? false);
-      setAvoidIds(new Set(config.avoidModIds ?? []));
-      setPreferIds(new Set(config.preferModIds ?? []));
-    },
-  }));
-
-  function updateFilter(key: keyof MapStatFilters, value: string) {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function toggleAvoid(id: number) {
-    setAvoidIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); }
-      else {
-        next.add(id);
-        setPreferIds((p) => { const n = new Set(p); n.delete(id); return n; });
-      }
-      return next;
-    });
-  }
-
-  function togglePrefer(id: number) {
-    setPreferIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) { next.delete(id); }
-      else {
-        next.add(id);
-        setAvoidIds((a) => { const n = new Set(a); n.delete(id); return n; });
-      }
-      return next;
-    });
-  }
+  // useImperativeHandle removed — store.getConfig()/loadConfig() used by parent page directly
 
   function buildTradeQuery() {
     type StatFilter = { id: string; value?: { min?: number }; disabled: boolean };
@@ -427,40 +343,38 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
   }
 
   function handleClear() {
-    setAvoidIds(new Set());
-    setPreferIds(new Set());
-    setFilters(EMPTY_FILTERS);
+    clearAll();
   }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Header checkboxes */}
-      <div className="flex flex-wrap items-center justify-end gap-4 px-4 pt-4 lg:px-6 lg:pt-6">
-        <label className="flex items-center gap-1.5 text-sm text-poe-text-muted">
-          <input
-            type="checkbox"
-            checked={isNightmareMap}
-            onChange={(e) => setIsNightmareMap(e.target.checked)}
-            className="accent-purple-500"
-          />
-          Nightmare Map
-        </label>
-        <label className="flex items-center gap-1.5 text-sm text-poe-text-muted">
-          <input
-            type="checkbox"
-            checked={showNightmare}
-            onChange={(e) => setShowNightmare(e.target.checked)}
-            className="accent-purple-500"
-          />
-          Show NM mods
-        </label>
-      </div>
-
       {/* ── Map stat filters — 3 rows ── */}
       <div className="mx-4 mt-4 shrink-0 space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4 lg:mx-6">
-        <h4 className="text-xs font-medium tracking-wide text-poe-text-dim">
-          Map Stats
-        </h4>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-medium tracking-wide text-poe-text-dim">
+            Map Stats
+          </h4>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-1.5 text-xs text-poe-text-muted">
+              <input
+                type="checkbox"
+                checked={isNightmareMap}
+                onChange={(e) => setIsNightmareMap(e.target.checked)}
+                className="accent-purple-500"
+              />
+              Nightmare Map
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-poe-text-muted">
+              <input
+                type="checkbox"
+                checked={showNightmare}
+                onChange={(e) => setShowNightmare(e.target.checked)}
+                className="accent-purple-500"
+              />
+              Show NM mods
+            </label>
+          </div>
+        </div>
 
         {/* Row 1: Base map stats */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -619,4 +533,4 @@ export const StatPicker = forwardRef<StatPickerRef>(function StatPicker(_props, 
       </div>
     </div>
   );
-});
+}

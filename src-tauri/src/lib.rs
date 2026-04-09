@@ -21,10 +21,16 @@ use commands::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
         update_filter_preset,
     },
-    prices::{fetch_all_prices, get_prices, is_prices_loading, lookup_item_prices},
+    prices::{fetch_all_prices, get_prices, is_prices_loading, lookup_item_prices, lookup_item_prices_advanced},
     regex_filters::{
         create_regex_filter, delete_regex_filter, get_regex_filter, get_regex_filters,
         update_regex_filter,
+    },
+    sharing::{content_hash, decode_share_code, encode_share_code, import_from_pastebin},
+    snapshots::{
+        create_snapshot_config, delete_snapshot, delete_snapshot_config, get_recent_snapshots,
+        get_snapshot_configs, get_snapshot_detail, get_snapshots, take_snapshot,
+        update_snapshot_config,
     },
     stash::{get_stash_tab_contents, get_stash_tabs},
     strategies::{
@@ -80,8 +86,7 @@ pub fn run() {
                 pool,
                 http_client,
                 rate_limiter: Arc::new(Mutex::new(state::RateLimiter::new())),
-                price_cache: Arc::new(Mutex::new(state::PriceCache::new())),
-                compact_prices: Arc::new(Mutex::new(state::CompactPriceCache::new())),
+                ninja_prices: Arc::new(Mutex::new(state::NinjaPriceCache::new())),
                 league_cache: Arc::new(Mutex::new(state::LeagueCache::new())),
                 stat_cache: Arc::new(Mutex::new(state::StatCache::new())),
                 ggg_token: Arc::new(Mutex::new(None)),
@@ -127,6 +132,7 @@ pub fn run() {
             // prices (Phase 3)
             get_prices,
             lookup_item_prices,
+            lookup_item_prices_advanced,
             fetch_all_prices,
             is_prices_loading,
             // auth (Phase 4)
@@ -137,6 +143,21 @@ pub fn run() {
             // stash (Phase 4)
             get_stash_tabs,
             get_stash_tab_contents,
+            // sharing
+            encode_share_code,
+            decode_share_code,
+            import_from_pastebin,
+            content_hash,
+            // snapshots
+            get_snapshot_configs,
+            create_snapshot_config,
+            update_snapshot_config,
+            delete_snapshot_config,
+            take_snapshot,
+            get_snapshots,
+            get_snapshot_detail,
+            get_recent_snapshots,
+            delete_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

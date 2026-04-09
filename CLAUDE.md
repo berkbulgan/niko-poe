@@ -86,7 +86,7 @@ GGG's official `league.json` export from [atlastree-export](https://github.com/g
 ## External APIs
 
 - **PoE Trade**: `www.pathofexile.com/api/trade/` — rate limited, proxied through Rust (PoE 1 uses `/api/trade/`, NOT `/api/trade2/`)
-- **poe.watch**: `poe.watch/api` — price data, 15-min cache
+- **poe.ninja**: `poe.ninja/api/data` — price data (currency + 27 item categories), 1-hour cache
 - **GGG OAuth**: `oauth.pathofexile.com` — PKCE flow, localhost callback via tauri-plugin-oauth
 - **GGG Stash**: `api.pathofexile.com/stash/` — requires OAuth token
 
@@ -103,9 +103,11 @@ feature branch → PR → dev → PR (with semver label) → main → auto tag +
 ```
 
 1. Feature branch from `dev` → PR → merge to `dev`
-2. `dev` → `main` PR with semver label (`patch`/`minor`/`major`)
-3. On merge: `auto-release.yml` bumps version in `package.json` + `tauri.conf.json` + `Cargo.toml`, commits, tags
-4. Tag push triggers `release.yml` → Windows installer build → draft GitHub Release
+2. **Update `CHANGELOG.md`** with the new version's changes before opening the release PR
+3. `dev` → `main` PR with semver label (`patch`/`minor`/`major`)
+4. On merge: `auto-release.yml` bumps version in `package.json` + `tauri.conf.json` + `Cargo.toml`, commits, tags
+5. Tag push triggers `release.yml` → Windows installer build → draft GitHub Release
+6. Review draft release notes, publish
 
 ### CI/CD Workflows
 

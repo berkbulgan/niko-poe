@@ -20,6 +20,7 @@ import type {
 } from '@/types/index';
 import type { AtlasTreeRecord, CreateAtlasTreeInput, UpdateAtlasTreeInput } from '@/types/index';
 import type {
+  DecodeResult,
   League,
   TradeStat,
   TradeSearchResult,
@@ -146,24 +147,62 @@ export function getPrices(category: string, league: string): Promise<PriceItem[]
   return invoke<PriceItem[]>('get_prices', { category, league });
 }
 
-/** Fetches the entire poe.watch compact dataset for a league. Returns item count. */
+/** Fetches all poe.ninja prices for a league. Returns item count. */
 export function fetchAllPrices(league: string): Promise<number> {
   return invoke<number>('fetch_all_prices', { league });
 }
 
 export interface PriceLookupEntry {
-  mean: number;
-  lowConfidence: boolean;
+  chaosValue: number;
+  icon: string;
+  category: string;
+  listingCount: number | null;
 }
 
-/** Looks up prices for a list of item names from the compact price cache. */
+/** Looks up prices for a list of item names from the ninja price cache. */
 export function lookupItemPrices(itemNames: string[], league: string): Promise<Record<string, PriceLookupEntry>> {
   return invoke<Record<string, PriceLookupEntry>>('lookup_item_prices', { itemNames, league });
 }
 
-/** Returns whether compact prices are currently being fetched. */
+export interface AdvancedLookupItem {
+  name: string;
+  frameType?: number | null;
+  links?: number | null;
+  gemLevel?: number | null;
+  gemQuality?: number | null;
+  corrupted?: boolean | null;
+  mapTier?: number | null;
+  variant?: string | null;
+  baseType?: string | null;
+  itemLevel?: number | null;
+}
+
+/** Advanced price lookup matching item properties (links, gem level, variant, etc.). */
+export function lookupItemPricesAdvanced(items: AdvancedLookupItem[], league: string): Promise<Record<string, PriceLookupEntry>> {
+  return invoke<Record<string, PriceLookupEntry>>('lookup_item_prices_advanced', { items, league });
+}
+
+/** Returns whether prices are currently being fetched. */
 export function isPricesLoading(): Promise<boolean> {
   return invoke<boolean>('is_prices_loading');
+}
+
+// --- Sharing ---
+
+export function encodeShareCode(entityType: string, payloadJson: string): Promise<string> {
+  return invoke<string>('encode_share_code', { entityType, payloadJson });
+}
+
+export function decodeShareCode(code: string): Promise<DecodeResult> {
+  return invoke<DecodeResult>('decode_share_code', { code });
+}
+
+export function importFromPastebin(url: string): Promise<string> {
+  return invoke<string>('import_from_pastebin', { url });
+}
+
+export function contentHash(json: string): Promise<string> {
+  return invoke<string>('content_hash', { json });
 }
 
 // --- GGG Auth ---
@@ -198,4 +237,52 @@ export function getStashTabs(league: string): Promise<StashTab[]> {
 /** Returns the items inside a specific stash tab. Requires GGG auth. */
 export function getStashTabContents(league: string, stashId: string): Promise<StashItem[]> {
   return invoke<StashItem[]>('get_stash_tab_contents', { league, stashId });
+}
+
+// --- Snapshots ---
+
+import type {
+  SnapshotConfig,
+  CreateSnapshotConfigInput,
+  UpdateSnapshotConfigInput,
+  StashSnapshot,
+  SnapshotSummary,
+  RecentSnapshot,
+  TakeSnapshotInput,
+} from '@/types/snapshots';
+
+export function getSnapshotConfigs(): Promise<SnapshotConfig[]> {
+  return invoke<SnapshotConfig[]>('get_snapshot_configs');
+}
+
+export function createSnapshotConfig(input: CreateSnapshotConfigInput): Promise<SnapshotConfig> {
+  return invoke<SnapshotConfig>('create_snapshot_config', { input });
+}
+
+export function updateSnapshotConfig(id: string, input: UpdateSnapshotConfigInput): Promise<SnapshotConfig> {
+  return invoke<SnapshotConfig>('update_snapshot_config', { id, input });
+}
+
+export function deleteSnapshotConfig(id: string): Promise<void> {
+  return invoke<void>('delete_snapshot_config', { id });
+}
+
+export function takeSnapshot(input: TakeSnapshotInput): Promise<StashSnapshot> {
+  return invoke<StashSnapshot>('take_snapshot', { input });
+}
+
+export function getSnapshots(configId: string): Promise<SnapshotSummary[]> {
+  return invoke<SnapshotSummary[]>('get_snapshots', { configId });
+}
+
+export function getSnapshotDetail(snapshotId: string): Promise<StashSnapshot> {
+  return invoke<StashSnapshot>('get_snapshot_detail', { snapshotId });
+}
+
+export function getRecentSnapshots(): Promise<RecentSnapshot[]> {
+  return invoke<RecentSnapshot[]>('get_recent_snapshots');
+}
+
+export function deleteSnapshot(snapshotId: string): Promise<void> {
+  return invoke<void>('delete_snapshot', { snapshotId });
 }

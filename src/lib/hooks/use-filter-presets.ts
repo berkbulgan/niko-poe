@@ -3,24 +3,10 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { FilterPreset } from '@/types/index';
+import type { FilterPresetConfig } from '@/types/filters';
 import * as ipc from '@/lib/ipc';
 
-export interface FilterPresetConfig {
-  quantity: string;
-  packSize: string;
-  rarity: string;
-  mapTier: string;
-  quality: string;
-  qualityType: string;
-  moreCurrency: string;
-  moreMaps: string;
-  moreScarabs: string;
-  moreDivination: string;
-  corrupted: 'natural' | 'prefer' | 'avoid';
-  isNightmareMap?: boolean;
-  avoidModIds: number[];
-  preferModIds: number[];
-}
+export type { FilterPresetConfig };
 
 // Parsed view of a FilterPreset — config as an object instead of a JSON string.
 export interface FilterPresetParsed extends Omit<FilterPreset, 'config'> {
@@ -90,12 +76,3 @@ export function useDuplicatePreset() {
   });
 }
 
-// Import by share code is a Phase 4 feature (requires GGG OAuth / server).
-// Keeping the hook stub so call sites compile.
-export function useImportPreset(_code: string) {
-  const queryClient = useQueryClient();
-  return useMutation<FilterPresetParsed, Error, void>({
-    mutationFn: async () => { throw new Error('Import not yet implemented'); },
-    onSettled: () => { void queryClient.invalidateQueries({ queryKey: PRESETS_KEY }); },
-  });
-}

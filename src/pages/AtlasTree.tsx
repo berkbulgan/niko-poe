@@ -1,11 +1,9 @@
 // ABOUTME: Atlas skill tree planner page with saved build sidebar, Canvas tree, and stats panel.
 // ABOUTME: Manages allocated node state, undo history, save/load/import/share/delete operations.
 
-import { useState, useMemo, useCallback, type FormEvent } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Modal } from '@/components/ui/modal';
-import { Spinner } from '@/components/ui/spinner';
 import { TreeRenderer } from '@/components/atlas-tree/tree-renderer';
 import { StatsPanel } from '@/components/atlas-tree/stats-panel';
 import {
@@ -13,11 +11,18 @@ import {
   useCreateAtlasTree,
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
-  useImportAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
+import { EditorToolbar } from '@/components/ui/editor-toolbar';
+import { SaveEntityModal } from '@/components/ui/save-entity-modal';
+import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
+import { EntitySidebar } from '@/components/ui/entity-sidebar';
+import { ExportModal } from '@/components/ui/export-modal';
+import { ImportModal } from '@/components/ui/import-modal';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
+import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type {
   AtlasTreeRawData,
@@ -29,150 +34,48 @@ import type {
 const treeData = rawTreeData as unknown as AtlasTreeRawData;
 const MAX_POINTS = treeData.points?.totalPoints ?? 138;
 
-function SaveAtlasTreeModal({
-  open,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSave: (name: string) => void;
-}) {
-  const [name, setName] = useState('');
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (name.trim()) {
-      onSave(name.trim());
-      setName('');
-      onClose();
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Save Atlas Tree">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">Build Name</label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Essence Farming, Delirium Rush..."
-            autoFocus
-            required
-          />
-        </div>
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={!name.trim()}>Save</Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
-function ImportAtlasTreeModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [code, setCode] = useState('');
-  const importTree = useImportAtlasTree(code);
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (code.length === 8) {
-      importTree.mutate(undefined, {
-        onSuccess: () => { setCode(''); onClose(); },
-      });
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Import Atlas Tree">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">8-Digit Share Code</label>
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            placeholder="12345678"
-            maxLength={8}
-            className="font-mono text-lg tracking-[0.3em] text-poe-currency"
-            autoFocus
-            required
-          />
-        </div>
-        {importTree.isError && (
-          <p className="text-xs text-poe-error">Atlas tree not found. Check the code.</p>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={code.length !== 8 || importTree.isPending}>
-            {importTree.isPending ? 'Importing...' : 'Import'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 function AtlasTreeRow({
   tree,
   active,
   onSelect,
   onDuplicate,
+  onExport,
 }: {
   tree: AtlasTreeType;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const deleteTree = useDeleteAtlasTree(tree.id);
 
   return (
-    <div className={`border-l-2 transition-all duration-100 ${active ? 'border-poe-gold bg-poe-gold/8' : 'border-transparent hover:bg-poe-panel-light/30'}`}>
-      <button
-        type="button"
-        onClick={onSelect}
-        className="w-full px-3 py-2 text-left"
-      >
-        <span className="block truncate text-sm text-poe-text">{tree.name}</span>
+    <SidebarEntityRow
+      name={tree.name}
+      active={active}
+      onSelect={onSelect}
+      onExport={onExport}
+      onDuplicate={onDuplicate}
+      onDelete={() => deleteTree.mutate(undefined)}
+      isDeleting={deleteTree.isPending}
+      subtitle={
         <span className="block text-xs text-poe-text-muted">
           {tree.config.allocatedNodeIds.length} pts
         </span>
-      </button>
-      {active && (
-        <div className="flex items-center gap-2 px-3 pb-2">
-          <button
-            onClick={onDuplicate}
-            className="text-xs text-poe-text-dim hover:text-poe-gold"
-          >
-            Duplicate
-          </button>
-          <span className="text-poe-border">&middot;</span>
-          <button
-            onClick={() => deleteTree.mutate(undefined)}
-            disabled={deleteTree.isPending}
-            className="text-xs text-poe-text-dim hover:text-poe-error"
-          >
-            {deleteTree.isPending ? '...' : 'Delete'}
-          </button>
-        </div>
-      )}
-    </div>
+      }
+    />
   );
 }
 
 export function AtlasTree() {
   const [showSaveAs, setShowSaveAs] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [activeTreeId, setActiveTreeId] = useState<string | null>(null);
-  const [allocatedIds, setAllocatedIds] = useState<Set<number>>(new Set());
-  const [history, setHistory] = useState<ReadonlyArray<Set<number>>>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+
+  const {
+    activeTreeId, setActiveTreeId, allocatedIds, history, searchQuery,
+    setSearchQuery, toggleNode, allocatePath, undo, reset, getConfig, loadTree,
+  } = useAtlasTreeStore();
 
   const { data: trees, isLoading } = useAtlasTrees();
   const createTree = useCreateAtlasTree();
@@ -180,6 +83,12 @@ export function AtlasTree() {
   const queryClient = useQueryClient();
 
   const activeTree = trees?.find((t) => t.id === activeTreeId);
+
+  // Detect unsaved changes by comparing current allocated nodes to saved tree
+  const hasUnsavedChanges = activeTree
+    ? allocatedIds.size !== activeTree.config.allocatedNodeIds.length ||
+      activeTree.config.allocatedNodeIds.some((id) => !allocatedIds.has(id))
+    : allocatedIds.size > 0;
 
   const processedNodes = useMemo(() => processTreeData(treeData), []);
 
@@ -202,58 +111,24 @@ export function AtlasTree() {
     maxY: treeData.max_y,
   }), []);
 
-  const pushHistory = useCallback((current: Set<number>) => {
-    setHistory((prev) => [...prev.slice(-49), current]);
-  }, []);
-
   const handleToggleNode = useCallback((nodeId: number) => {
-    setAllocatedIds((prev) => {
-      if (prev.has(nodeId)) {
-        // Deallocate: remove node and prune anything disconnected from root
-        const stringIds = new Set(Array.from(prev).map(String));
-        const reachable = pruneDisconnected(String(nodeId), stringIds, rawNodes);
-        pushHistory(prev);
-        return new Set(Array.from(reachable).map(Number));
-      }
-      const next = new Set(prev);
-      next.add(nodeId);
-      pushHistory(prev);
-      return next;
-    });
-  }, [rawNodes, pushHistory]);
+    toggleNode(nodeId, rawNodes, pruneDisconnected);
+  }, [rawNodes, toggleNode]);
 
   const handleUndo = useCallback(() => {
-    if (history.length === 0) return;
-    const previous = history[history.length - 1];
-    setHistory((prev) => prev.slice(0, -1));
-    setAllocatedIds(previous);
-  }, [history]);
+    undo();
+  }, [undo]);
 
   const handleReset = useCallback(() => {
-    if (allocatedIds.size === 0) return;
-    pushHistory(allocatedIds);
-    setAllocatedIds(new Set());
-  }, [allocatedIds, pushHistory]);
+    reset();
+  }, [reset]);
 
   const handleAllocatePath = useCallback((nodeIds: number[]) => {
-    if (nodeIds.length === 0) return;
-    setAllocatedIds((prev) => {
-      pushHistory(prev);
-      const next = new Set(prev);
-      for (const id of nodeIds) next.add(id);
-      return next;
-    });
-  }, [pushHistory]);
-
-  function buildConfig(): AtlasTreeConfig {
-    return {
-      allocatedNodeIds: Array.from(allocatedIds),
-      treeVersion: treeData.tree,
-    };
-  }
+    allocatePath(nodeIds);
+  }, [allocatePath]);
 
   function handleSaveAs(name: string) {
-    const config = buildConfig();
+    const config = getConfig(treeData.tree);
     createTree.mutate({ name, config }, {
       onSuccess: (saved) => { setActiveTreeId(saved.id); },
     });
@@ -268,7 +143,7 @@ export function AtlasTree() {
 
   function handleSaveOverwrite() {
     if (!activeTreeId) return;
-    const config = buildConfig();
+    const config = getConfig(treeData.tree);
     overwriteMutation.mutate({ config });
   }
 
@@ -277,96 +152,75 @@ export function AtlasTree() {
       { name: `${tree.name} (copy)`, config: tree.config },
       {
         onSuccess: (dup) => {
-          setActiveTreeId(dup.id);
-          setAllocatedIds(new Set(dup.config.allocatedNodeIds));
-          setHistory([]);
+          loadTree(dup.id, dup.config.allocatedNodeIds);
         },
       },
     );
   }
 
   function handleLoadTree(tree: AtlasTreeType) {
-    setActiveTreeId(tree.id);
-    setAllocatedIds(new Set(tree.config.allocatedNodeIds));
-    setHistory([]);
+    loadTree(tree.id, tree.config.allocatedNodeIds);
   }
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
-      {/* Left panel: Saved Builds */}
-      <aside className="flex w-48 shrink-0 flex-col border-r border-poe-border/30 xl:w-56">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-poe-border/20 px-3 py-3">
-          <h2 className="text-sm font-semibold text-poe-text-dim">Atlas Builds</h2>
-          <Button variant="ghost" size="sm" onClick={() => setShowImport(true)}>
-            Import
-          </Button>
-        </div>
-
-        {/* Build list */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex justify-center py-8"><Spinner /></div>
-          ) : !trees || trees.length === 0 ? (
-            <div className="p-4 text-center">
-              <p className="text-sm text-poe-text-dim">No builds saved</p>
-              <p className="mt-1 text-xs text-poe-text-muted">
-                Allocate nodes and hit Save
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-px p-1">
-              {trees.map((tree) => (
-                <AtlasTreeRow
-                  key={tree.id}
-                  tree={tree}
-                  active={activeTreeId === tree.id}
-                  onSelect={() => handleLoadTree(tree)}
-                  onDuplicate={() => handleDuplicate(tree)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </aside>
+      <EntitySidebar
+        title="Atlas Builds"
+        onImport={() => setShowImport(true)}
+        isLoading={isLoading}
+        isEmpty={!trees || trees.length === 0}
+        emptyTitle="No builds saved"
+        emptyDescription="Allocate nodes and hit Save"
+      >
+        {trees?.map((tree) => (
+          <AtlasTreeRow
+            key={tree.id}
+            tree={tree}
+            active={activeTreeId === tree.id}
+            onSelect={() => handleLoadTree(tree)}
+            onDuplicate={() => handleDuplicate(tree)}
+            onExport={() => setExportInput({ type: 'A', name: tree.name, config: tree.config })}
+          />
+        ))}
+      </EntitySidebar>
 
       {/* Center panel: Tree Canvas */}
       <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-2">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Atlas Skill Tree</h3>
+        <EditorToolbar
+          title="Atlas Skill Tree"
+          hasUnsavedChanges={hasUnsavedChanges}
+          hasActiveEntity={!!activeTree}
+          onSave={handleSaveOverwrite}
+          onSaveAs={() => setShowSaveAs(true)}
+          compact
+          titleExtra={
             <span className={`text-xs ${allocatedIds.size > MAX_POINTS ? 'text-poe-error font-semibold' : 'text-poe-text-muted'}`}>
               {allocatedIds.size} / {MAX_POINTS} pts
             </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleUndo}
-              disabled={history.length === 0}
-              title="Undo (Ctrl+Z)"
-            >
-              Undo
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              disabled={allocatedIds.size === 0}
-            >
-              Reset
-            </Button>
-            <div className="mx-1 h-5 w-px bg-poe-border/30" />
-            {activeTree && (
-              <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
-            )}
-            <Button variant="primary" size="sm" onClick={() => setShowSaveAs(true)}>
-              {activeTree ? 'Save As' : 'Save'}
-            </Button>
-          </div>
-        </div>
+          }
+          actions={
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleUndo}
+                disabled={history.length === 0}
+                title="Undo (Ctrl+Z)"
+              >
+                Undo
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                disabled={allocatedIds.size === 0}
+              >
+                Reset
+              </Button>
+              <div className="mx-1 h-5 w-px bg-poe-border/30" />
+            </>
+          }
+        />
 
         {/* Tree renderer */}
         <div className="relative flex-1">
@@ -411,8 +265,16 @@ export function AtlasTree() {
         maxPoints={MAX_POINTS}
       />
 
-      <SaveAtlasTreeModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
-      <ImportAtlasTreeModal open={showImport} onClose={() => setShowImport(false)} />
+      <SaveEntityModal
+        open={showSaveAs}
+        onClose={() => setShowSaveAs(false)}
+        onSave={handleSaveAs}
+        title="Save Atlas Tree"
+        placeholder="e.g. Essence Farming, Delirium Rush..."
+        label="Build Name"
+      />
+      <ImportModal open={showImport} onClose={() => setShowImport(false)} />
+      <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
 }

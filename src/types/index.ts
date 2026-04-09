@@ -124,6 +124,14 @@ export interface UpdateAtlasTreeInput {
   config?: string;
 }
 
+// --- Sharing ---
+// Mirrors src-tauri/src/commands/sharing.rs DecodeResult
+
+export interface DecodeResult {
+  entityType: string;
+  payloadJson: string;
+}
+
 // --- Trade & Price IPC types ---
 // All fields match Rust serde(rename_all = "camelCase") structs in commands/trade.rs and commands/prices.rs.
 
@@ -185,16 +193,23 @@ export interface ProxySearchResult {
   total: number;
 }
 
-/** One price entry from poe.watch, mirroring PriceItem in commands/prices.rs. */
+/** One price entry from poe.ninja, mirroring NinjaPrice in state.rs. */
 export interface PriceItem {
-  id: number;
   name: string;
-  category: string;
-  mean: number;
-  daily: number;
-  change: number;
-  lowConfidence: boolean;
+  chaosValue: number;
   icon: string;
+  category: string;
+  frameType: number | null;
+  links: number | null;
+  variant: string | null;
+  gemLevel: number | null;
+  gemQuality: number | null;
+  corrupted: boolean | null;
+  mapTier: number | null;
+  baseType: string | null;
+  itemLevel: number | null;
+  listingCount: number | null;
+  detailsId: string | null;
 }
 
 // --- Stash ---

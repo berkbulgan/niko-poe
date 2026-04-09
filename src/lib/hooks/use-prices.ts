@@ -1,26 +1,22 @@
-// ABOUTME: TanStack Query hooks for fetching poe.watch price data by category.
+// ABOUTME: TanStack Query hooks for fetching poe.ninja price data by category.
 // ABOUTME: Public data — uses useQuery directly without auth wrappers.
 
 import { useQuery } from '@tanstack/react-query';
 import { getPrices } from '@/lib/ipc';
 import type { PriceItem } from '@/types/index';
+import type { PriceCategory } from '@/types/strategies';
 
-export type PriceCategory =
-  | 'scarab'
-  | 'deliriumOrb'
-  | 'currency'
-  | 'chisel'
-  | 'astrolabe';
+export type { PriceCategory };
 
 const PRICES_KEY = ['prices'] as const;
 
-const FIFTEEN_MINUTES = 15 * 60 * 1000;
+const ONE_HOUR = 60 * 60 * 1000;
 
 export function usePrices(category: PriceCategory, league: string) {
   return useQuery<PriceItem[]>({
     queryKey: [...PRICES_KEY, category, league],
     queryFn: () => getPrices(category, league),
-    staleTime: FIFTEEN_MINUTES,
+    staleTime: ONE_HOUR,
     enabled: league.length > 0,
   });
 }
@@ -28,5 +24,5 @@ export function usePrices(category: PriceCategory, league: string) {
 export function useDivinePrice(league: string) {
   const { data } = usePrices('currency', league);
   const divine = data?.find((item) => item.name === 'Divine Orb');
-  return divine?.mean ?? 150;
+  return divine?.chaosValue ?? 150;
 }

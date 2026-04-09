@@ -1,11 +1,9 @@
 // ABOUTME: Strategy cost calculator with item picker, quantity editor, and cost summary.
-// ABOUTME: Links to filter presets for trade search. Uses poe.watch prices for cost calculation.
+// ABOUTME: Links to filter presets for trade search. Uses poe.ninja prices for cost calculation.
 
 import {
   useState,
   useMemo,
-  useImperativeHandle,
-  forwardRef,
   useCallback,
 } from 'react';
 import { Input } from '@/components/ui/input';
@@ -13,37 +11,17 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import { useLeague } from '@/lib/league-context';
-import {
-  usePrices,
-  useDivinePrice,
-  type PriceCategory,
-  type PoeWatchItem,
-} from '@/lib/hooks/use-prices';
-import type { StrategyConfig, StrategyItem } from '@/lib/hooks/use-strategies';
+import { usePrices, useDivinePrice } from '@/lib/hooks/use-prices';
+import type { PriceCategory } from '@/types/strategies';
+import type { PriceItem } from '@/types/index';
 import { useFilterPresets, type FilterPreset } from '@/lib/hooks/use-filter-presets';
 import { useAtlasTrees, type AtlasTreeParsed } from '@/lib/hooks/use-atlas-trees';
 import { openExternal } from '@/lib/platform';
+import { useStrategiesStore, type SelectedItem } from '@/lib/stores/strategies-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type { AtlasTreeRawData } from '@/types/atlas-tree';
 
 const treeData = rawTreeData as unknown as AtlasTreeRawData;
-
-// ── Types ──
-
-interface SelectedItem {
-  itemId: number;
-  name: string;
-  category: string;
-  quantity: number;
-  unitPrice: number;
-  icon: string;
-  mapsPerUse: number;
-}
-
-export interface StrategyBuilderRef {
-  getConfig: () => StrategyConfig;
-  loadConfig: (config: StrategyConfig) => void;
-}
 
 // ── Constants ──
 
@@ -56,7 +34,7 @@ const CATEGORY_OPTIONS: Array<{ value: PriceCategory; label: string }> = [
 
 // Categories where 1 unit covers multiple maps
 const MAPS_PER_USE: Partial<Record<PriceCategory, number>> = {
-  astrolabe: 8,
+  astrolabe: 5,
 };
 
 // ── Sub-components ──
@@ -89,11 +67,11 @@ function ItemDropdown({
   onSearchChange,
   onSelect,
 }: {
-  items: PoeWatchItem[];
+  items: PriceItem[];
   isLoading: boolean;
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  onSelect: (item: PoeWatchItem) => void;
+  onSelect: (item: PriceItem) => void;
 }) {
   const filtered = useMemo(() => {
     if (searchQuery.length < 1) return items.slice(0, 50);
@@ -118,7 +96,7 @@ function ItemDropdown({
         <div className="max-h-48 overflow-y-auto border border-poe-border/20">
           {filtered.map((item) => (
             <button
-              key={item.id}
+              key={item.name}
               type="button"
               onClick={() => onSelect(item)}
               className="flex w-full items-center justify-between border-b border-poe-border/10 px-3 py-1.5 text-left transition-colors hover:bg-poe-panel-light/30"
@@ -130,7 +108,7 @@ function ItemDropdown({
                 <span className="text-sm text-poe-text">{item.name}</span>
               </span>
               <span className="flex items-center gap-1 text-xs text-poe-currency">
-                {item.mean.toFixed(1)}
+                {item.chaosValue.toFixed(1)}
                 <PoeIcon name="chaos" size={12} />
               </span>
             </button>
@@ -433,16 +411,16 @@ function LinkedAtlasTreeSection({
 
 // ── Main component ──
 
-export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyBuilder(_props, ref) {
+export function StrategyBuilder() {
   const { currentLeague } = useLeague();
-  const [category, setCategory] = useState<PriceCategory>('scarab');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
-  const [averageMapCost, setAverageMapCost] = useState(0);
-  const [mapCount, setMapCount] = useState(100);
-  const [showPicker, setShowPicker] = useState(false);
-  const [filterPresetId, setFilterPresetId] = useState<string | null>(null);
-  const [atlasTreeId, setAtlasTreeId] = useState<string | null>(null);
+  const store = useStrategiesStore();
+  const {
+    selectedItems, averageMapCost, mapCount, filterPresetId, atlasTreeId,
+    category, showPicker, searchQuery,
+    setCategory, setShowPicker, setSearchQuery,
+    addItem, updateItemQuantity, removeItem,
+    setAverageMapCost, setMapCount, setFilterPresetId, setAtlasTreeId,
+  } = store;
 
   const { data: priceData, isLoading: pricesLoading } = usePrices(category, currentLeague);
   const { data: filterPresets } = useFilterPresets();
@@ -465,84 +443,28 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
 
   // ── Handlers ──
 
-  const handleAddItem = useCallback((poeItem: PoeWatchItem) => {
+  const handleAddItem = useCallback((poeItem: PriceItem) => {
     const mapsPerUse = MAPS_PER_USE[category] ?? 1;
-    setSelectedItems((prev) => {
-      const existing = prev.find((i) => i.itemId === poeItem.id && i.category === category);
-      if (existing) {
-        return prev.map((i) =>
-          i.itemId === poeItem.id && i.category === category
-            ? { ...i, quantity: i.quantity + 1 }
-            : i,
-        );
-      }
-      return [
-        ...prev,
-        {
-          itemId: poeItem.id,
-          name: poeItem.name,
-          category,
-          quantity: 1,
-          unitPrice: poeItem.mean,
-          icon: poeItem.icon,
-          mapsPerUse,
-        },
-      ];
+    addItem({
+      itemId: 0,
+      name: poeItem.name,
+      category,
+      quantity: 1,
+      unitPrice: poeItem.chaosValue,
+      icon: poeItem.icon,
+      mapsPerUse,
     });
     setShowPicker(false);
     setSearchQuery('');
-  }, [category]);
+  }, [category, addItem, setShowPicker, setSearchQuery]);
 
   const handleQuantityChange = useCallback((itemId: number, itemCategory: string, qty: number) => {
-    setSelectedItems((prev) =>
-      prev.map((i) =>
-        i.itemId === itemId && i.category === itemCategory ? { ...i, quantity: qty } : i,
-      ),
-    );
-  }, []);
+    updateItemQuantity(itemId, itemCategory, qty);
+  }, [updateItemQuantity]);
 
   const handleRemove = useCallback((itemId: number, itemCategory: string) => {
-    setSelectedItems((prev) =>
-      prev.filter((i) => !(i.itemId === itemId && i.category === itemCategory)),
-    );
-  }, []);
-
-  // ── Imperative handle ──
-
-  useImperativeHandle(ref, () => ({
-    getConfig: (): StrategyConfig => ({
-      items: selectedItems.map((si): StrategyItem => ({
-        itemId: si.itemId,
-        name: si.name,
-        category: si.category,
-        quantity: si.quantity,
-        unitPrice: si.unitPrice,
-        icon: si.icon,
-        mapsPerUse: si.mapsPerUse > 1 ? si.mapsPerUse : undefined,
-      })),
-      averageMapCost,
-      mapCount,
-      filterPresetId,
-      atlasTreeId,
-    }),
-    loadConfig: (config: StrategyConfig) => {
-      setSelectedItems(
-        config.items.map((item) => ({
-          itemId: item.itemId,
-          name: item.name,
-          category: item.category,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          icon: item.icon,
-          mapsPerUse: item.mapsPerUse ?? 1,
-        })),
-      );
-      setAverageMapCost(config.averageMapCost);
-      setMapCount(config.mapCount);
-      setFilterPresetId(config.filterPresetId ?? null);
-      setAtlasTreeId(config.atlasTreeId ?? null);
-    },
-  }));
+    removeItem(itemId, itemCategory);
+  }, [removeItem]);
 
   // ── Render ──
 
@@ -673,4 +595,4 @@ export const StrategyBuilder = forwardRef<StrategyBuilderRef>(function StrategyB
       </div>
     </div>
   );
-});
+}

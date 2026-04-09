@@ -159,9 +159,7 @@ pub async fn start_oauth_login(
 
     let config = tauri_plugin_oauth::OauthConfig {
         ports: Some(vec![OAUTH_PORT]),
-        response: Some(std::borrow::Cow::Borrowed(
-            "<html><body>Login successful — you can close this tab.</body></html>",
-        )),
+        response: Some(std::borrow::Cow::Borrowed(include_str!("../oauth-callback.html"))),
     };
 
     let port = tauri_plugin_oauth::start_with_config(config, move |url| {

@@ -1,6 +1,7 @@
 // ABOUTME: AppState holds shared runtime resources injected into all Tauri commands.
 // ABOUTME: Holds database pool, HTTP caches, and rate limiter for trade API calls.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use sqlx::SqlitePool;
 use tokio::sync::Mutex;
@@ -21,22 +22,59 @@ impl RateLimiter {
     }
 }
 
-pub struct PriceCacheEntry {
-    pub items: Vec<PoeWatchItem>,
-    pub fetched_at: std::time::Instant,
+/// A normalized price entry stored in the ninja price cache.
+/// Supports advanced matching via optional fields (links, gem_level, variant, etc.).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NinjaPrice {
+    pub name: String,
+    pub chaos_value: f64,
+    pub icon: String,
+    pub category: String,
+    /// Item frame type (0=Normal, 1=Magic, 2=Rare, 3=Unique, 4=Gem, 5=Currency, 6=Div, 9=Relic)
+    pub frame_type: Option<i32>,
+    /// Number of links (for 5L/6L unique weapons/armour)
+    pub links: Option<i32>,
+    /// Variant string from poe.ninja (e.g. "Shaper", "Elder")
+    pub variant: Option<String>,
+    /// Gem level (for skill gems)
+    pub gem_level: Option<i32>,
+    /// Gem quality (for skill gems)
+    pub gem_quality: Option<i32>,
+    /// Whether the item is corrupted
+    pub corrupted: Option<bool>,
+    /// Map tier
+    pub map_tier: Option<i32>,
+    /// Base type (for maps, beasts, etc.)
+    pub base_type: Option<String>,
+    /// Item level (for coffins, allflame embers, etc.)
+    pub item_level: Option<i32>,
+    /// Listing count — used as confidence indicator
+    pub listing_count: Option<i32>,
+    /// Details ID from poe.ninja (used for URL generation)
+    pub details_id: Option<String>,
 }
 
-pub struct PriceCache {
-    pub entries: std::collections::HashMap<String, PriceCacheEntry>,
-    /// Cache TTL in seconds (default: 900 = 15 minutes).
+/// Stores all poe.ninja prices fetched on demand when a league is selected.
+pub struct NinjaPriceCache {
+    /// All price entries from poe.ninja, keyed by lowercase name for fast lookup.
+    /// Multiple entries per name are possible (e.g. different gem levels).
+    pub prices: HashMap<String, Vec<NinjaPrice>>,
+    /// Which league these prices belong to.
+    pub league: Option<String>,
+    pub fetched_at: Option<std::time::Instant>,
     pub ttl_secs: u64,
+    pub is_loading: bool,
 }
 
-impl PriceCache {
+impl NinjaPriceCache {
     pub fn new() -> Self {
         Self {
-            entries: std::collections::HashMap::new(),
-            ttl_secs: 900,
+            prices: HashMap::new(),
+            league: None,
+            fetched_at: None,
+            ttl_secs: 3600,
+            is_loading: false,
         }
     }
 }
@@ -92,47 +130,6 @@ pub struct TradeStat {
     pub stat_type: String,
 }
 
-/// A single item price record from poe.watch.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct PoeWatchItem {
-    pub id: i64,
-    pub name: String,
-    pub category: String,
-    pub mean: f64,
-    pub daily: f64,
-    pub change: f64,
-    pub low_confidence: bool,
-    pub icon: String,
-}
-
-/// Compact price entry from poe.watch /compact endpoint.
-/// Only has id and mean — name resolved via the full item list.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CompactPriceEntry {
-    pub id: i64,
-    pub mean: f64,
-}
-
-/// Stores the full compact price dataset fetched at app startup.
-pub struct CompactPriceCache {
-    /// Map of item name (lowercase) → (mean chaos price, low_confidence flag).
-    pub prices: std::collections::HashMap<String, (f64, bool)>,
-    pub fetched_at: Option<std::time::Instant>,
-    pub ttl_secs: u64,
-    pub is_loading: bool,
-}
-
-impl CompactPriceCache {
-    pub fn new() -> Self {
-        Self {
-            prices: std::collections::HashMap::new(),
-            fetched_at: None,
-            ttl_secs: 900,
-            is_loading: false,
-        }
-    }
-}
-
 /// GGG OAuth2 token state stored in memory and persisted to the secure store.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GggTokenState {
@@ -147,8 +144,7 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub http_client: reqwest::Client,
     pub rate_limiter: Arc<Mutex<RateLimiter>>,
-    pub price_cache: Arc<Mutex<PriceCache>>,
-    pub compact_prices: Arc<Mutex<CompactPriceCache>>,
+    pub ninja_prices: Arc<Mutex<NinjaPriceCache>>,
     pub league_cache: Arc<Mutex<LeagueCache>>,
     pub stat_cache: Arc<Mutex<StatCache>>,
     pub ggg_token: Arc<Mutex<Option<GggTokenState>>>,
