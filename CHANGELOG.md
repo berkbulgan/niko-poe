@@ -5,6 +5,11 @@ All notable changes to N.I.K.O. are documented here. Format follows [Keep a Chan
 ## [0.3.0] - 2026-04-09
 
 ### Added
+- **Share Code Export/Import** — PoB-inspired encoding pipeline (JSON → deflate → base64) for filter presets, atlas trees, and strategies
+- Strategy export bundles linked FilterPreset and AtlasTree inline
+- Import with content-hash dedup (SHA256) prevents duplicate entities
+- Pastebin URL import support (fetches raw paste, no API key needed)
+- Name collision handling with " (2)", " (3)" suffixes
 - **Stash Snapshots** — Take point-in-time snapshots of selected stash tabs with automatic poe.ninja pricing
 - **Snapshot Configs** — Save reusable tab selections (e.g. "Dump Tabs", "Currency Only") with optional strategy linking
 - **ROI Tracking** — Link a config to a strategy, take before/after snapshots, see gross profit minus strategy cost
@@ -18,6 +23,7 @@ All notable changes to N.I.K.O. are documented here. Format follows [Keep a Chan
 - **GGG Disclaimer** — Added to OAuth callback, Settings > About, and NSIS installer preinstall hook
 - **Unsaved Changes Indicator** — Shows next to Save button when current state differs from saved config
 - **Shared UI Components** — Extracted EditorToolbar, SaveEntityModal, SidebarEntityRow, EntitySidebar
+- **Developer Credits** — Settings > About with social links and Buy Me a Coffee donation button
 
 ### Changed
 - **Pricing source migrated from poe.watch to poe.ninja** — 29 categories (up from 5), 1-hour cache
@@ -27,10 +33,14 @@ All notable changes to N.I.K.O. are documented here. Format follows [Keep a Chan
 - **Sidebar loading indicator** — "Fetching prices..." pulse animation during price fetch
 - Nightmare checkboxes moved into Map Stats box header
 - State persistence across navigation via Zustand stores (filters, strategies, atlas tree)
+- Astrolabe mapsPerUse corrected from 8 to 5
+- PoeIcon: added `rarity`, `corrupted`, `currency`, `tier` aliases
 
 ### Fixed
 - Page state lost when navigating between tabs (Zustand stores replace local useState)
 - Selected preset/strategy/tree not preserved on tab switch
+- Divine Orb price accuracy (use `min` field over unreliable `mean`)
+- Strategy builder mapsPerUse not applied correctly on config load
 - Line chart Y-axis labels clipped on left side
 
 ## [0.2.0] - 2026-04-07
