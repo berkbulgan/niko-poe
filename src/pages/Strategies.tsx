@@ -1,7 +1,7 @@
 // ABOUTME: Strategies page — preset sidebar + strategy cost calculator.
 // ABOUTME: Left panel: saved strategies with share codes. Right panel: strategy-builder component.
 
-import { useState, useRef, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -17,13 +17,11 @@ import type { Strategy } from '@/types/index';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
-import {
-  StrategyBuilder,
-  type StrategyBuilderRef,
-} from '@/components/strategies/strategy-builder';
+import { StrategyBuilder } from '@/components/strategies/strategy-builder';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
 import * as ipc from '@/lib/ipc';
+import { useStrategiesStore } from '@/lib/stores/strategies-store';
 
 function SaveStrategyModal({
   open,
@@ -121,26 +119,27 @@ function StrategyRow({
   );
 }
 
+// Categories where 1 unit covers multiple maps (mirrored from strategy-builder for loadConfig)
+const MAPS_PER_USE: Partial<Record<string, number>> = {
+  astrolabe: 5,
+};
+
 export function Strategies() {
   const [showSaveAs, setShowSaveAs] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [activeStrategyId, setActiveStrategyId] = useState<string | null>(null);
-  const builderRef = useRef<StrategyBuilderRef>(null);
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+
+  const { activeStrategyId, setActiveStrategyId, getConfig, loadConfig } = useStrategiesStore();
 
   const { data: strategies, isLoading } = useStrategies();
   const createStrategy = useCreateStrategy();
   const duplicateStrategy = useDuplicateStrategy();
-  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
   const queryClient = useQueryClient();
 
   const activeStrategy = strategies?.find((s) => s.id === activeStrategyId);
 
   function handleSaveAs(name: string) {
-    const config = builderRef.current?.getConfig();
-    if (!config) {
-      console.error('[Strategies] getConfig() returned null — StrategyBuilder ref not attached');
-      return;
-    }
+    const config = getConfig();
     createStrategy.mutate({ name, config }, {
       onSuccess: (saved) => {
         setActiveStrategyId(saved.id);
@@ -160,21 +159,20 @@ export function Strategies() {
 
   function handleSaveOverwrite() {
     if (!activeStrategyId) return;
-    const config = builderRef.current?.getConfig();
-    if (!config) return;
+    const config = getConfig();
     overwriteMutation.mutate({ config });
   }
 
   function handleDuplicate(strategy: Strategy) {
     duplicateStrategy.mutate(
       { name: `${strategy.name} (copy)`, config: strategy.config },
-      { onSuccess: (dup) => { setActiveStrategyId(dup.id); builderRef.current?.loadConfig(dup.config); } },
+      { onSuccess: (dup) => { setActiveStrategyId(dup.id); loadConfig(dup.config, MAPS_PER_USE); } },
     );
   }
 
   function handleLoadStrategy(strategy: Strategy) {
     setActiveStrategyId(strategy.id);
-    builderRef.current?.loadConfig(strategy.config);
+    loadConfig(strategy.config, MAPS_PER_USE);
   }
 
   return (
@@ -231,7 +229,7 @@ export function Strategies() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
-          <StrategyBuilder ref={builderRef} />
+          <StrategyBuilder />
         </div>
       </main>
 

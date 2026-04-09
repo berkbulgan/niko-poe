@@ -4,13 +4,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { getPrices } from '@/lib/ipc';
 import type { PriceItem } from '@/types/index';
+import type { PriceCategory } from '@/types/strategies';
 
-export type PriceCategory =
-  | 'scarab'
-  | 'deliriumOrb'
-  | 'currency'
-  | 'chisel'
-  | 'astrolabe';
+export type { PriceCategory };
 
 const PRICES_KEY = ['prices'] as const;
 

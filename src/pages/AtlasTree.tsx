@@ -20,6 +20,7 @@ import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
+import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type {
   AtlasTreeRawData,
@@ -133,15 +134,16 @@ function AtlasTreeRow({
 export function AtlasTree() {
   const [showSaveAs, setShowSaveAs] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [activeTreeId, setActiveTreeId] = useState<string | null>(null);
-  const [allocatedIds, setAllocatedIds] = useState<Set<number>>(new Set());
-  const [history, setHistory] = useState<ReadonlyArray<Set<number>>>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+
+  const {
+    activeTreeId, setActiveTreeId, allocatedIds, history, searchQuery,
+    setSearchQuery, toggleNode, allocatePath, undo, reset, getConfig, loadTree,
+  } = useAtlasTreeStore();
 
   const { data: trees, isLoading } = useAtlasTrees();
   const createTree = useCreateAtlasTree();
   const duplicateTree = useDuplicateAtlasTree();
-  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
   const queryClient = useQueryClient();
 
   const activeTree = trees?.find((t) => t.id === activeTreeId);
@@ -167,58 +169,24 @@ export function AtlasTree() {
     maxY: treeData.max_y,
   }), []);
 
-  const pushHistory = useCallback((current: Set<number>) => {
-    setHistory((prev) => [...prev.slice(-49), current]);
-  }, []);
-
   const handleToggleNode = useCallback((nodeId: number) => {
-    setAllocatedIds((prev) => {
-      if (prev.has(nodeId)) {
-        // Deallocate: remove node and prune anything disconnected from root
-        const stringIds = new Set(Array.from(prev).map(String));
-        const reachable = pruneDisconnected(String(nodeId), stringIds, rawNodes);
-        pushHistory(prev);
-        return new Set(Array.from(reachable).map(Number));
-      }
-      const next = new Set(prev);
-      next.add(nodeId);
-      pushHistory(prev);
-      return next;
-    });
-  }, [rawNodes, pushHistory]);
+    toggleNode(nodeId, rawNodes, pruneDisconnected);
+  }, [rawNodes, toggleNode]);
 
   const handleUndo = useCallback(() => {
-    if (history.length === 0) return;
-    const previous = history[history.length - 1];
-    setHistory((prev) => prev.slice(0, -1));
-    setAllocatedIds(previous);
-  }, [history]);
+    undo();
+  }, [undo]);
 
   const handleReset = useCallback(() => {
-    if (allocatedIds.size === 0) return;
-    pushHistory(allocatedIds);
-    setAllocatedIds(new Set());
-  }, [allocatedIds, pushHistory]);
+    reset();
+  }, [reset]);
 
   const handleAllocatePath = useCallback((nodeIds: number[]) => {
-    if (nodeIds.length === 0) return;
-    setAllocatedIds((prev) => {
-      pushHistory(prev);
-      const next = new Set(prev);
-      for (const id of nodeIds) next.add(id);
-      return next;
-    });
-  }, [pushHistory]);
-
-  function buildConfig(): AtlasTreeConfig {
-    return {
-      allocatedNodeIds: Array.from(allocatedIds),
-      treeVersion: treeData.tree,
-    };
-  }
+    allocatePath(nodeIds);
+  }, [allocatePath]);
 
   function handleSaveAs(name: string) {
-    const config = buildConfig();
+    const config = getConfig(treeData.tree);
     createTree.mutate({ name, config }, {
       onSuccess: (saved) => { setActiveTreeId(saved.id); },
     });
@@ -233,7 +201,7 @@ export function AtlasTree() {
 
   function handleSaveOverwrite() {
     if (!activeTreeId) return;
-    const config = buildConfig();
+    const config = getConfig(treeData.tree);
     overwriteMutation.mutate({ config });
   }
 
@@ -242,18 +210,14 @@ export function AtlasTree() {
       { name: `${tree.name} (copy)`, config: tree.config },
       {
         onSuccess: (dup) => {
-          setActiveTreeId(dup.id);
-          setAllocatedIds(new Set(dup.config.allocatedNodeIds));
-          setHistory([]);
+          loadTree(dup.id, dup.config.allocatedNodeIds);
         },
       },
     );
   }
 
   function handleLoadTree(tree: AtlasTreeType) {
-    setActiveTreeId(tree.id);
-    setAllocatedIds(new Set(tree.config.allocatedNodeIds));
-    setHistory([]);
+    loadTree(tree.id, tree.config.allocatedNodeIds);
   }
 
   return (

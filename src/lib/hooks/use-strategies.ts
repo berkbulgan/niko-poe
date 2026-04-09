@@ -3,25 +3,10 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Strategy } from '@/types/index';
+import type { StrategyItem, StrategyConfig } from '@/types/strategies';
 import * as ipc from '@/lib/ipc';
 
-export interface StrategyItem {
-  itemId: number;
-  name: string;
-  category: string;
-  quantity: number;
-  unitPrice: number;
-  icon: string;
-  mapsPerUse?: number;
-}
-
-export interface StrategyConfig {
-  items: StrategyItem[];
-  averageMapCost: number;
-  mapCount: number;
-  filterPresetId: string | null;
-  atlasTreeId: string | null;
-}
+export type { StrategyItem, StrategyConfig };
 
 // Parsed view of a Strategy — config as an object instead of a JSON string.
 export interface StrategyParsed extends Omit<Strategy, 'config'> {
