@@ -50,6 +50,51 @@ const MIGRATIONS: &[(&str, &str)] = &[
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         );",
     ),
+    (
+        "005_create_snapshot_tables",
+        "CREATE TABLE IF NOT EXISTS snapshot_configs (
+            id          TEXT PRIMARY KEY NOT NULL,
+            name        TEXT NOT NULL,
+            league      TEXT NOT NULL,
+            tab_ids     TEXT NOT NULL,
+            strategy_id TEXT,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS stash_snapshots (
+            id              TEXT PRIMARY KEY NOT NULL,
+            config_id       TEXT NOT NULL,
+            label           TEXT,
+            total_chaos     REAL NOT NULL,
+            total_items     INTEGER NOT NULL,
+            unpriced_count  INTEGER NOT NULL,
+            divine_rate     REAL NOT NULL,
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (config_id) REFERENCES snapshot_configs(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_snapshots_config_id
+            ON stash_snapshots(config_id);
+
+        CREATE INDEX IF NOT EXISTS idx_snapshots_created_at
+            ON stash_snapshots(created_at);
+
+        CREATE TABLE IF NOT EXISTS snapshot_items (
+            id            TEXT PRIMARY KEY NOT NULL,
+            snapshot_id   TEXT NOT NULL,
+            item_name     TEXT NOT NULL,
+            type_line     TEXT NOT NULL,
+            stack_size    INTEGER NOT NULL,
+            chaos_value   REAL,
+            frame_type    INTEGER,
+            icon          TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (snapshot_id) REFERENCES stash_snapshots(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_snapshot_items_snapshot_id
+            ON snapshot_items(snapshot_id);",
+    ),
 ];
 
 /// Runs all pending migrations on the given pool.
