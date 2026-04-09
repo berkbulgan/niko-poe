@@ -28,7 +28,7 @@ export function LineChart({
 }: LineChartProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+  const padding = { top: 20, right: 20, bottom: 30, left: 70 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
