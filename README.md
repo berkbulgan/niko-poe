@@ -109,6 +109,12 @@ Found a bug or have a feature request? Please [open an issue](https://github.com
 - [ ] Strategy profit history over time
 - [ ] macOS / Linux builds
 
+## Support
+
+If N.I.K.O. helps your mapping, consider buying me a coffee:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/berkbulgan)
+
 ## License
 
 Private — Not affiliated with Grinding Gear Games.
