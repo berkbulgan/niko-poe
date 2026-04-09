@@ -74,12 +74,3 @@ export function useDuplicateStrategy() {
   });
 }
 
-// Import by share code is a Phase 4 feature (requires GGG OAuth / server).
-// Keeping the hook stub so call sites compile.
-export function useImportStrategy(_code: string) {
-  const queryClient = useQueryClient();
-  return useMutation<StrategyParsed, Error, void>({
-    mutationFn: async () => { throw new Error('Import not yet implemented'); },
-    onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); },
-  });
-}

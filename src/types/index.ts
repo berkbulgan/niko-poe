@@ -124,6 +124,14 @@ export interface UpdateAtlasTreeInput {
   config?: string;
 }
 
+// --- Sharing ---
+// Mirrors src-tauri/src/commands/sharing.rs DecodeResult
+
+export interface DecodeResult {
+  entityType: string;
+  payloadJson: string;
+}
+
 // --- Trade & Price IPC types ---
 // All fields match Rust serde(rename_all = "camelCase") structs in commands/trade.rs and commands/prices.rs.
 

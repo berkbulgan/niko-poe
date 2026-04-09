@@ -12,10 +12,10 @@ import {
   useUpdatePreset,
   useDuplicatePreset,
   useDeletePreset,
-  useImportPreset,
   type FilterPresetConfig,
   type FilterPreset,
 } from '@/lib/hooks/use-filter-presets';
+import { useImportEntity } from '@/lib/hooks/use-sharing';
 import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
@@ -69,12 +69,12 @@ function ImportModal({
   onClose: () => void;
 }) {
   const [code, setCode] = useState('');
-  const importPreset = useImportPreset(code);
+  const importEntity = useImportEntity();
 
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (code.length === 8) {
-      importPreset.mutate(undefined, {
+    if (code.trim()) {
+      importEntity.mutate({ code }, {
         onSuccess: () => { setCode(''); onClose(); },
       });
     }
@@ -84,24 +84,23 @@ function ImportModal({
     <Modal isOpen={open} onClose={onClose} title="Import Preset">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">8-Digit Share Code</label>
+          <label className="mb-1.5 block text-xs text-poe-text-muted">Share Code or Pastebin URL</label>
           <Input
             value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            placeholder="12345678"
-            maxLength={8}
-            className="font-mono text-lg tracking-[0.3em] text-poe-currency"
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="F... or pastebin.com/..."
+            className="font-mono text-sm text-poe-currency"
             autoFocus
             required
           />
         </div>
-        {importPreset.isError && (
-          <p className="text-xs text-poe-error">Preset not found. Check the code.</p>
+        {importEntity.isError && (
+          <p className="text-xs text-poe-error">Import failed. Check the code and try again.</p>
         )}
         <div className="flex justify-end gap-3">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={code.length !== 8 || importPreset.isPending}>
-            {importPreset.isPending ? 'Importing...' : 'Import'}
+          <Button type="submit" variant="primary" disabled={!code.trim() || importEntity.isPending}>
+            {importEntity.isPending ? 'Importing...' : 'Import'}
           </Button>
         </div>
       </form>

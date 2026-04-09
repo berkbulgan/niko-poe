@@ -26,6 +26,7 @@ use commands::{
         create_regex_filter, delete_regex_filter, get_regex_filter, get_regex_filters,
         update_regex_filter,
     },
+    sharing::{content_hash, decode_share_code, encode_share_code, import_from_pastebin},
     stash::{get_stash_tab_contents, get_stash_tabs},
     strategies::{
         create_strategy, delete_strategy, get_strategy, get_strategies, update_strategy,
@@ -137,6 +138,11 @@ pub fn run() {
             // stash (Phase 4)
             get_stash_tabs,
             get_stash_tab_contents,
+            // sharing
+            encode_share_code,
+            decode_share_code,
+            import_from_pastebin,
+            content_hash,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
