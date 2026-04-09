@@ -1,7 +1,7 @@
 // ABOUTME: Filters page — preset sidebar + map mod picker.
 // ABOUTME: Left panel: saved presets with share codes. Right panel: avoid/prefer mod columns.
 
-import { useState, useRef, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -12,14 +12,14 @@ import {
   useUpdatePreset,
   useDuplicatePreset,
   useDeletePreset,
-  type FilterPresetConfig,
   type FilterPreset,
 } from '@/lib/hooks/use-filter-presets';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
-import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
-import { useQueryClient, useMutation } from '@tanstack/react-query';
+import { StatPicker } from '@/components/filters/stat-picker';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFiltersStore } from '@/lib/stores/filters-store';
 
 function SavePresetModal({
   open,
@@ -120,23 +120,33 @@ function PresetRow({
 export function Filters() {
   const [showSaveAs, setShowSaveAs] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [activePresetId, setActivePresetId] = useState<string | null>(null);
-  const pickerRef = useRef<StatPickerRef>(null);
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+
+  const { activePresetId, setActivePresetId, getConfig, loadConfig } = useFiltersStore();
 
   const { data: presets, isLoading } = useFilterPresets();
   const createPreset = useCreatePreset();
   const duplicatePreset = useDuplicatePreset();
-  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+  const queryClient = useQueryClient();
 
   // Find active preset for Save (overwrite) operation
   const activePreset = presets?.find((p) => p.id === activePresetId);
 
+  const updatePreset = useUpdatePreset(activePresetId ?? '');
+
+  // Detect unsaved changes by comparing current store state to saved preset config
+  const currentConfig = getConfig();
+  const hasUnsavedChanges = activePreset
+    ? JSON.stringify(currentConfig) !== JSON.stringify(activePreset.config)
+    : currentConfig.avoidModIds.length > 0 || currentConfig.preferModIds.length > 0 ||
+      currentConfig.quantity !== '' || currentConfig.packSize !== '' ||
+      currentConfig.rarity !== '' || currentConfig.quality !== '' ||
+      currentConfig.moreCurrency !== '' || currentConfig.moreMaps !== '' ||
+      currentConfig.moreScarabs !== '' || currentConfig.moreDivination !== '' ||
+      currentConfig.corrupted !== 'natural' || currentConfig.isNightmareMap === true;
+
   function handleSaveAs(name: string) {
-    const config = pickerRef.current?.getConfig();
-    if (!config) {
-      console.error('[Filters] getConfig() returned null — StatPicker ref not attached');
-      return;
-    }
+    const config = getConfig();
     createPreset.mutate({ name, config }, {
       onSuccess: (saved) => {
         setActivePresetId(saved.id);
@@ -146,15 +156,9 @@ export function Filters() {
     });
   }
 
-  const queryClient = useQueryClient();
-
-  // Phase 2: replace with ipc.updateFilterPreset() call
-  const updatePreset = useUpdatePreset(activePresetId ?? '');
-
   function handleSaveOverwrite() {
     if (!activePresetId) return;
-    const config = pickerRef.current?.getConfig();
-    if (!config) return;
+    const config = getConfig();
     updatePreset.mutate({ config }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
@@ -165,13 +169,13 @@ export function Filters() {
   function handleDuplicate(preset: FilterPreset) {
     duplicatePreset.mutate(
       { name: `${preset.name} (copy)`, config: preset.config },
-      { onSuccess: (dup) => { setActivePresetId(dup.id); pickerRef.current?.loadConfig(dup.config); } },
+      { onSuccess: (dup) => { setActivePresetId(dup.id); loadConfig(dup.config); } },
     );
   }
 
   function handleLoadPreset(preset: FilterPreset) {
     setActivePresetId(preset.id);
-    pickerRef.current?.loadConfig(preset.config);
+    loadConfig(preset.config);
   }
 
   return (
@@ -218,7 +222,10 @@ export function Filters() {
       <main className="flex flex-1 flex-col overflow-y-auto">
         <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
           <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Map Mod Picker</h3>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
+              <span className="text-xs text-poe-currency">Unsaved Changes</span>
+            )}
             {activePreset && (
               <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
             )}
@@ -228,7 +235,7 @@ export function Filters() {
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
-          <StatPicker ref={pickerRef} />
+          <StatPicker />
         </div>
       </main>
 

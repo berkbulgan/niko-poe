@@ -3,8 +3,8 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
-import type { FilterPresetConfig } from '@/lib/hooks/use-filter-presets';
-import type { StrategyConfig } from '@/lib/hooks/use-strategies';
+import type { FilterPresetConfig } from '@/types/filters';
+import type { StrategyConfig } from '@/types/strategies';
 import type { AtlasTreeConfig } from '@/types/atlas-tree';
 
 // --- Export payload shapes ---
