@@ -18,6 +18,7 @@ import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { StatPicker } from '@/components/filters/stat-picker';
+import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { useQueryClient } from '@tanstack/react-query';
 import { useFiltersStore } from '@/lib/stores/filters-store';
 
@@ -220,20 +221,13 @@ export function Filters() {
 
       {/* ── Right panel: Map Mod Picker ── */}
       <main className="flex flex-1 flex-col overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
-          <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Map Mod Picker</h3>
-          <div className="flex items-center gap-2">
-            {hasUnsavedChanges && (
-              <span className="text-xs text-poe-currency">Unsaved Changes</span>
-            )}
-            {activePreset && (
-              <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
-            )}
-            <Button variant="primary" size="sm" onClick={() => setShowSaveAs(true)}>
-              {activePreset ? 'Save As' : 'Save'}
-            </Button>
-          </div>
-        </div>
+        <EditorToolbar
+          title="Map Mod Picker"
+          hasUnsavedChanges={hasUnsavedChanges}
+          hasActiveEntity={!!activePreset}
+          onSave={handleSaveOverwrite}
+          onSaveAs={() => setShowSaveAs(true)}
+        />
         <div className="flex-1 overflow-hidden">
           <StatPicker />
         </div>

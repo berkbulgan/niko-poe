@@ -14,6 +14,7 @@ import {
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
+import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
@@ -269,43 +270,41 @@ export function AtlasTree() {
       {/* Center panel: Tree Canvas */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-2">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Atlas Skill Tree</h3>
+        <EditorToolbar
+          title="Atlas Skill Tree"
+          hasUnsavedChanges={hasUnsavedChanges}
+          hasActiveEntity={!!activeTree}
+          onSave={handleSaveOverwrite}
+          onSaveAs={() => setShowSaveAs(true)}
+          compact
+          titleExtra={
             <span className={`text-xs ${allocatedIds.size > MAX_POINTS ? 'text-poe-error font-semibold' : 'text-poe-text-muted'}`}>
               {allocatedIds.size} / {MAX_POINTS} pts
             </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleUndo}
-              disabled={history.length === 0}
-              title="Undo (Ctrl+Z)"
-            >
-              Undo
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              disabled={allocatedIds.size === 0}
-            >
-              Reset
-            </Button>
-            <div className="mx-1 h-5 w-px bg-poe-border/30" />
-            {hasUnsavedChanges && (
-              <span className="text-xs text-poe-currency">Unsaved Changes</span>
-            )}
-            {activeTree && (
-              <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
-            )}
-            <Button variant="primary" size="sm" onClick={() => setShowSaveAs(true)}>
-              {activeTree ? 'Save As' : 'Save'}
-            </Button>
-          </div>
-        </div>
+          }
+          actions={
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleUndo}
+                disabled={history.length === 0}
+                title="Undo (Ctrl+Z)"
+              >
+                Undo
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleReset}
+                disabled={allocatedIds.size === 0}
+              >
+                Reset
+              </Button>
+              <div className="mx-1 h-5 w-px bg-poe-border/30" />
+            </>
+          }
+        />
 
         {/* Tree renderer */}
         <div className="relative flex-1">

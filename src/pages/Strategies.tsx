@@ -18,6 +18,7 @@ import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { StrategyBuilder } from '@/components/strategies/strategy-builder';
+import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
 import * as ipc from '@/lib/ipc';
@@ -224,20 +225,13 @@ export function Strategies() {
 
       {/* Right panel: Strategy Builder */}
       <main className="flex flex-1 flex-col overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
-          <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Strategy Cost Calculator</h3>
-          <div className="flex items-center gap-2">
-            {hasUnsavedChanges && (
-              <span className="text-xs text-poe-currency">Unsaved Changes</span>
-            )}
-            {activeStrategy && (
-              <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
-            )}
-            <Button variant="primary" size="sm" onClick={() => setShowSaveAs(true)}>
-              {activeStrategy ? 'Save As' : 'Save'}
-            </Button>
-          </div>
-        </div>
+        <EditorToolbar
+          title="Strategy Cost Calculator"
+          hasUnsavedChanges={hasUnsavedChanges}
+          hasActiveEntity={!!activeStrategy}
+          onSave={handleSaveOverwrite}
+          onSaveAs={() => setShowSaveAs(true)}
+        />
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           <StrategyBuilder />
         </div>
