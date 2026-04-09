@@ -14,7 +14,9 @@ import {
   type StrategyParsed,
 } from '@/lib/hooks/use-strategies';
 import type { Strategy } from '@/types/index';
-import { useImportEntity, useExportEntity } from '@/lib/hooks/use-sharing';
+import { useImportEntity } from '@/lib/hooks/use-sharing';
+import { ExportModal } from '@/components/ui/export-modal';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import {
   StrategyBuilder,
   type StrategyBuilderRef,
@@ -174,7 +176,7 @@ export function Strategies() {
   const { data: strategies, isLoading } = useStrategies();
   const createStrategy = useCreateStrategy();
   const duplicateStrategy = useDuplicateStrategy();
-  const exportEntity = useExportEntity();
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
   const queryClient = useQueryClient();
 
   const activeStrategy = strategies?.find((s) => s.id === activeStrategyId);
@@ -253,7 +255,7 @@ export function Strategies() {
                   active={activeStrategyId === strategy.id}
                   onSelect={() => handleLoadStrategy(strategy)}
                   onDuplicate={() => handleDuplicate(strategy)}
-                  onExport={() => exportEntity.mutate({ type: 'S', name: strategy.name, config: strategy.config })}
+                  onExport={() => setExportInput({ type: 'S', name: strategy.name, config: strategy.config })}
                 />
               ))}
             </div>
@@ -281,6 +283,7 @@ export function Strategies() {
 
       <SaveStrategyModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
       <ImportStrategyModal open={showImport} onClose={() => setShowImport(false)} />
+      <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
 }

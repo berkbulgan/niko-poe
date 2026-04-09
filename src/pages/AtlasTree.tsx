@@ -14,7 +14,9 @@ import {
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
-import { useImportEntity, useExportEntity } from '@/lib/hooks/use-sharing';
+import { useImportEntity } from '@/lib/hooks/use-sharing';
+import { ExportModal } from '@/components/ui/export-modal';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
@@ -185,7 +187,7 @@ export function AtlasTree() {
   const { data: trees, isLoading } = useAtlasTrees();
   const createTree = useCreateAtlasTree();
   const duplicateTree = useDuplicateAtlasTree();
-  const exportEntity = useExportEntity();
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
   const queryClient = useQueryClient();
 
   const activeTree = trees?.find((t) => t.id === activeTreeId);
@@ -332,7 +334,7 @@ export function AtlasTree() {
                   active={activeTreeId === tree.id}
                   onSelect={() => handleLoadTree(tree)}
                   onDuplicate={() => handleDuplicate(tree)}
-                  onExport={() => exportEntity.mutate({ type: 'A', name: tree.name, config: tree.config })}
+                  onExport={() => setExportInput({ type: 'A', name: tree.name, config: tree.config })}
                 />
               ))}
             </div>
@@ -423,6 +425,7 @@ export function AtlasTree() {
 
       <SaveAtlasTreeModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
       <ImportAtlasTreeModal open={showImport} onClose={() => setShowImport(false)} />
+      <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
 }

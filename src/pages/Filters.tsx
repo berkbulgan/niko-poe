@@ -15,7 +15,9 @@ import {
   type FilterPresetConfig,
   type FilterPreset,
 } from '@/lib/hooks/use-filter-presets';
-import { useImportEntity, useExportEntity } from '@/lib/hooks/use-sharing';
+import { useImportEntity } from '@/lib/hooks/use-sharing';
+import { ExportModal } from '@/components/ui/export-modal';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
@@ -170,7 +172,7 @@ export function Filters() {
   const { data: presets, isLoading } = useFilterPresets();
   const createPreset = useCreatePreset();
   const duplicatePreset = useDuplicatePreset();
-  const exportEntity = useExportEntity();
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
 
   // Find active preset for Save (overwrite) operation
   const activePreset = presets?.find((p) => p.id === activePresetId);
@@ -250,7 +252,7 @@ export function Filters() {
                   active={activePresetId === preset.id}
                   onSelect={() => handleLoadPreset(preset)}
                   onDuplicate={() => handleDuplicate(preset)}
-                  onExport={() => exportEntity.mutate({ type: 'F', name: preset.name, config: preset.config })}
+                  onExport={() => setExportInput({ type: 'F', name: preset.name, config: preset.config })}
                 />
               ))}
             </div>
@@ -278,6 +280,7 @@ export function Filters() {
 
       <SavePresetModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
+      <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
 }

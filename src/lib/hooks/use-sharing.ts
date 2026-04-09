@@ -3,7 +3,6 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
-import { copyToClipboard } from '@/lib/platform';
 import type { FilterPresetConfig } from '@/lib/hooks/use-filter-presets';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
 import type { AtlasTreeConfig } from '@/types/atlas-tree';
@@ -110,7 +109,7 @@ interface ExportStrategyInput {
   config: StrategyConfig;
 }
 
-type ExportInput = ExportFilterPresetInput | ExportAtlasTreeInput | ExportStrategyInput;
+export type ExportInput = ExportFilterPresetInput | ExportAtlasTreeInput | ExportStrategyInput;
 
 export function useExportEntity() {
   return useMutation<string, Error, ExportInput>({
@@ -144,7 +143,6 @@ export function useExportEntity() {
       }
 
       const code = await ipc.encodeShareCode(input.type, payload);
-      await copyToClipboard(code);
       return code;
     },
   });
