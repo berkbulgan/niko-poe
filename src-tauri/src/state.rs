@@ -55,11 +55,13 @@ pub struct NinjaPrice {
     pub details_id: Option<String>,
 }
 
-/// Stores all poe.ninja prices fetched at app startup/refresh.
+/// Stores all poe.ninja prices fetched on demand when a league is selected.
 pub struct NinjaPriceCache {
     /// All price entries from poe.ninja, keyed by lowercase name for fast lookup.
     /// Multiple entries per name are possible (e.g. different gem levels).
     pub prices: HashMap<String, Vec<NinjaPrice>>,
+    /// Which league these prices belong to.
+    pub league: Option<String>,
     pub fetched_at: Option<std::time::Instant>,
     pub ttl_secs: u64,
     pub is_loading: bool,
@@ -69,6 +71,7 @@ impl NinjaPriceCache {
     pub fn new() -> Self {
         Self {
             prices: HashMap::new(),
+            league: None,
             fetched_at: None,
             ttl_secs: 3600,
             is_loading: false,

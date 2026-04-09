@@ -10,9 +10,10 @@ import {
   useState,
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getLeagues } from '@/lib/ipc';
+import { getLeagues, fetchAllPrices } from '@/lib/ipc';
 import type { League } from '@/types/index';
 import { storage } from '@/lib/platform';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface LeagueContextValue {
   leagues: League[];
@@ -56,6 +57,18 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
       setCurrentLeague(leagues[0].id);
     }
   }, [leagues, currentLeague]);
+
+  const queryClient = useQueryClient();
+
+  // Fetch poe.ninja prices whenever the active league changes.
+  useEffect(() => {
+    if (currentLeague) {
+      void fetchAllPrices(currentLeague).then(() => {
+        void queryClient.invalidateQueries({ queryKey: ['prices'] });
+        void queryClient.invalidateQueries({ queryKey: ['item-prices'] });
+      });
+    }
+  }, [currentLeague, queryClient]);
 
   const setLeague = useCallback((id: string) => {
     setCurrentLeague(id);

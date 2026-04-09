@@ -1,49 +1,14 @@
 // ABOUTME: Vite entry point — mounts the React Router app into #root.
-// ABOUTME: Shows a loading screen while fetching bulk price data from poe.ninja on startup.
+// ABOUTME: Price data is fetched on demand when a league is selected, not at startup.
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { Providers } from './providers';
-import { fetchAllPrices, getLeagues } from './lib/ipc';
 import './globals.css';
 
 function App() {
-  const [ready, setReady] = useState(false);
-  const [status, setStatus] = useState('Loading price data...');
-
-  useEffect(() => {
-    async function init() {
-      try {
-        setStatus('Detecting active league...');
-        const leagues = await getLeagues();
-        const league = leagues.length > 0 ? leagues[0].id : 'Mirage';
-        setStatus(`Fetching prices from poe.ninja (${league})...`);
-        const count = await fetchAllPrices(league);
-        setStatus(`Loaded ${count.toLocaleString()} items`);
-      } catch {
-        setStatus('Price fetch failed — continuing without prices');
-      }
-      // Brief pause so user sees the result
-      await new Promise((r) => setTimeout(r, 400));
-      setReady(true);
-    }
-    void init();
-  }, []);
-
-  if (!ready) {
-    return (
-      <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-poe-bg">
-        <h1 className="text-2xl font-bold tracking-wider text-poe-gold">N.I.K.O.</h1>
-        <p className="text-sm text-poe-text-muted">{status}</p>
-        <div className="h-1 w-48 overflow-hidden rounded bg-poe-panel-light">
-          <div className="h-full animate-pulse rounded bg-poe-gold/60" style={{ width: '60%' }} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <Providers>
       <RouterProvider router={router} />

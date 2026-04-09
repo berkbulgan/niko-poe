@@ -46,20 +46,23 @@ const ITEM_TYPES: &[&str] = &[
 ];
 
 /// Fetches all poe.ninja prices for a league (currency + item overviews).
-/// Called at app startup. Stores everything in NinjaPriceCache.
+/// Called when the user selects a league. Invalidates cache if league changed.
 /// Returns the total number of priced items loaded.
 #[tauri::command]
 pub async fn fetch_all_prices(
     league: String,
     state: State<'_, AppState>,
 ) -> Result<u32> {
-    // Check if cache is still fresh
+    // Check if cache is still fresh AND for the same league
     {
         let cache = state.ninja_prices.lock().await;
-        if let Some(fetched_at) = cache.fetched_at {
-            if fetched_at.elapsed().as_secs() < cache.ttl_secs {
-                let count: usize = cache.prices.values().map(|v| v.len()).sum();
-                return Ok(count as u32);
+        let same_league = cache.league.as_deref() == Some(&league);
+        if same_league {
+            if let Some(fetched_at) = cache.fetched_at {
+                if fetched_at.elapsed().as_secs() < cache.ttl_secs {
+                    let count: usize = cache.prices.values().map(|v| v.len()).sum();
+                    return Ok(count as u32);
+                }
             }
         }
     }
@@ -67,6 +70,7 @@ pub async fn fetch_all_prices(
     {
         let mut cache = state.ninja_prices.lock().await;
         cache.is_loading = true;
+        cache.league = Some(league.clone());
     }
 
     let client = &state.http_client;
