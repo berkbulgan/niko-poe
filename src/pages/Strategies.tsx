@@ -1,11 +1,7 @@
 // ABOUTME: Strategies page — preset sidebar + strategy cost calculator.
 // ABOUTME: Left panel: saved strategies with share codes. Right panel: strategy-builder component.
 
-import { useState, type FormEvent } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Modal } from '@/components/ui/modal';
-import { Spinner } from '@/components/ui/spinner';
+import { useState } from 'react';
 import {
   useStrategies,
   useCreateStrategy,
@@ -16,56 +12,16 @@ import {
 import type { Strategy } from '@/types/index';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
-import type { ExportInput } from '@/lib/hooks/use-sharing';
-import { StrategyBuilder } from '@/components/strategies/strategy-builder';
+import { SaveEntityModal } from '@/components/ui/save-entity-modal';
+import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
+import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { EditorToolbar } from '@/components/ui/editor-toolbar';
+import { StrategyBuilder } from '@/components/strategies/strategy-builder';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
 import * as ipc from '@/lib/ipc';
 import { useStrategiesStore } from '@/lib/stores/strategies-store';
-
-function SaveStrategyModal({
-  open,
-  onClose,
-  onSave,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onSave: (name: string) => void;
-}) {
-  const [name, setName] = useState('');
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (name.trim()) {
-      onSave(name.trim());
-      setName('');
-      onClose();
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Save Strategy">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">Strategy Name</label>
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Deli Scarab Blast, Legion Farming..."
-            autoFocus
-            required
-          />
-        </div>
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={!name.trim()}>Save</Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
-
 
 function StrategyRow({
   strategy,
@@ -83,40 +39,15 @@ function StrategyRow({
   const deleteStrategy = useDeleteStrategy(strategy.id);
 
   return (
-    <div className={`border-l-2 transition-all duration-100 ${active ? 'border-poe-gold bg-poe-gold/8' : 'border-transparent hover:bg-poe-panel-light/30'}`}>
-      <button
-        type="button"
-        onClick={onSelect}
-        className="w-full px-3 py-2 text-left"
-      >
-        <span className="block truncate text-sm text-poe-text">{strategy.name}</span>
-      </button>
-      {active && (
-        <div className="flex items-center gap-2 px-3 pb-2">
-          <button
-            onClick={onExport}
-            className="text-xs text-poe-text-dim hover:text-poe-gold"
-          >
-            Export
-          </button>
-          <span className="text-poe-border">·</span>
-          <button
-            onClick={onDuplicate}
-            className="text-xs text-poe-text-dim hover:text-poe-gold"
-          >
-            Duplicate
-          </button>
-          <span className="text-poe-border">·</span>
-          <button
-            onClick={() => deleteStrategy.mutate(undefined)}
-            disabled={deleteStrategy.isPending}
-            className="text-xs text-poe-text-dim hover:text-poe-error"
-          >
-            {deleteStrategy.isPending ? '...' : 'Delete'}
-          </button>
-        </div>
-      )}
-    </div>
+    <SidebarEntityRow
+      name={strategy.name}
+      active={active}
+      onSelect={onSelect}
+      onExport={onExport}
+      onDuplicate={onDuplicate}
+      onDelete={() => deleteStrategy.mutate(undefined)}
+      isDeleting={deleteStrategy.isPending}
+    />
   );
 }
 
@@ -185,43 +116,25 @@ export function Strategies() {
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
-      {/* Left panel: Strategies */}
-      <aside className="flex w-48 shrink-0 flex-col border-r border-poe-border/30 xl:w-56">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-poe-border/20 px-3 py-3">
-          <h2 className="text-sm font-semibold text-poe-text-dim">Strategies</h2>
-          <Button variant="ghost" size="sm" onClick={() => setShowImport(true)}>
-            Import
-          </Button>
-        </div>
-
-        {/* Strategy list */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex justify-center py-8"><Spinner /></div>
-          ) : !strategies || strategies.length === 0 ? (
-            <div className="p-4 text-center">
-              <p className="text-sm text-poe-text-dim">No strategies saved</p>
-              <p className="mt-1 text-xs text-poe-text-muted">
-                Build your strategy and hit Save
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-px p-1">
-              {strategies.map((strategy) => (
-                <StrategyRow
-                  key={strategy.id}
-                  strategy={strategy}
-                  active={activeStrategyId === strategy.id}
-                  onSelect={() => handleLoadStrategy(strategy)}
-                  onDuplicate={() => handleDuplicate(strategy)}
-                  onExport={() => setExportInput({ type: 'S', name: strategy.name, config: strategy.config })}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </aside>
+      <EntitySidebar
+        title="Strategies"
+        onImport={() => setShowImport(true)}
+        isLoading={isLoading}
+        isEmpty={!strategies || strategies.length === 0}
+        emptyTitle="No strategies saved"
+        emptyDescription="Build your strategy and hit Save"
+      >
+        {strategies?.map((strategy) => (
+          <StrategyRow
+            key={strategy.id}
+            strategy={strategy}
+            active={activeStrategyId === strategy.id}
+            onSelect={() => handleLoadStrategy(strategy)}
+            onDuplicate={() => handleDuplicate(strategy)}
+            onExport={() => setExportInput({ type: 'S', name: strategy.name, config: strategy.config })}
+          />
+        ))}
+      </EntitySidebar>
 
       {/* Right panel: Strategy Builder */}
       <main className="flex flex-1 flex-col overflow-y-auto">
@@ -237,7 +150,14 @@ export function Strategies() {
         </div>
       </main>
 
-      <SaveStrategyModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
+      <SaveEntityModal
+        open={showSaveAs}
+        onClose={() => setShowSaveAs(false)}
+        onSave={handleSaveAs}
+        title="Save Strategy"
+        placeholder="e.g. Deli Scarab Blast, Legion Farming..."
+        label="Strategy Name"
+      />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
       <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
