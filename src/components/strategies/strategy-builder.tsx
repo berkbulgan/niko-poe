@@ -1,5 +1,5 @@
 // ABOUTME: Strategy cost calculator with item picker, quantity editor, and cost summary.
-// ABOUTME: Links to filter presets for trade search. Uses poe.watch prices for cost calculation.
+// ABOUTME: Links to filter presets for trade search. Uses poe.ninja prices for cost calculation.
 
 import {
   useState,
@@ -96,7 +96,7 @@ function ItemDropdown({
         <div className="max-h-48 overflow-y-auto border border-poe-border/20">
           {filtered.map((item) => (
             <button
-              key={item.id}
+              key={item.name}
               type="button"
               onClick={() => onSelect(item)}
               className="flex w-full items-center justify-between border-b border-poe-border/10 px-3 py-1.5 text-left transition-colors hover:bg-poe-panel-light/30"
@@ -108,7 +108,7 @@ function ItemDropdown({
                 <span className="text-sm text-poe-text">{item.name}</span>
               </span>
               <span className="flex items-center gap-1 text-xs text-poe-currency">
-                {item.mean.toFixed(1)}
+                {item.chaosValue.toFixed(1)}
                 <PoeIcon name="chaos" size={12} />
               </span>
             </button>
@@ -446,11 +446,11 @@ export function StrategyBuilder() {
   const handleAddItem = useCallback((poeItem: PriceItem) => {
     const mapsPerUse = MAPS_PER_USE[category] ?? 1;
     addItem({
-      itemId: poeItem.id,
+      itemId: 0,
       name: poeItem.name,
       category,
       quantity: 1,
-      unitPrice: poeItem.mean,
+      unitPrice: poeItem.chaosValue,
       icon: poeItem.icon,
       mapsPerUse,
     });
