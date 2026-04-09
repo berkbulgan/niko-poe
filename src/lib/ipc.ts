@@ -218,3 +218,51 @@ export function getStashTabs(league: string): Promise<StashTab[]> {
 export function getStashTabContents(league: string, stashId: string): Promise<StashItem[]> {
   return invoke<StashItem[]>('get_stash_tab_contents', { league, stashId });
 }
+
+// --- Snapshots ---
+
+import type {
+  SnapshotConfig,
+  CreateSnapshotConfigInput,
+  UpdateSnapshotConfigInput,
+  StashSnapshot,
+  SnapshotSummary,
+  RecentSnapshot,
+  TakeSnapshotInput,
+} from '@/types/snapshots';
+
+export function getSnapshotConfigs(): Promise<SnapshotConfig[]> {
+  return invoke<SnapshotConfig[]>('get_snapshot_configs');
+}
+
+export function createSnapshotConfig(input: CreateSnapshotConfigInput): Promise<SnapshotConfig> {
+  return invoke<SnapshotConfig>('create_snapshot_config', { input });
+}
+
+export function updateSnapshotConfig(id: string, input: UpdateSnapshotConfigInput): Promise<SnapshotConfig> {
+  return invoke<SnapshotConfig>('update_snapshot_config', { id, input });
+}
+
+export function deleteSnapshotConfig(id: string): Promise<void> {
+  return invoke<void>('delete_snapshot_config', { id });
+}
+
+export function takeSnapshot(input: TakeSnapshotInput): Promise<StashSnapshot> {
+  return invoke<StashSnapshot>('take_snapshot', { input });
+}
+
+export function getSnapshots(configId: string): Promise<SnapshotSummary[]> {
+  return invoke<SnapshotSummary[]>('get_snapshots', { configId });
+}
+
+export function getSnapshotDetail(snapshotId: string): Promise<StashSnapshot> {
+  return invoke<StashSnapshot>('get_snapshot_detail', { snapshotId });
+}
+
+export function getRecentSnapshots(): Promise<RecentSnapshot[]> {
+  return invoke<RecentSnapshot[]>('get_recent_snapshots');
+}
+
+export function deleteSnapshot(snapshotId: string): Promise<void> {
+  return invoke<void>('delete_snapshot', { snapshotId });
+}

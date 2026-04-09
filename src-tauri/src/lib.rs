@@ -27,6 +27,11 @@ use commands::{
         update_regex_filter,
     },
     sharing::{content_hash, decode_share_code, encode_share_code, import_from_pastebin},
+    snapshots::{
+        create_snapshot_config, delete_snapshot, delete_snapshot_config, get_recent_snapshots,
+        get_snapshot_configs, get_snapshot_detail, get_snapshots, take_snapshot,
+        update_snapshot_config,
+    },
     stash::{get_stash_tab_contents, get_stash_tabs},
     strategies::{
         create_strategy, delete_strategy, get_strategy, get_strategies, update_strategy,
@@ -143,6 +148,16 @@ pub fn run() {
             decode_share_code,
             import_from_pastebin,
             content_hash,
+            // snapshots
+            get_snapshot_configs,
+            create_snapshot_config,
+            update_snapshot_config,
+            delete_snapshot_config,
+            take_snapshot,
+            get_snapshots,
+            get_snapshot_detail,
+            get_recent_snapshots,
+            delete_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
