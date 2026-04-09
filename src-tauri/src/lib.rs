@@ -21,7 +21,7 @@ use commands::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
         update_filter_preset,
     },
-    prices::{fetch_all_prices, get_prices, is_prices_loading, lookup_item_prices},
+    prices::{fetch_all_prices, get_prices, is_prices_loading, lookup_item_prices, lookup_item_prices_advanced},
     regex_filters::{
         create_regex_filter, delete_regex_filter, get_regex_filter, get_regex_filters,
         update_regex_filter,
@@ -86,8 +86,7 @@ pub fn run() {
                 pool,
                 http_client,
                 rate_limiter: Arc::new(Mutex::new(state::RateLimiter::new())),
-                price_cache: Arc::new(Mutex::new(state::PriceCache::new())),
-                compact_prices: Arc::new(Mutex::new(state::CompactPriceCache::new())),
+                ninja_prices: Arc::new(Mutex::new(state::NinjaPriceCache::new())),
                 league_cache: Arc::new(Mutex::new(state::LeagueCache::new())),
                 stat_cache: Arc::new(Mutex::new(state::StatCache::new())),
                 ggg_token: Arc::new(Mutex::new(None)),
@@ -133,6 +132,7 @@ pub fn run() {
             // prices (Phase 3)
             get_prices,
             lookup_item_prices,
+            lookup_item_prices_advanced,
             fetch_all_prices,
             is_prices_loading,
             // auth (Phase 4)

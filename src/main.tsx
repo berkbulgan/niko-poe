@@ -1,5 +1,5 @@
 // ABOUTME: Vite entry point — mounts the React Router app into #root.
-// ABOUTME: Shows a loading screen while fetching bulk price data from poe.watch on startup.
+// ABOUTME: Shows a loading screen while fetching bulk price data from poe.ninja on startup.
 
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -16,7 +16,7 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
-        setStatus('Fetching prices from poe.watch...');
+        setStatus('Fetching prices from poe.ninja...');
         const count = await fetchAllPrices('Mirage');
         setStatus(`Loaded ${count.toLocaleString()} items`);
       } catch {

@@ -390,9 +390,9 @@ pub async fn take_snapshot(
         entry.stack_size += item.stack_size.unwrap_or(1) as i32;
     }
 
-    // 5. Look up prices from compact cache
-    let price_map = {
-        let cache = state.compact_prices.lock().await;
+    // 5. Look up prices from ninja cache
+    let ninja_cache = {
+        let cache = state.ninja_prices.lock().await;
         cache.prices.clone()
     };
 
@@ -402,7 +402,14 @@ pub async fn take_snapshot(
 
     for (_name, agg) in &aggregated {
         let key = agg.item_name.to_lowercase();
-        let chaos_value = price_map.get(&key).map(|(mean, _)| *mean);
+        let chaos_value = ninja_cache
+            .get(&key)
+            .and_then(|entries| {
+                entries
+                    .iter()
+                    .max_by_key(|e| e.listing_count.unwrap_or(0))
+                    .map(|e| e.chaos_value)
+            });
 
         if let Some(price) = chaos_value {
             total_chaos += price * agg.stack_size as f64;
@@ -421,10 +428,10 @@ pub async fn take_snapshot(
         });
     }
 
-    // 6. Get divine rate from compact cache
-    let divine_rate = price_map
+    // 6. Get divine rate from ninja cache
+    let divine_rate = ninja_cache
         .get("divine orb")
-        .map(|(mean, _)| *mean)
+        .and_then(|entries| entries.first().map(|e| e.chaos_value))
         .unwrap_or(0.0);
 
     // 7. Write to database

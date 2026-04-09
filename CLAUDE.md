@@ -86,7 +86,7 @@ GGG's official `league.json` export from [atlastree-export](https://github.com/g
 ## External APIs
 
 - **PoE Trade**: `www.pathofexile.com/api/trade/` — rate limited, proxied through Rust (PoE 1 uses `/api/trade/`, NOT `/api/trade2/`)
-- **poe.watch**: `poe.watch/api` — price data, 15-min cache
+- **poe.ninja**: `poe.ninja/api/data` — price data (currency + 27 item categories), 1-hour cache
 - **GGG OAuth**: `oauth.pathofexile.com` — PKCE flow, localhost callback via tauri-plugin-oauth
 - **GGG Stash**: `api.pathofexile.com/stash/` — requires OAuth token
 

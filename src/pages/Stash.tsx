@@ -205,12 +205,14 @@ interface ProcessedItem {
   priceAmount: number;
   priceCurrency: string;
   total: number;
-  lowConfidence: boolean;
+  lowListings: boolean;
 }
 
 interface PriceMapEntry {
-  mean: number;
-  lowConfidence: boolean;
+  chaosValue: number;
+  icon: string;
+  category: string;
+  listingCount: number | null;
 }
 
 function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; priceMap: Record<string, PriceMapEntry>; divinePrice: number }) {
@@ -222,11 +224,11 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
       .map((item): ProcessedItem => {
         const displayName = item.name !== '' ? item.name : item.typeLine;
         const quantity = item.stackSize ?? 1;
-        const watchEntry = priceMap[displayName] ?? priceMap[item.typeLine];
+        const ninjaEntry = priceMap[displayName] ?? priceMap[item.typeLine];
         const notePrice = parsePrice(item.note);
-        const priceAmount = watchEntry ? watchEntry.mean : (notePrice?.amount ?? 0);
-        const priceCurrency = watchEntry ? 'chaos' : (notePrice?.currency ?? '');
-        const lowConfidence = watchEntry?.lowConfidence ?? false;
+        const priceAmount = ninjaEntry ? ninjaEntry.chaosValue : (notePrice?.amount ?? 0);
+        const priceCurrency = ninjaEntry ? 'chaos' : (notePrice?.currency ?? '');
+        const lowListings = (ninjaEntry?.listingCount ?? 0) < 5;
         const total = priceAmount * quantity;
 
         return {
@@ -237,7 +239,7 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
           priceAmount,
           priceCurrency,
           total,
-          lowConfidence,
+          lowListings,
         };
       });
   }, [items, priceMap]);
@@ -332,14 +334,14 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
                 </td>
                 <td className="px-4 py-1.5">
                   <div className="flex items-center justify-end gap-1 text-sm tabular-nums text-poe-text-dim">
-                    {item.lowConfidence && (
+                    {item.lowListings && (
                       <span title="Low confidence — unreliable price">
                         <AlertTriangle size={12} className="shrink-0 text-red-500" />
                       </span>
                     )}
                     {item.priceAmount > 0 ? (
                       <>
-                        <span className={item.lowConfidence ? 'text-poe-text-muted' : ''}>{formatPrice(item.priceAmount)}</span>
+                        <span className={item.lowListings ? 'text-poe-text-muted' : ''}>{formatPrice(item.priceAmount)}</span>
                         <PoeIcon name="chaos" size={14} />
                       </>
                     ) : (

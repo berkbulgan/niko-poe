@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost https://api.pathofexile.com https://www.pathofexile.com https://poe.watch https://poewatch.com https://*.poewatch.com https://oauth.pathofexile.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: https://web.poecdn.com https://*.poecdn.com"
+      "csp": "default-src 'self' ipc: http://ipc.localhost; connect-src 'self' ipc: http://ipc.localhost https://api.pathofexile.com https://www.pathofexile.com https://poe.ninja https://oauth.pathofexile.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: https://web.poecdn.com https://*.poecdn.com"
     }
   },
   "bundle": {

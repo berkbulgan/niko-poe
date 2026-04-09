@@ -147,22 +147,42 @@ export function getPrices(category: string, league: string): Promise<PriceItem[]
   return invoke<PriceItem[]>('get_prices', { category, league });
 }
 
-/** Fetches the entire poe.watch compact dataset for a league. Returns item count. */
+/** Fetches all poe.ninja prices for a league. Returns item count. */
 export function fetchAllPrices(league: string): Promise<number> {
   return invoke<number>('fetch_all_prices', { league });
 }
 
 export interface PriceLookupEntry {
-  mean: number;
-  lowConfidence: boolean;
+  chaosValue: number;
+  icon: string;
+  category: string;
+  listingCount: number | null;
 }
 
-/** Looks up prices for a list of item names from the compact price cache. */
+/** Looks up prices for a list of item names from the ninja price cache. */
 export function lookupItemPrices(itemNames: string[], league: string): Promise<Record<string, PriceLookupEntry>> {
   return invoke<Record<string, PriceLookupEntry>>('lookup_item_prices', { itemNames, league });
 }
 
-/** Returns whether compact prices are currently being fetched. */
+export interface AdvancedLookupItem {
+  name: string;
+  frameType?: number | null;
+  links?: number | null;
+  gemLevel?: number | null;
+  gemQuality?: number | null;
+  corrupted?: boolean | null;
+  mapTier?: number | null;
+  variant?: string | null;
+  baseType?: string | null;
+  itemLevel?: number | null;
+}
+
+/** Advanced price lookup matching item properties (links, gem level, variant, etc.). */
+export function lookupItemPricesAdvanced(items: AdvancedLookupItem[], league: string): Promise<Record<string, PriceLookupEntry>> {
+  return invoke<Record<string, PriceLookupEntry>>('lookup_item_prices_advanced', { items, league });
+}
+
+/** Returns whether prices are currently being fetched. */
 export function isPricesLoading(): Promise<boolean> {
   return invoke<boolean>('is_prices_loading');
 }
