@@ -148,6 +148,12 @@ export function AtlasTree() {
 
   const activeTree = trees?.find((t) => t.id === activeTreeId);
 
+  // Detect unsaved changes by comparing current allocated nodes to saved tree
+  const hasUnsavedChanges = activeTree
+    ? allocatedIds.size !== activeTree.config.allocatedNodeIds.length ||
+      activeTree.config.allocatedNodeIds.some((id) => !allocatedIds.has(id))
+    : allocatedIds.size > 0;
+
   const processedNodes = useMemo(() => processTreeData(treeData), []);
 
   const rawNodes = treeData.nodes;
@@ -289,6 +295,9 @@ export function AtlasTree() {
               Reset
             </Button>
             <div className="mx-1 h-5 w-px bg-poe-border/30" />
+            {hasUnsavedChanges && (
+              <span className="text-xs text-poe-currency">Unsaved Changes</span>
+            )}
             {activeTree && (
               <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
             )}

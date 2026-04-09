@@ -138,6 +138,13 @@ export function Strategies() {
 
   const activeStrategy = strategies?.find((s) => s.id === activeStrategyId);
 
+  // Detect unsaved changes by comparing current store state to saved strategy config
+  const currentConfig = getConfig();
+  const hasUnsavedChanges = activeStrategy
+    ? JSON.stringify(currentConfig) !== JSON.stringify(activeStrategy.config)
+    : currentConfig.items.length > 0 || currentConfig.averageMapCost !== 0 ||
+      currentConfig.filterPresetId !== null || currentConfig.atlasTreeId !== null;
+
   function handleSaveAs(name: string) {
     const config = getConfig();
     createStrategy.mutate({ name, config }, {
@@ -219,7 +226,10 @@ export function Strategies() {
       <main className="flex flex-1 flex-col overflow-y-auto">
         <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
           <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Strategy Cost Calculator</h3>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
+              <span className="text-xs text-poe-currency">Unsaved Changes</span>
+            )}
             {activeStrategy && (
               <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
             )}

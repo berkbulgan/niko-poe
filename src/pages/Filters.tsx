@@ -134,6 +134,17 @@ export function Filters() {
 
   const updatePreset = useUpdatePreset(activePresetId ?? '');
 
+  // Detect unsaved changes by comparing current store state to saved preset config
+  const currentConfig = getConfig();
+  const hasUnsavedChanges = activePreset
+    ? JSON.stringify(currentConfig) !== JSON.stringify(activePreset.config)
+    : currentConfig.avoidModIds.length > 0 || currentConfig.preferModIds.length > 0 ||
+      currentConfig.quantity !== '' || currentConfig.packSize !== '' ||
+      currentConfig.rarity !== '' || currentConfig.quality !== '' ||
+      currentConfig.moreCurrency !== '' || currentConfig.moreMaps !== '' ||
+      currentConfig.moreScarabs !== '' || currentConfig.moreDivination !== '' ||
+      currentConfig.corrupted !== 'natural' || currentConfig.isNightmareMap === true;
+
   function handleSaveAs(name: string) {
     const config = getConfig();
     createPreset.mutate({ name, config }, {
@@ -211,7 +222,10 @@ export function Filters() {
       <main className="flex flex-1 flex-col overflow-y-auto">
         <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
           <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">Map Mod Picker</h3>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && (
+              <span className="text-xs text-poe-currency">Unsaved Changes</span>
+            )}
             {activePreset && (
               <Button variant="ghost" size="sm" onClick={handleSaveOverwrite}>Save</Button>
             )}

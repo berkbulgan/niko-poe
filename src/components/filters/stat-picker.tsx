@@ -348,33 +348,33 @@ export function StatPicker() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Header checkboxes */}
-      <div className="flex flex-wrap items-center justify-end gap-4 px-4 pt-4 lg:px-6 lg:pt-6">
-        <label className="flex items-center gap-1.5 text-sm text-poe-text-muted">
-          <input
-            type="checkbox"
-            checked={isNightmareMap}
-            onChange={(e) => setIsNightmareMap(e.target.checked)}
-            className="accent-purple-500"
-          />
-          Nightmare Map
-        </label>
-        <label className="flex items-center gap-1.5 text-sm text-poe-text-muted">
-          <input
-            type="checkbox"
-            checked={showNightmare}
-            onChange={(e) => setShowNightmare(e.target.checked)}
-            className="accent-purple-500"
-          />
-          Show NM mods
-        </label>
-      </div>
-
       {/* ── Map stat filters — 3 rows ── */}
       <div className="mx-4 mt-4 shrink-0 space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4 lg:mx-6">
-        <h4 className="text-xs font-medium tracking-wide text-poe-text-dim">
-          Map Stats
-        </h4>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-medium tracking-wide text-poe-text-dim">
+            Map Stats
+          </h4>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-1.5 text-xs text-poe-text-muted">
+              <input
+                type="checkbox"
+                checked={isNightmareMap}
+                onChange={(e) => setIsNightmareMap(e.target.checked)}
+                className="accent-purple-500"
+              />
+              Nightmare Map
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-poe-text-muted">
+              <input
+                type="checkbox"
+                checked={showNightmare}
+                onChange={(e) => setShowNightmare(e.target.checked)}
+                className="accent-purple-500"
+              />
+              Show NM mods
+            </label>
+          </div>
+        </div>
 
         {/* Row 1: Base map stats */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
