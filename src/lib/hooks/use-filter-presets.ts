@@ -90,12 +90,3 @@ export function useDuplicatePreset() {
   });
 }
 
-// Import by share code is a Phase 4 feature (requires GGG OAuth / server).
-// Keeping the hook stub so call sites compile.
-export function useImportPreset(_code: string) {
-  const queryClient = useQueryClient();
-  return useMutation<FilterPresetParsed, Error, void>({
-    mutationFn: async () => { throw new Error('Import not yet implemented'); },
-    onSettled: () => { void queryClient.invalidateQueries({ queryKey: PRESETS_KEY }); },
-  });
-}

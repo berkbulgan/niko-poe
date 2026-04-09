@@ -11,10 +11,12 @@ import {
   useCreateStrategy,
   useDuplicateStrategy,
   useDeleteStrategy,
-  useImportStrategy,
-  type Strategy,
   type StrategyParsed,
 } from '@/lib/hooks/use-strategies';
+import type { Strategy } from '@/types/index';
+import { ExportModal } from '@/components/ui/export-modal';
+import { ImportModal } from '@/components/ui/import-modal';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import {
   StrategyBuilder,
   type StrategyBuilderRef,
@@ -65,64 +67,19 @@ function SaveStrategyModal({
   );
 }
 
-function ImportStrategyModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [code, setCode] = useState('');
-  const importStrategy = useImportStrategy(code);
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (code.length === 8) {
-      importStrategy.mutate(undefined, {
-        onSuccess: () => { setCode(''); onClose(); },
-      });
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Import Strategy">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">8-Digit Share Code</label>
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            placeholder="12345678"
-            maxLength={8}
-            className="font-mono text-lg tracking-[0.3em] text-poe-currency"
-            autoFocus
-            required
-          />
-        </div>
-        {importStrategy.isError && (
-          <p className="text-xs text-poe-error">Strategy not found. Check the code.</p>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={code.length !== 8 || importStrategy.isPending}>
-            {importStrategy.isPending ? 'Importing...' : 'Import'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 function StrategyRow({
   strategy,
   active,
   onSelect,
   onDuplicate,
+  onExport,
 }: {
   strategy: Strategy;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const deleteStrategy = useDeleteStrategy(strategy.id);
 
@@ -137,6 +94,13 @@ function StrategyRow({
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            onClick={onExport}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Export
+          </button>
+          <span className="text-poe-border">·</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -166,6 +130,7 @@ export function Strategies() {
   const { data: strategies, isLoading } = useStrategies();
   const createStrategy = useCreateStrategy();
   const duplicateStrategy = useDuplicateStrategy();
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
   const queryClient = useQueryClient();
 
   const activeStrategy = strategies?.find((s) => s.id === activeStrategyId);
@@ -244,6 +209,7 @@ export function Strategies() {
                   active={activeStrategyId === strategy.id}
                   onSelect={() => handleLoadStrategy(strategy)}
                   onDuplicate={() => handleDuplicate(strategy)}
+                  onExport={() => setExportInput({ type: 'S', name: strategy.name, config: strategy.config })}
                 />
               ))}
             </div>
@@ -270,7 +236,8 @@ export function Strategies() {
       </main>
 
       <SaveStrategyModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
-      <ImportStrategyModal open={showImport} onClose={() => setShowImport(false)} />
+      <ImportModal open={showImport} onClose={() => setShowImport(false)} />
+      <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
 }

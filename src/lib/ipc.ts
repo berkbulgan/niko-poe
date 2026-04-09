@@ -20,6 +20,7 @@ import type {
 } from '@/types/index';
 import type { AtlasTreeRecord, CreateAtlasTreeInput, UpdateAtlasTreeInput } from '@/types/index';
 import type {
+  DecodeResult,
   League,
   TradeStat,
   TradeSearchResult,
@@ -164,6 +165,24 @@ export function lookupItemPrices(itemNames: string[], league: string): Promise<R
 /** Returns whether compact prices are currently being fetched. */
 export function isPricesLoading(): Promise<boolean> {
   return invoke<boolean>('is_prices_loading');
+}
+
+// --- Sharing ---
+
+export function encodeShareCode(entityType: string, payloadJson: string): Promise<string> {
+  return invoke<string>('encode_share_code', { entityType, payloadJson });
+}
+
+export function decodeShareCode(code: string): Promise<DecodeResult> {
+  return invoke<DecodeResult>('decode_share_code', { code });
+}
+
+export function importFromPastebin(url: string): Promise<string> {
+  return invoke<string>('import_from_pastebin', { url });
+}
+
+export function contentHash(json: string): Promise<string> {
+  return invoke<string>('content_hash', { json });
 }
 
 // --- GGG Auth ---

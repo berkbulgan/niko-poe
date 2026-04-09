@@ -12,10 +12,12 @@ import {
   useUpdatePreset,
   useDuplicatePreset,
   useDeletePreset,
-  useImportPreset,
   type FilterPresetConfig,
   type FilterPreset,
 } from '@/lib/hooks/use-filter-presets';
+import { ExportModal } from '@/components/ui/export-modal';
+import { ImportModal } from '@/components/ui/import-modal';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
@@ -61,64 +63,19 @@ function SavePresetModal({
   );
 }
 
-function ImportModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [code, setCode] = useState('');
-  const importPreset = useImportPreset(code);
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (code.length === 8) {
-      importPreset.mutate(undefined, {
-        onSuccess: () => { setCode(''); onClose(); },
-      });
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Import Preset">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">8-Digit Share Code</label>
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            placeholder="12345678"
-            maxLength={8}
-            className="font-mono text-lg tracking-[0.3em] text-poe-currency"
-            autoFocus
-            required
-          />
-        </div>
-        {importPreset.isError && (
-          <p className="text-xs text-poe-error">Preset not found. Check the code.</p>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={code.length !== 8 || importPreset.isPending}>
-            {importPreset.isPending ? 'Importing...' : 'Import'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 function PresetRow({
   preset,
   active,
   onSelect,
   onDuplicate,
+  onExport,
 }: {
   preset: FilterPreset;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const deletePreset = useDeletePreset(preset.id);
 
@@ -133,6 +90,13 @@ function PresetRow({
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            onClick={onExport}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Export
+          </button>
+          <span className="text-poe-border">·</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -162,6 +126,7 @@ export function Filters() {
   const { data: presets, isLoading } = useFilterPresets();
   const createPreset = useCreatePreset();
   const duplicatePreset = useDuplicatePreset();
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
 
   // Find active preset for Save (overwrite) operation
   const activePreset = presets?.find((p) => p.id === activePresetId);
@@ -241,6 +206,7 @@ export function Filters() {
                   active={activePresetId === preset.id}
                   onSelect={() => handleLoadPreset(preset)}
                   onDuplicate={() => handleDuplicate(preset)}
+                  onExport={() => setExportInput({ type: 'F', name: preset.name, config: preset.config })}
                 />
               ))}
             </div>
@@ -268,6 +234,7 @@ export function Filters() {
 
       <SavePresetModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
+      <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
 }

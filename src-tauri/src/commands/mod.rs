@@ -8,4 +8,5 @@ pub mod prices;
 pub mod regex_filters;
 pub mod stash;
 pub mod strategies;
+pub mod sharing;
 pub mod trade;

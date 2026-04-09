@@ -13,8 +13,10 @@ import {
   useCreateAtlasTree,
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
-  useImportAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
+import { ExportModal } from '@/components/ui/export-modal';
+import { ImportModal } from '@/components/ui/import-modal';
+import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
@@ -71,64 +73,19 @@ function SaveAtlasTreeModal({
   );
 }
 
-function ImportAtlasTreeModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [code, setCode] = useState('');
-  const importTree = useImportAtlasTree(code);
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (code.length === 8) {
-      importTree.mutate(undefined, {
-        onSuccess: () => { setCode(''); onClose(); },
-      });
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Import Atlas Tree">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">8-Digit Share Code</label>
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
-            placeholder="12345678"
-            maxLength={8}
-            className="font-mono text-lg tracking-[0.3em] text-poe-currency"
-            autoFocus
-            required
-          />
-        </div>
-        {importTree.isError && (
-          <p className="text-xs text-poe-error">Atlas tree not found. Check the code.</p>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={code.length !== 8 || importTree.isPending}>
-            {importTree.isPending ? 'Importing...' : 'Import'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 function AtlasTreeRow({
   tree,
   active,
   onSelect,
   onDuplicate,
+  onExport,
 }: {
   tree: AtlasTreeType;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const deleteTree = useDeleteAtlasTree(tree.id);
 
@@ -146,6 +103,13 @@ function AtlasTreeRow({
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            onClick={onExport}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Export
+          </button>
+          <span className="text-poe-border">&middot;</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -177,6 +141,7 @@ export function AtlasTree() {
   const { data: trees, isLoading } = useAtlasTrees();
   const createTree = useCreateAtlasTree();
   const duplicateTree = useDuplicateAtlasTree();
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
   const queryClient = useQueryClient();
 
   const activeTree = trees?.find((t) => t.id === activeTreeId);
@@ -323,6 +288,7 @@ export function AtlasTree() {
                   active={activeTreeId === tree.id}
                   onSelect={() => handleLoadTree(tree)}
                   onDuplicate={() => handleDuplicate(tree)}
+                  onExport={() => setExportInput({ type: 'A', name: tree.name, config: tree.config })}
                 />
               ))}
             </div>
@@ -412,7 +378,8 @@ export function AtlasTree() {
       />
 
       <SaveAtlasTreeModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
-      <ImportAtlasTreeModal open={showImport} onClose={() => setShowImport(false)} />
+      <ImportModal open={showImport} onClose={() => setShowImport(false)} />
+      <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
 }
