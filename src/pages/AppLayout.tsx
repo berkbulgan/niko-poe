@@ -37,7 +37,7 @@ function NavItem({ href, icon, label, active, dimmed = false }: NavItemProps) {
 
 export function AppLayout() {
   const { user, isAuthenticated, isLoading, login, logout } = useAuth();
-  const { leagues, currentLeague, setLeague } = useLeague();
+  const { leagues, currentLeague, setLeague, pricesLoading } = useLeague();
   const { pathname } = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(() => window.innerWidth < 1280);
@@ -135,6 +135,11 @@ export function AppLayout() {
                 <option key={l.id} value={l.id}>{l.text}</option>
               ))}
             </select>
+            {pricesLoading && (
+              <p className="mt-1 text-[10px] text-poe-gold/70 animate-pulse">
+                Fetching prices...
+              </p>
+            )}
           </div>
         )}
 

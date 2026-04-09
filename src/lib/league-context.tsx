@@ -18,7 +18,8 @@ interface LeagueContextValue {
   leagues: League[];
   currentLeague: string;
   setLeague: (id: string) => void;
-  isLoading: boolean;
+  /** True while poe.ninja prices are being fetched for the current league. */
+  pricesLoading: boolean;
 }
 
 const LeagueContext = createContext<LeagueContextValue | null>(null);
@@ -36,10 +37,10 @@ const LEAGUES: League[] = [
 
 export function LeagueProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
+  const [pricesLoading, setPricesLoading] = useState(true);
 
   const [currentLeague, setCurrentLeague] = useState(() => {
     const stored = storage.get(LEAGUE_STORAGE_KEY);
-    // Validate stored league is still in the list
     if (stored && LEAGUES.some((l) => l.id === stored)) {
       return stored;
     }
@@ -47,13 +48,27 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
   });
 
   // Fetch poe.ninja prices whenever the active league changes.
+  // Sets pricesLoading=true before fetch, false after + invalidates queries.
   useEffect(() => {
-    if (currentLeague) {
-      void fetchAllPrices(currentLeague).then(() => {
+    if (!currentLeague) return;
+
+    let cancelled = false;
+    setPricesLoading(true);
+
+    fetchAllPrices(currentLeague)
+      .then(() => {
+        if (cancelled) return;
         void queryClient.invalidateQueries({ queryKey: ['prices'] });
         void queryClient.invalidateQueries({ queryKey: ['item-prices'] });
+      })
+      .catch(() => {
+        // Price fetch failed — continue without prices
+      })
+      .finally(() => {
+        if (!cancelled) setPricesLoading(false);
       });
-    }
+
+    return () => { cancelled = true; };
   }, [currentLeague, queryClient]);
 
   const setLeague = useCallback((id: string) => {
@@ -65,8 +80,8 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
     leagues: LEAGUES,
     currentLeague,
     setLeague,
-    isLoading: false,
-  }), [currentLeague, setLeague]);
+    pricesLoading,
+  }), [currentLeague, setLeague, pricesLoading]);
 
   return (
     <LeagueContext.Provider value={value}>
