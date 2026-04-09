@@ -6,7 +6,7 @@ import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { Providers } from './providers';
-import { fetchAllPrices } from './lib/ipc';
+import { fetchAllPrices, getLeagues } from './lib/ipc';
 import './globals.css';
 
 function App() {
@@ -16,8 +16,11 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
-        setStatus('Fetching prices from poe.ninja...');
-        const count = await fetchAllPrices('Mirage');
+        setStatus('Detecting active league...');
+        const leagues = await getLeagues();
+        const league = leagues.length > 0 ? leagues[0].id : 'Mirage';
+        setStatus(`Fetching prices from poe.ninja (${league})...`);
+        const count = await fetchAllPrices(league);
         setStatus(`Loaded ${count.toLocaleString()} items`);
       } catch {
         setStatus('Price fetch failed — continuing without prices');

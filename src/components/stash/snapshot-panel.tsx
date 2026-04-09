@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import { LineChart } from '@/components/ui/line-chart';
+import { PricedItemTable } from '@/components/ui/priced-item-table';
+import type { PricedItem } from '@/components/ui/priced-item-table';
 import {
   useSnapshots,
   useSnapshotDetail,
@@ -277,7 +279,6 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
                   {isExpanded && (
                     <SnapshotDetail
                       snapshotId={snap.id}
-                      unit={unit}
                       divineRate={divineRate}
                       onDelete={() => { void deleteSnapshotMut.mutateAsync(snap.id); }}
                       isDeleting={deleteSnapshotMut.isPending}
@@ -297,13 +298,11 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
 
 function SnapshotDetail({
   snapshotId,
-  unit,
   divineRate,
   onDelete,
   isDeleting,
 }: {
   snapshotId: string;
-  unit: 'divine' | 'chaos';
   divineRate: number;
   onDelete: () => void;
   isDeleting: boolean;
@@ -318,51 +317,27 @@ function SnapshotDetail({
     );
   }
 
-  const pricedItems = snapshot.items.filter((item) => item.chaosValue != null);
+  const pricedItems: PricedItem[] = snapshot.items
+    .filter((item) => item.chaosValue != null)
+    .map((item) => ({
+      id: item.id,
+      name: item.itemName,
+      icon: item.icon,
+      quantity: item.stackSize,
+      unitPrice: item.chaosValue ?? 0,
+      total: (item.chaosValue ?? 0) * item.stackSize,
+      lowListings: false,
+    }));
+
   const unpricedItems = snapshot.items.filter((item) => item.chaosValue == null);
 
   return (
-    <div className="border-t border-poe-border/20 px-4 py-3">
-      {/* Item table */}
-      <table className="mb-3 w-full">
-        <thead>
-          <tr className="text-xs text-poe-text-muted">
-            <th className="py-1 text-left font-medium">Item</th>
-            <th className="w-16 py-1 text-right font-medium">Qty</th>
-            <th className="w-24 py-1 text-right font-medium">Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {pricedItems.map((item) => {
-            const total = (item.chaosValue ?? 0) * item.stackSize;
-            return (
-              <tr key={item.id} className="border-t border-poe-border/10">
-                <td className="py-1">
-                  <div className="flex items-center gap-2">
-                    {item.icon && (
-                      <img src={item.icon} alt="" className="h-5 w-5 object-contain" loading="lazy" />
-                    )}
-                    <span className="truncate text-xs text-poe-text">{item.itemName}</span>
-                  </div>
-                </td>
-                <td className="py-1 text-right text-xs tabular-nums text-poe-text-dim">
-                  {item.stackSize}
-                </td>
-                <td className="py-1 text-right">
-                  <span className="flex items-center justify-end gap-1 text-xs tabular-nums text-poe-currency">
-                    {formatValue(total, divineRate, unit)}
-                    <PoeIcon name={unit === 'divine' ? 'divine' : 'chaos'} size={12} />
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="border-t border-poe-border/20">
+      <PricedItemTable items={pricedItems} divinePrice={divineRate} showDivineRate={false} />
 
       {/* Unpriced items */}
       {unpricedItems.length > 0 && (
-        <div className="mb-3">
+        <div className="px-4 py-3">
           <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-poe-text-muted">
             Unpriced ({unpricedItems.length})
           </p>
@@ -383,7 +358,7 @@ function SnapshotDetail({
       )}
 
       {/* Delete button */}
-      <div className="flex justify-end">
+      <div className="flex justify-end px-4 pb-3">
         <Button
           variant="ghost"
           size="sm"
