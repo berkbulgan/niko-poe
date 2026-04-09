@@ -3,11 +3,12 @@
 
 import { useState } from 'react';
 
-type SettingsSection = 'general' | 'stash-ignore';
+type SettingsSection = 'general' | 'stash-ignore' | 'about';
 
 const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'general', label: 'General' },
   { id: 'stash-ignore', label: 'Stash Ignore List' },
+  { id: 'about', label: 'About' },
 ];
 
 function GeneralSection() {
@@ -24,6 +25,28 @@ function StashIgnoreSection() {
     <div className="p-6">
       <h2 className="mb-1 font-display text-sm tracking-wide text-poe-text-dim">Stash Ignore List</h2>
       <p className="text-xs text-poe-text-muted">Configure items to hide from stash view.</p>
+    </div>
+  );
+}
+
+function AboutSection() {
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h2 className="mb-1 font-display text-sm tracking-wide text-poe-text-dim">About N.I.K.O.</h2>
+        <p className="text-xs text-poe-text-muted">
+          Desktop companion for Path of Exile 1 players. Regex filter builder, trade search,
+          strategy cost calculator, atlas tree planner, and GGG account integration.
+        </p>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="border-l-2 border-poe-gold/20 bg-poe-panel/20 px-4 py-3">
+        <h3 className="mb-1.5 text-xs font-medium tracking-wide text-poe-text-dim">Legal Notice</h3>
+        <p className="text-[11px] leading-relaxed text-poe-text-muted">
+          This product isn&apos;t affiliated with or endorsed by Grinding Gear Games in any way.
+        </p>
+      </div>
     </div>
   );
 }
@@ -60,6 +83,7 @@ export function Settings() {
       <main className="flex-1 overflow-y-auto">
         {activeSection === 'general' && <GeneralSection />}
         {activeSection === 'stash-ignore' && <StashIgnoreSection />}
+        {activeSection === 'about' && <AboutSection />}
       </main>
     </div>
   );

@@ -39,7 +39,8 @@
       "nsis": {
         "displayLanguageSelector": false,
         "installMode": "currentUser",
-        "languages": ["English"]
+        "languages": ["English"],
+        "installerHooks": "nsis-hooks.nsh"
       },
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",

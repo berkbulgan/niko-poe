@@ -9,6 +9,7 @@ import { Strategies } from './pages/Strategies';
 import { AtlasTree } from './pages/AtlasTree';
 import { Stash } from './pages/Stash';
 import { Settings } from './pages/Settings';
+import { AuthCallback } from './pages/AuthCallback';
 
 export const router = createHashRouter([
   {
@@ -22,6 +23,7 @@ export const router = createHashRouter([
       { path: 'atlas-tree', element: <AtlasTree /> },
       { path: 'stash', element: <Stash /> },
       { path: 'settings', element: <Settings /> },
+      { path: 'auth/callback', element: <AuthCallback /> },
     ],
   },
 ]);
