@@ -14,7 +14,7 @@ import {
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
-import { useImportEntity } from '@/lib/hooks/use-sharing';
+import { useImportEntity, useExportEntity } from '@/lib/hooks/use-sharing';
 import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
@@ -123,11 +123,13 @@ function AtlasTreeRow({
   active,
   onSelect,
   onDuplicate,
+  onExport,
 }: {
   tree: AtlasTreeType;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const deleteTree = useDeleteAtlasTree(tree.id);
 
@@ -145,6 +147,13 @@ function AtlasTreeRow({
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            onClick={onExport}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Export
+          </button>
+          <span className="text-poe-border">&middot;</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -176,6 +185,7 @@ export function AtlasTree() {
   const { data: trees, isLoading } = useAtlasTrees();
   const createTree = useCreateAtlasTree();
   const duplicateTree = useDuplicateAtlasTree();
+  const exportEntity = useExportEntity();
   const queryClient = useQueryClient();
 
   const activeTree = trees?.find((t) => t.id === activeTreeId);
@@ -322,6 +332,7 @@ export function AtlasTree() {
                   active={activeTreeId === tree.id}
                   onSelect={() => handleLoadTree(tree)}
                   onDuplicate={() => handleDuplicate(tree)}
+                  onExport={() => exportEntity.mutate({ type: 'A', name: tree.name, config: tree.config })}
                 />
               ))}
             </div>

@@ -14,7 +14,7 @@ import {
   type StrategyParsed,
 } from '@/lib/hooks/use-strategies';
 import type { Strategy } from '@/types/index';
-import { useImportEntity } from '@/lib/hooks/use-sharing';
+import { useImportEntity, useExportEntity } from '@/lib/hooks/use-sharing';
 import {
   StrategyBuilder,
   type StrategyBuilderRef,
@@ -117,11 +117,13 @@ function StrategyRow({
   active,
   onSelect,
   onDuplicate,
+  onExport,
 }: {
   strategy: Strategy;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const deleteStrategy = useDeleteStrategy(strategy.id);
 
@@ -136,6 +138,13 @@ function StrategyRow({
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            onClick={onExport}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Export
+          </button>
+          <span className="text-poe-border">·</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -165,6 +174,7 @@ export function Strategies() {
   const { data: strategies, isLoading } = useStrategies();
   const createStrategy = useCreateStrategy();
   const duplicateStrategy = useDuplicateStrategy();
+  const exportEntity = useExportEntity();
   const queryClient = useQueryClient();
 
   const activeStrategy = strategies?.find((s) => s.id === activeStrategyId);
@@ -243,6 +253,7 @@ export function Strategies() {
                   active={activeStrategyId === strategy.id}
                   onSelect={() => handleLoadStrategy(strategy)}
                   onDuplicate={() => handleDuplicate(strategy)}
+                  onExport={() => exportEntity.mutate({ type: 'S', name: strategy.name, config: strategy.config })}
                 />
               ))}
             </div>

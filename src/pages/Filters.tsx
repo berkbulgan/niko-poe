@@ -15,7 +15,7 @@ import {
   type FilterPresetConfig,
   type FilterPreset,
 } from '@/lib/hooks/use-filter-presets';
-import { useImportEntity } from '@/lib/hooks/use-sharing';
+import { useImportEntity, useExportEntity } from '@/lib/hooks/use-sharing';
 import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 
@@ -113,11 +113,13 @@ function PresetRow({
   active,
   onSelect,
   onDuplicate,
+  onExport,
 }: {
   preset: FilterPreset;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
+  onExport: () => void;
 }) {
   const deletePreset = useDeletePreset(preset.id);
 
@@ -132,6 +134,13 @@ function PresetRow({
       </button>
       {active && (
         <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            onClick={onExport}
+            className="text-xs text-poe-text-dim hover:text-poe-gold"
+          >
+            Export
+          </button>
+          <span className="text-poe-border">·</span>
           <button
             onClick={onDuplicate}
             className="text-xs text-poe-text-dim hover:text-poe-gold"
@@ -161,6 +170,7 @@ export function Filters() {
   const { data: presets, isLoading } = useFilterPresets();
   const createPreset = useCreatePreset();
   const duplicatePreset = useDuplicatePreset();
+  const exportEntity = useExportEntity();
 
   // Find active preset for Save (overwrite) operation
   const activePreset = presets?.find((p) => p.id === activePresetId);
@@ -240,6 +250,7 @@ export function Filters() {
                   active={activePresetId === preset.id}
                   onSelect={() => handleLoadPreset(preset)}
                   onDuplicate={() => handleDuplicate(preset)}
+                  onExport={() => exportEntity.mutate({ type: 'F', name: preset.name, config: preset.config })}
                 />
               ))}
             </div>
