@@ -39,8 +39,7 @@
       "nsis": {
         "displayLanguageSelector": false,
         "installMode": "currentUser",
-        "languages": ["English"],
-        "license": "DISCLAIMER.txt"
+        "languages": ["English"]
       },
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",

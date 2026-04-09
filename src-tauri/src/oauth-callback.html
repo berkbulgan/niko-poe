@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>N.I.K.O. — Login Complete</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500&family=Inter:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: #0C0C0E;
+    color: #E8E4D9;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Subtle radial glow behind the card */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 50%; left: 50%;
+    width: 600px; height: 600px;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(175,96,37,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .card {
+    text-align: center;
+    max-width: 380px;
+    padding: 48px 32px;
+    position: relative;
+  }
+
+  /* Shield icon */
+  .icon {
+    width: 56px; height: 56px;
+    margin: 0 auto 28px;
+    border: 1px solid rgba(34,197,94,0.25);
+    background: rgba(34,197,94,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon svg {
+    width: 28px; height: 28px;
+    color: #22C55E;
+    opacity: 0;
+    animation: fadeScale 0.5s ease-out 0.2s forwards;
+  }
+
+  @keyframes fadeScale {
+    from { opacity: 0; transform: scale(0.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+    opacity: 0;
+    animation: fadeUp 0.5s ease-out 0.3s forwards;
+  }
+
+  .gold { color: #AF6025; }
+
+  .subtitle {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #8B8680;
+    opacity: 0;
+    animation: fadeUp 0.4s ease-out 0.45s forwards;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Progress bar */
+  .progress-track {
+    width: 180px;
+    height: 1px;
+    margin: 28px auto 0;
+    background: rgba(42,42,62,0.6);
+    overflow: hidden;
+    opacity: 0;
+    animation: fadeUp 0.3s ease-out 0.6s forwards;
+  }
+
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: rgba(175,96,37,0.5);
+    animation: fillBar 4s linear 0.8s forwards;
+  }
+
+  @keyframes fillBar {
+    to { width: 100%; }
+  }
+
+  .hint {
+    margin-top: 14px;
+    font-size: 11px;
+    color: #5A5650;
+    opacity: 0;
+    animation: fadeUp 0.3s ease-out 0.7s forwards;
+  }
+
+  /* Disclaimer */
+  .disclaimer {
+    margin-top: 48px;
+    font-size: 10px;
+    line-height: 1.6;
+    color: rgba(90,86,80,0.5);
+    opacity: 0;
+    animation: fadeUp 0.3s ease-out 0.9s forwards;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <path d="m9 12 2 2 4-4"/>
+      </svg>
+    </div>
+
+    <h1>Login <span class="gold">Successful</span></h1>
+    <p class="subtitle">You can return to N.I.K.O. now</p>
+
+    <div class="progress-track">
+      <div class="progress-bar"></div>
+    </div>
+    <p class="hint">This tab will close automatically</p>
+
+    <p class="disclaimer">
+      This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
+    </p>
+  </div>
+
+  <script>setTimeout(function() { window.close(); }, 5000);</script>
+</body>
+</html>
