@@ -15,8 +15,8 @@ import {
   type FilterPresetConfig,
   type FilterPreset,
 } from '@/lib/hooks/use-filter-presets';
-import { useImportEntity } from '@/lib/hooks/use-sharing';
 import { ExportModal } from '@/components/ui/export-modal';
+import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { StatPicker, type StatPickerRef } from '@/components/filters/stat-picker';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
@@ -63,52 +63,6 @@ function SavePresetModal({
   );
 }
 
-function ImportModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [code, setCode] = useState('');
-  const importEntity = useImportEntity();
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (code.trim()) {
-      importEntity.mutate({ code }, {
-        onSuccess: () => { setCode(''); onClose(); },
-      });
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Import Preset">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">Share Code or Pastebin URL</label>
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="F... or pastebin.com/..."
-            className="font-mono text-sm text-poe-currency"
-            autoFocus
-            required
-          />
-        </div>
-        {importEntity.isError && (
-          <p className="text-xs text-poe-error">Import failed. Check the code and try again.</p>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={!code.trim() || importEntity.isPending}>
-            {importEntity.isPending ? 'Importing...' : 'Import'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 function PresetRow({
   preset,

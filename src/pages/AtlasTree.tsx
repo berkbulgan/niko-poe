@@ -14,8 +14,8 @@ import {
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
-import { useImportEntity } from '@/lib/hooks/use-sharing';
 import { ExportModal } from '@/components/ui/export-modal';
+import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
@@ -73,52 +73,6 @@ function SaveAtlasTreeModal({
   );
 }
 
-function ImportAtlasTreeModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [code, setCode] = useState('');
-  const importEntity = useImportEntity();
-
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (code.trim()) {
-      importEntity.mutate({ code }, {
-        onSuccess: () => { setCode(''); onClose(); },
-      });
-    }
-  }
-
-  return (
-    <Modal isOpen={open} onClose={onClose} title="Import Atlas Tree">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">Share Code or Pastebin URL</label>
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            placeholder="A... or pastebin.com/..."
-            className="font-mono text-sm text-poe-currency"
-            autoFocus
-            required
-          />
-        </div>
-        {importEntity.isError && (
-          <p className="text-xs text-poe-error">Import failed. Check the code and try again.</p>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" disabled={!code.trim() || importEntity.isPending}>
-            {importEntity.isPending ? 'Importing...' : 'Import'}
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
-}
 
 function AtlasTreeRow({
   tree,
@@ -424,7 +378,7 @@ export function AtlasTree() {
       />
 
       <SaveAtlasTreeModal open={showSaveAs} onClose={() => setShowSaveAs(false)} onSave={handleSaveAs} />
-      <ImportAtlasTreeModal open={showImport} onClose={() => setShowImport(false)} />
+      <ImportModal open={showImport} onClose={() => setShowImport(false)} />
       <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
   );
