@@ -2,6 +2,47 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.0] - 2026-04-09
+
+### Added
+- **Share Code Export/Import** — PoB-inspired encoding pipeline (JSON → deflate → base64) for filter presets, atlas trees, and strategies
+- Strategy export bundles linked FilterPreset and AtlasTree inline
+- Import with content-hash dedup (SHA256) prevents duplicate entities
+- Pastebin URL import support (fetches raw paste, no API key needed)
+- Name collision handling with " (2)", " (3)" suffixes
+- **Stash Snapshots** — Take point-in-time snapshots of selected stash tabs with automatic poe.ninja pricing
+- **Snapshot Configs** — Save reusable tab selections (e.g. "Dump Tabs", "Currency Only") with optional strategy linking
+- **ROI Tracking** — Link a config to a strategy, take before/after snapshots, see gross profit minus strategy cost
+- **Net Worth History** — SVG line chart showing stash value over time per config
+- **Dashboard Snapshots Widget** — Last 5 snapshots with config name, value, and delta from previous
+- **Divine/Chaos Toggle** — Currency display toggle (default divine) shared across all pages via Zustand store
+- **Unpriced Item Tracking** — Items without poe.ninja price shown separately with count indicator
+- **Advanced Item Matching** — Gem level/quality/corruption, unique links/variant, map tier matching for accurate pricing
+- **Shared PricedItemTable** — Reusable sortable item table used by both stash browse and snapshot detail
+- **OAuth Callback Page** — Styled browser callback page for GGG OAuth login with auto-close
+- **GGG Disclaimer** — Added to OAuth callback, Settings > About, and NSIS installer preinstall hook
+- **Unsaved Changes Indicator** — Shows next to Save button when current state differs from saved config
+- **Shared UI Components** — Extracted EditorToolbar, SaveEntityModal, SidebarEntityRow, EntitySidebar
+- **Developer Credits** — Settings > About with social links and Buy Me a Coffee donation button
+
+### Changed
+- **Pricing source migrated from poe.watch to poe.ninja** — 29 categories (up from 5), 1-hour cache
+- **Prices fetch on league change** — No more startup blocking; fetches when league is selected
+- **League selector** — Hardcoded to 4 poe.ninja-supported leagues (Mirage, HC Mirage, Standard, Hardcore)
+- **Total column display** — Divine is primary (bigger font) when value >= 1 div, chaos shown below
+- **Sidebar loading indicator** — "Fetching prices..." pulse animation during price fetch
+- Nightmare checkboxes moved into Map Stats box header
+- State persistence across navigation via Zustand stores (filters, strategies, atlas tree)
+- Astrolabe mapsPerUse corrected from 8 to 5
+- PoeIcon: added `rarity`, `corrupted`, `currency`, `tier` aliases
+
+### Fixed
+- Page state lost when navigating between tabs (Zustand stores replace local useState)
+- Selected preset/strategy/tree not preserved on tab switch
+- Divine Orb price accuracy (use `min` field over unreliable `mean`)
+- Strategy builder mapsPerUse not applied correctly on config load
+- Line chart Y-axis labels clipped on left side
+
 ## [0.2.0] - 2026-04-07
 
 ### Added
