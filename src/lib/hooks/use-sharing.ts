@@ -113,6 +113,7 @@ export type ExportInput = ExportFilterPresetInput | ExportAtlasTreeInput | Expor
 
 export function useExportEntity() {
   return useMutation<string, Error, ExportInput>({
+    meta: { inlineError: true },
     mutationFn: async (input) => {
       let payload: string;
 
@@ -158,6 +159,7 @@ export function useImportEntity() {
   const queryClient = useQueryClient();
 
   return useMutation<ImportResult, Error, ImportInput>({
+    meta: { inlineError: true },
     mutationFn: async ({ code }) => {
       let shareCode = code.trim();
 

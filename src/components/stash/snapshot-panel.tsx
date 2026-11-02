@@ -17,6 +17,9 @@ import {
 } from '@/lib/hooks/use-snapshots';
 import { useStrategies } from '@/lib/hooks/use-strategies';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
+import { toast } from '@/lib/stores/toast-store';
+import { confirmAction } from '@/lib/platform';
+import { strategyCostPerMap } from '@/lib/strategy-cost';
 import type { SnapshotConfig } from '@/types/snapshots';
 import type { StrategyConfig } from '@/types/strategies';
 
@@ -62,12 +65,16 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
     return strat?.config ?? null;
   }, [config.strategyId, strategies]);
 
-  async function handleTakeSnapshot() {
-    await takeSnapshotMut.mutateAsync({
-      configId: config.id,
-      label: label ?? undefined,
-    });
-    setLabel(null);
+  function handleTakeSnapshot() {
+    takeSnapshotMut.mutate(
+      { configId: config.id, label: label ?? undefined },
+      {
+        onSuccess: () => {
+          setLabel(null);
+          toast.success('Snapshot saved');
+        },
+      },
+    );
   }
 
   // Chart data — oldest first for left-to-right time axis
@@ -95,10 +102,7 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
     if (!before || !after) return null;
 
     const grossProfit = after.totalChaos - before.totalChaos;
-    const strategyCost = strategyConfig.items.reduce(
-      (sum, item) => sum + item.unitPrice * item.quantity,
-      0,
-    ) * strategyConfig.mapCount;
+    const strategyCost = strategyCostPerMap(strategyConfig) * strategyConfig.mapCount;
     const netProfit = grossProfit - strategyCost;
     const divineRate = after.divineRate || 150;
 
@@ -124,7 +128,7 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
         <Button
           variant="primary"
           size="sm"
-          onClick={() => { void handleTakeSnapshot(); }}
+          onClick={handleTakeSnapshot}
           disabled={takeSnapshotMut.isPending}
         >
           <span className="flex items-center gap-1.5">
@@ -177,6 +181,13 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
             emptyMessage="Take your first snapshot to see the chart"
           />
         </div>
+      )}
+
+      {hasStrategy && !roiInfo && (
+        <p className="text-xs text-poe-text-muted">
+          ROI: take a snapshot labelled <span className="text-poe-text-dim">Before</span>, run your maps,
+          then take one labelled <span className="text-poe-text-dim">After</span>.
+        </p>
       )}
 
       {/* ROI Banner (strategy-linked only) */}
@@ -280,7 +291,9 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
                     <SnapshotDetail
                       snapshotId={snap.id}
                       divineRate={divineRate}
-                      onDelete={() => { void deleteSnapshotMut.mutateAsync(snap.id); }}
+                      onDelete={() => {
+                        if (confirmAction('Delete this snapshot?')) deleteSnapshotMut.mutate(snap.id);
+                      }}
                       isDeleting={deleteSnapshotMut.isPending}
                     />
                   )}

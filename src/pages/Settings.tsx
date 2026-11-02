@@ -2,6 +2,8 @@
 // ABOUTME: Left sidebar: section nav. Right content: section-specific settings panels.
 
 import { useState } from 'react';
+import { PoeIcon } from '@/components/ui/poe-icon';
+import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
 
 type SettingsSection = 'general' | 'stash-ignore' | 'about';
 
@@ -12,10 +14,31 @@ const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
 ];
 
 function GeneralSection() {
+  const { unit, setUnit } = useCurrencyDisplay();
+
   return (
-    <div className="p-6">
+    <div className="space-y-4 p-6">
       <h2 className="mb-1 font-display text-sm tracking-wide text-poe-text-dim">General</h2>
-      <p className="text-xs text-poe-text-muted">Settings coming soon.</p>
+      <div>
+        <p className="mb-1 text-xs text-poe-text-dim">Show values in</p>
+        <div className="flex" role="radiogroup" aria-label="Currency display unit">
+          {(['divine', 'chaos'] as const).map((u) => (
+            <button
+              key={u}
+              type="button"
+              role="radio"
+              aria-checked={unit === u}
+              onClick={() => setUnit(u)}
+              className={`flex items-center gap-1.5 border border-poe-border/30 px-3 py-1.5 text-xs capitalize transition-colors ${
+                unit === u ? 'bg-poe-gold/15 text-poe-gold' : 'text-poe-text-dim hover:bg-poe-panel/40'
+              }`}
+            >
+              <PoeIcon name={u} size={14} />
+              {u}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

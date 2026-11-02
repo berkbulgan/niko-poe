@@ -85,6 +85,7 @@ pub struct SnapshotSummary {
 #[serde(rename_all = "camelCase")]
 pub struct RecentSnapshot {
     pub id: String,
+    pub config_id: String,
     pub config_name: String,
     pub total_chaos: f64,
     pub divine_rate: f64,
@@ -528,7 +529,7 @@ pub async fn get_snapshot_detail(
 #[tauri::command]
 pub async fn get_recent_snapshots(state: State<'_, AppState>) -> Result<Vec<RecentSnapshot>> {
     let rows = sqlx::query(
-        "SELECT s.id, c.name AS config_name, s.total_chaos, s.divine_rate,
+        "SELECT s.id, s.config_id, c.name AS config_name, s.total_chaos, s.divine_rate,
                 s.total_items, s.unpriced_count, s.created_at
          FROM stash_snapshots s
          JOIN snapshot_configs c ON s.config_id = c.id
@@ -543,6 +544,7 @@ pub async fn get_recent_snapshots(state: State<'_, AppState>) -> Result<Vec<Rece
         .iter()
         .map(|row| RecentSnapshot {
             id: row.get("id"),
+            config_id: row.get("config_id"),
             config_name: row.get("config_name"),
             total_chaos: row.get("total_chaos"),
             divine_rate: row.get("divine_rate"),

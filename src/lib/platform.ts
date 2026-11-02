@@ -38,3 +38,14 @@ export async function copyToClipboard(text: string): Promise<boolean> {
     return false;
   }
 }
+
+// --- Dialogs ---
+
+export function confirmAction(message: string): boolean {
+  return window.confirm(message);
+}
+
+/** Returns true when it's OK to replace the editor contents (nothing unsaved, or the user agreed). */
+export function confirmDiscard(hasUnsavedChanges: boolean): boolean {
+  return !hasUnsavedChanges || confirmAction('You have unsaved changes. Discard them?');
+}

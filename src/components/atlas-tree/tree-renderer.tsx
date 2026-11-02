@@ -104,6 +104,7 @@ export function TreeRenderer({
   const [panY, setPanY] = useState(0);
   const [initialized, setInitialized] = useState(false);
   const [spritesReady, setSpritesReady] = useState(false);
+  const [spritesFailed, setSpritesFailed] = useState(false);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const animTimeRef = useRef(0);
@@ -129,9 +130,13 @@ export function TreeRenderer({
   useEffect(() => {
     initZoomLevels(imageZoomLevels, sprites);
     const zoomKey = pickZoomLevel(MIN_ZOOM);
-    preloadSprites(sprites, zoomKey).then(() => {
-      setSpritesReady(true);
-    });
+    preloadSprites(sprites, zoomKey).then(
+      () => setSpritesReady(true),
+      (err: unknown) => {
+        console.error('[TreeRenderer] sprite preload failed:', err);
+        setSpritesFailed(true);
+      },
+    );
   }, [sprites, imageZoomLevels]);
 
   // Preload next zoom level when zoom changes
@@ -478,7 +483,9 @@ export function TreeRenderer({
       {/* Loading overlay */}
       {!spritesReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#060911]">
-          <p className="text-sm text-poe-text-muted">Loading atlas tree...</p>
+          <p className="text-sm text-poe-text-muted">
+            {spritesFailed ? 'Failed to load atlas tree images — try restarting the app' : 'Loading atlas tree...'}
+          </p>
         </div>
       )}
 

@@ -22,8 +22,9 @@ interface StrategiesState {
   setActiveStrategyId: (id: string | null) => void;
   setSelectedItems: (items: SelectedItem[]) => void;
   addItem: (item: SelectedItem) => void;
-  updateItemQuantity: (itemId: number, category: string, qty: number) => void;
-  removeItem: (itemId: number, category: string) => void;
+  // Items are identified by name + category (itemId is always 0 for poe.ninja picks).
+  updateItemQuantity: (name: string, category: string, qty: number) => void;
+  removeItem: (name: string, category: string) => void;
   setAverageMapCost: (cost: number) => void;
   setMapCount: (count: number) => void;
   setFilterPresetId: (id: string | null) => void;
@@ -54,12 +55,12 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
 
   addItem: (item) => set((state) => {
     const existing = state.selectedItems.find(
-      (i) => i.itemId === item.itemId && i.category === item.category,
+      (i) => i.name === item.name && i.category === item.category,
     );
     if (existing) {
       return {
         selectedItems: state.selectedItems.map((i) =>
-          i.itemId === item.itemId && i.category === item.category
+          i.name === item.name && i.category === item.category
             ? { ...i, quantity: i.quantity + 1 }
             : i,
         ),
@@ -68,15 +69,15 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
     return { selectedItems: [...state.selectedItems, item] };
   }),
 
-  updateItemQuantity: (itemId, category, qty) => set((state) => ({
+  updateItemQuantity: (name, category, qty) => set((state) => ({
     selectedItems: state.selectedItems.map((i) =>
-      i.itemId === itemId && i.category === category ? { ...i, quantity: qty } : i,
+      i.name === name && i.category === category ? { ...i, quantity: qty } : i,
     ),
   })),
 
-  removeItem: (itemId, category) => set((state) => ({
+  removeItem: (name, category) => set((state) => ({
     selectedItems: state.selectedItems.filter(
-      (i) => !(i.itemId === itemId && i.category === category),
+      (i) => !(i.name === name && i.category === category),
     ),
   })),
 
