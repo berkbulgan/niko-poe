@@ -14,9 +14,10 @@ import { useLeague } from '@/lib/league-context';
 import { usePrices, useDivinePrice } from '@/lib/hooks/use-prices';
 import type { PriceCategory } from '@/types/strategies';
 import type { PriceItem } from '@/types/index';
-import { useFilterPresets, type FilterPreset } from '@/lib/hooks/use-filter-presets';
+import { useFilterPresets, type FilterPresetParsed } from '@/lib/hooks/use-filter-presets';
 import { useAtlasTrees, type AtlasTreeParsed } from '@/lib/hooks/use-atlas-trees';
 import { openExternal } from '@/lib/platform';
+import { proxySearch } from '@/lib/ipc';
 import { useStrategiesStore, type SelectedItem } from '@/lib/stores/strategies-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type { AtlasTreeRawData } from '@/types/atlas-tree';
@@ -176,7 +177,7 @@ function LinkedPresetSection({
   selectedPresetId,
   onSelect,
 }: {
-  presets: FilterPreset[];
+  presets: FilterPresetParsed[];
   selectedPresetId: string | null;
   onSelect: (id: string | null) => void;
 }) {
@@ -184,7 +185,7 @@ function LinkedPresetSection({
   const selectedPreset = presets.find((p) => p.id === selectedPresetId);
   const [searching, setSearching] = useState(false);
 
-  function buildPresetTradeQuery(config: FilterPreset['config']) {
+  function buildPresetTradeQuery(config: FilterPresetParsed['config']) {
     type StatFilter = { id: string; value?: { min?: number }; disabled: boolean };
     const statFilters: StatFilter[] = [];
 
@@ -267,13 +268,16 @@ function LinkedPresetSection({
     };
   }
 
-  // Phase 2: replace stub with ipc.proxyTradeSearch() then openExternal(result.url)
   async function handleOpenTrade() {
     if (!selectedPreset) return;
     setSearching(true);
     try {
-      const fallbackUrl = `https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`;
-      await openExternal(fallbackUrl);
+      const result = await proxySearch(buildPresetTradeQuery(selectedPreset.config), currentLeague);
+      await openExternal(result.url);
+    } catch (err) {
+      console.error('[LinkedPreset] proxySearch failed:', err);
+      // Fallback: open empty trade page so the user isn't stuck
+      await openExternal(`https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`);
     } finally {
       setSearching(false);
     }
@@ -491,7 +495,7 @@ export function StrategyBuilder() {
         </h4>
         <div className="flex flex-wrap items-center gap-2">
           <CategorySelect value={category} onChange={setCategory} />
-          <Button variant="primary" size="sm" onClick={() => setShowPicker((prev) => !prev)}>
+          <Button variant="primary" size="sm" onClick={() => setShowPicker(!showPicker)}>
             {showPicker ? 'Close' : 'Add Item'}
           </Button>
         </div>

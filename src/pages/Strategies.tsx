@@ -9,7 +9,6 @@ import {
   useDeleteStrategy,
   type StrategyParsed,
 } from '@/lib/hooks/use-strategies';
-import type { Strategy } from '@/types/index';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import { SaveEntityModal } from '@/components/ui/save-entity-modal';
@@ -30,7 +29,7 @@ function StrategyRow({
   onDuplicate,
   onExport,
 }: {
-  strategy: Strategy;
+  strategy: StrategyParsed;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
@@ -102,14 +101,14 @@ export function Strategies() {
     overwriteMutation.mutate({ config });
   }
 
-  function handleDuplicate(strategy: Strategy) {
+  function handleDuplicate(strategy: StrategyParsed) {
     duplicateStrategy.mutate(
       { name: `${strategy.name} (copy)`, config: strategy.config },
       { onSuccess: (dup) => { setActiveStrategyId(dup.id); loadConfig(dup.config, MAPS_PER_USE); } },
     );
   }
 
-  function handleLoadStrategy(strategy: Strategy) {
+  function handleLoadStrategy(strategy: StrategyParsed) {
     setActiveStrategyId(strategy.id);
     loadConfig(strategy.config, MAPS_PER_USE);
   }

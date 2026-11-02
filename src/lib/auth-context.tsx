@@ -2,6 +2,7 @@
 // ABOUTME: App works fully when unauthenticated; login is optional for stash features.
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { GggProfile, UserProfile } from '@/types';
 import { getGggProfile, logoutGgg, startOAuthLogin } from '@/lib/ipc';
 
@@ -26,6 +27,7 @@ function profileToUser(profile: GggProfile): UserProfile {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // On mount, check if a stored session exists.
   useEffect(() => {
@@ -52,11 +54,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await startOAuthLogin();
       const profile = await getGggProfile();
       setUser(profile !== null ? profileToUser(profile) : null);
+      // Re-run stash queries that failed with the previous (expired) session.
+      void queryClient.invalidateQueries({ queryKey: ['ggg-profile'] });
+      void queryClient.invalidateQueries({ queryKey: ['stash'] });
     } catch (err: unknown) {
       console.error('[auth] login failed:', JSON.stringify(err));
       throw err;
     }
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(async () => {
     await logoutGgg();

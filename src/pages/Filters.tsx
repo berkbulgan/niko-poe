@@ -8,7 +8,7 @@ import {
   useUpdatePreset,
   useDuplicatePreset,
   useDeletePreset,
-  type FilterPreset,
+  type FilterPresetParsed,
 } from '@/lib/hooks/use-filter-presets';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
@@ -28,7 +28,7 @@ function PresetRow({
   onDuplicate,
   onExport,
 }: {
-  preset: FilterPreset;
+  preset: FilterPresetParsed;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
@@ -98,14 +98,14 @@ export function Filters() {
     });
   }
 
-  function handleDuplicate(preset: FilterPreset) {
+  function handleDuplicate(preset: FilterPresetParsed) {
     duplicatePreset.mutate(
       { name: `${preset.name} (copy)`, config: preset.config },
       { onSuccess: (dup) => { setActivePresetId(dup.id); loadConfig(dup.config); } },
     );
   }
 
-  function handleLoadPreset(preset: FilterPreset) {
+  function handleLoadPreset(preset: FilterPresetParsed) {
     setActivePresetId(preset.id);
     loadConfig(preset.config);
   }

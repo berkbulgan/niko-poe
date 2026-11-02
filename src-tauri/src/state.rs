@@ -64,7 +64,8 @@ pub struct NinjaPriceCache {
     pub league: Option<String>,
     pub fetched_at: Option<std::time::Instant>,
     pub ttl_secs: u64,
-    pub is_loading: bool,
+    /// League of the most recent in-flight fetch; older fetches for other leagues are discarded.
+    pub loading_league: Option<String>,
 }
 
 impl NinjaPriceCache {
@@ -74,7 +75,7 @@ impl NinjaPriceCache {
             league: None,
             fetched_at: None,
             ttl_secs: 3600,
-            is_loading: false,
+            loading_league: None,
         }
     }
 }

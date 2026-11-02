@@ -1,7 +1,7 @@
 // ABOUTME: Authenticated app shell — sidebar navigation, league selector, user section.
 // ABOUTME: Rendered as the root layout route; child routes render via <Outlet />.
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
