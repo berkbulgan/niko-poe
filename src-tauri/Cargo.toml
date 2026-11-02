@@ -36,3 +36,4 @@ sha2 = "0.10"
 base64 = "0.22"
 rand = "0.8"
 flate2 = "1"
+niko-community-api = { path = "community-api" }
