@@ -13,6 +13,12 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
+  /* In-game overlay window: let the game show through around the panel. */
+  html.overlay-window,
+  html.overlay-window body {
+    background: transparent;
+  }
+
   ::selection {
     @apply bg-poe-gold/30 text-poe-text;
   }
