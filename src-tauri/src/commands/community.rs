@@ -12,8 +12,12 @@ use tauri::State;
 use crate::error::{Error, Result};
 use crate::state::AppState;
 
-/// Server URL baked in at build time (release builds set it from a CI secret).
-pub const DEFAULT_BASE_URL: Option<&str> = option_env!("NIKO_COMMUNITY_API_URL");
+/// Server URL baked in at build time (release builds set it from a CI secret); unset or blank means none.
+pub fn default_base_url() -> Option<String> {
+    option_env!("NIKO_COMMUNITY_API_URL")
+        .map(|u| u.trim().trim_end_matches('/').to_string())
+        .filter(|u| !u.is_empty())
+}
 
 fn validation(e: niko_community_api::ValidationError) -> Error {
     Error::Validation(e.0)
@@ -129,7 +133,7 @@ pub async fn set_community_base_url(state: State<'_, AppState>, url: Option<Stri
             return Err(Error::Validation("server URL must start with http:// or https://".into()));
         }
         Some(u) => Some(u),
-        None => DEFAULT_BASE_URL.map(str::to_string),
+        None => default_base_url(),
     };
     *state.community_base_url.lock().await = url.clone();
     Ok(url)

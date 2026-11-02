@@ -94,9 +94,7 @@ pub fn run() {
                 league_cache: Arc::new(Mutex::new(state::LeagueCache::new())),
                 stat_cache: Arc::new(Mutex::new(state::StatCache::new())),
                 ggg_token: Arc::new(Mutex::new(None)),
-                community_base_url: Arc::new(Mutex::new(
-                    commands::community::DEFAULT_BASE_URL.map(str::to_string),
-                )),
+                community_base_url: Arc::new(Mutex::new(commands::community::default_base_url())),
             };
 
             // Restore previously stored GGG tokens (silent — ignores missing/expired).
