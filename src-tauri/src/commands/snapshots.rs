@@ -295,16 +295,27 @@ pub async fn take_snapshot(
     state: State<'_, AppState>,
     input: TakeSnapshotInput,
 ) -> Result<StashSnapshot> {
+    take_snapshot_inner(&app, &state, &input.config_id, input.label).await
+}
+
+/// Fetches the config's tabs, prices them from the poe.ninja cache and stores the snapshot.
+/// Shared by the take_snapshot command and map tracking runs.
+pub async fn take_snapshot_inner(
+    app: &tauri::AppHandle,
+    state: &AppState,
+    config_id: &str,
+    label: Option<String>,
+) -> Result<StashSnapshot> {
     // 1. Load the config
     let config_row = sqlx::query(
         "SELECT id, name, league, tab_ids, strategy_id, created_at, updated_at
          FROM snapshot_configs WHERE id = ?",
     )
-    .bind(&input.config_id)
+    .bind(config_id)
     .fetch_optional(&state.pool)
     .await
     .map_err(|e| Error::Database(e.to_string()))?
-    .ok_or_else(|| Error::NotFound(format!("snapshot config {}", input.config_id)))?;
+    .ok_or_else(|| Error::NotFound(format!("snapshot config {config_id}")))?;
 
     let config = row_to_config(&config_row)?;
 
@@ -322,7 +333,7 @@ pub async fn take_snapshot(
     };
 
     // 3. Fetch items from all configured tabs
-    let access_token = crate::commands::auth::access_token(&app, &state).await?;
+    let access_token = crate::commands::auth::access_token(app, state).await?;
     let mut all_items: Vec<crate::commands::stash::StashItem> = Vec::new();
     for tab_id in &config.tab_ids {
         let items =
@@ -409,8 +420,8 @@ pub async fn take_snapshot(
          VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&snapshot_id)
-    .bind(&input.config_id)
-    .bind(&input.label)
+    .bind(config_id)
+    .bind(&label)
     .bind(total_chaos)
     .bind(total_items)
     .bind(unpriced_count)
@@ -450,8 +461,8 @@ pub async fn take_snapshot(
 
     Ok(StashSnapshot {
         id: snapshot_id,
-        config_id: input.config_id,
-        label: input.label,
+        config_id: config_id.to_string(),
+        label,
         total_chaos,
         total_items,
         unpriced_count,
