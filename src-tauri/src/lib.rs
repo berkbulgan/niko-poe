@@ -37,6 +37,11 @@ use commands::{
     strategies::{
         create_strategy, delete_strategy, get_strategy, get_strategies, update_strategy,
     },
+    tracking::{
+        get_tracker_state, start_tracking_run, switch_tracking_strategy, stop_tracking_run,
+        dismiss_tracking_suggestion, get_tracking_history, reassign_map_runs, delete_tracking_run,
+        get_tracker_settings, set_tracker_settings,
+    },
     trade::{
         fetch_trade_results, get_leagues, get_trade_stats, proxy_search, search_trade,
     },
@@ -78,6 +83,9 @@ pub fn run() {
                 p
             });
 
+            let tracker =
+                tauri::async_runtime::block_on(commands::tracking::load_tracker(app.handle(), &pool));
+
             let http_client = reqwest::Client::builder()
                 .user_agent("NIKO-TradeHelper/0.1.0")
                 .build()
@@ -91,12 +99,24 @@ pub fn run() {
                 league_cache: Arc::new(Mutex::new(state::LeagueCache::new())),
                 stat_cache: Arc::new(Mutex::new(state::StatCache::new())),
                 ggg_token: Arc::new(Mutex::new(None)),
+                tracker: Arc::new(Mutex::new(tracker)),
             };
 
             // Restore previously stored GGG tokens (silent — ignores missing/expired).
             commands::auth::try_load_tokens_from_store(app.handle(), &app_state);
 
             app.manage(app_state);
+            commands::tracking::spawn_watcher(app.handle().clone());
+
+            // The overlay is a second window; closing the main window must quit the app with it.
+            if let Some(main) = app.get_webview_window("main") {
+                let handle = app.handle().clone();
+                main.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { .. } = event {
+                        handle.exit(0);
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -159,6 +179,17 @@ pub fn run() {
             get_snapshot_detail,
             get_recent_snapshots,
             delete_snapshot,
+            // tracking
+            get_tracker_state,
+            start_tracking_run,
+            switch_tracking_strategy,
+            stop_tracking_run,
+            dismiss_tracking_suggestion,
+            get_tracking_history,
+            reassign_map_runs,
+            delete_tracking_run,
+            get_tracker_settings,
+            set_tracker_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
