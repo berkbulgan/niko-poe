@@ -8,7 +8,7 @@ use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use rand::Rng;
 use reqwest::Url;
 use sha2::{Digest, Sha256};
-use tauri::State;
+use tauri::{Manager, State};
 use tokio::sync::Mutex;
 
 use crate::error::{Error, Result};
@@ -205,6 +205,13 @@ pub async fn start_oauth_login(
     // otherwise the fixed port stays bound and every later login attempt fails.
     let _ = tauri_plugin_oauth::cancel(port);
     let callback_url = callback_url?;
+
+    // Browsers won't let the callback page close its own tab, so bring the app back to the
+    // front instead. Best-effort: Windows may only flash the taskbar button.
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
 
     let parsed = Url::parse(&callback_url)
         .map_err(|e| Error::Parse(format!("invalid callback URL: {}", e)))?;

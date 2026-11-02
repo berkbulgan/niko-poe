@@ -3,6 +3,7 @@
 
 import { create } from 'zustand';
 import type { FilterPresetConfig, MapStatFilters, QualityType } from '@/types/filters';
+import { resolveModIds } from '@/data';
 
 const EMPTY_FILTERS: MapStatFilters = {
   quantity: '',
@@ -127,8 +128,8 @@ export const useFiltersStore = create<FiltersState>((set, get) => ({
       corrupted: config.corrupted ?? 'natural',
     },
     isNightmareMap: config.isNightmareMap ?? false,
-    avoidIds: new Set(config.avoidModIds ?? []),
-    preferIds: new Set(config.preferModIds ?? []),
+    avoidIds: new Set(resolveModIds(config.avoidModIds ?? [])),
+    preferIds: new Set(resolveModIds(config.preferModIds ?? [])),
   }),
 }));
 

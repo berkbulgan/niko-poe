@@ -143,13 +143,17 @@
     <div class="progress-track">
       <div class="progress-bar"></div>
     </div>
-    <p class="hint">This tab will close automatically</p>
+    <p class="hint">You can close this tab now</p>
 
     <p class="disclaimer">
       This product isn't affiliated with or endorsed by Grinding Gear Games in any way.
     </p>
   </div>
 
-  <script>setTimeout(function() { window.close(); }, 5000);</script>
+  <script>
+    // Attempt to close the tab after a delay. Browsers block window.close()
+    // on tabs not opened via window.open(), so this is best-effort only.
+    setTimeout(function() { window.close(); }, 5000);
+  </script>
 </body>
 </html>

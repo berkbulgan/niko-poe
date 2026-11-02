@@ -57,7 +57,6 @@
       "endpoints": [
         "https://github.com/berkbulgan/niko-poe/releases/latest/download/latest.json"
       ],
-      "dialog": true,
       "windows": {
         "installMode": "passive"
       }

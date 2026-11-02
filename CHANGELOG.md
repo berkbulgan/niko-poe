@@ -2,6 +2,20 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0] - 2026-11-02
+
+### Added
+- **Automatic updates** — The app checks for a new release on startup and offers to install it
+- **Daily game data sync** — Atlas tree and map mod regex data are checked daily and shipped as patch releases when they change
+
+### Changed
+- Atlas tree data updated to 3.29.1 (+45 / -3 nodes); now follows GGG's main atlas tree export
+- Map mod regex data updated from poe.re (1 added, 1 removed, 92 changed); 46 saved mod ids remapped
+- The app window comes to the front after GGG login; the callback page no longer promises to close itself
+
+### Fixed
+- Saved filter presets keep their mods when upstream data changes mod ids
+
 ## [0.3.0] - 2026-11-02
 
 ### Added
