@@ -25,12 +25,12 @@ interface LeagueContextValue {
 const LeagueContext = createContext<LeagueContextValue | null>(null);
 
 const LEAGUE_STORAGE_KEY = 'niko_league';
-const DEFAULT_LEAGUE = 'Mirage';
+const DEFAULT_LEAGUE = 'Allflame';
 
 // poe.ninja only supports these 4 leagues — updated manually each league launch.
 const LEAGUES: League[] = [
-  { id: 'Mirage', text: 'Mirage' },
-  { id: 'Hardcore Mirage', text: 'Hardcore Mirage' },
+  { id: 'Allflame', text: 'Allflame' },
+  { id: 'Hardcore Allflame', text: 'Hardcore Allflame' },
   { id: 'Standard', text: 'Standard' },
   { id: 'Hardcore', text: 'Hardcore' },
 ];
