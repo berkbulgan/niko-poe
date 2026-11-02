@@ -2,6 +2,14 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.0] - 2026-11-02
+
+### Added
+- **Map tracking** — N.I.K.O. watches the game's Client.txt and asks "Track?" when you enter a map; a run takes a stash snapshot at start and end and records every map with its time
+- **Overlay** — Small always-on-top window to start, stop or switch strategy mid-run (switching takes a fresh snapshot); can be turned off in Settings
+- **Per-strategy results** — Strategies page shows profit per map, profit per hour and a run history chart; maps can be moved to another strategy or runs deleted
+- Settings: Client.txt path (auto-detected for the standalone and Steam clients)
+
 ## [0.5.0] - 2026-11-02
 
 ### Added
