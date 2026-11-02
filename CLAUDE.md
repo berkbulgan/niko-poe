@@ -42,7 +42,7 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 
 ### Atlas Tree Data (`src/data/atlas-tree-data.json`)
 
-GGG's official `league.json` export from [atlastree-export](https://github.com/grindinggear/atlastree-export). Contains node definitions, group positions, sprite sheet coordinates, orbit constants, wormhole data, and tree bounds. Sprite assets served from `public/atlas/` (41 files, ~10MB).
+GGG's official `data.json` export from [atlastree-export](https://github.com/grindinggear/atlastree-export) at its latest release tag, kept current by `scripts/sync-game-data.mjs` (map mod data in `src/data/` comes from [poe.re](https://github.com/veiset/poe.re) the same way; `src/data/sources.json` records the bundled versions and `mod-id-aliases.json` maps re-id'd mods for saved presets). Contains node definitions, group positions, sprite sheet coordinates, orbit constants, wormhole data, and tree bounds. Sprite assets served from `public/atlas/` (41 files, ~10MB).
 
 ### Atlas Tree Architecture
 
@@ -106,15 +106,15 @@ feature branch → PR → dev → PR (with semver label) → main → auto tag +
 2. **Update `CHANGELOG.md`** with the new version's changes before opening the release PR
 3. `dev` → `main` PR with semver label (`patch`/`minor`/`major`)
 4. On merge: `auto-release.yml` bumps version in `package.json` + `tauri.conf.json` + `Cargo.toml`, commits, tags
-5. Tag push triggers `release.yml` → Windows installer build → draft GitHub Release
-6. Review draft release notes, publish
+5. Tag push triggers `release.yml` → Windows installer build → published GitHub Release (the in-app updater only sees published releases)
 
 ### CI/CD Workflows
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `auto-release.yml` | PR with semver label merged to `main` | Version bump → commit → tag push |
-| `release.yml` | Tag push (`v*.*.*`) | Tauri build → NSIS installer → GitHub Release (draft) |
+| `auto-release.yml` | PR with semver label merged to `main` | Version bump → commit → tag push → merge `main` back into `dev` |
+| `release.yml` | Tag push (`v*.*.*`) | Tauri build → NSIS installer → GitHub Release (published) |
+| `data-sync.yml` | Daily 06:00 UTC + manual | Pulls atlas/regex data → PR (label `patch`) → auto-merge when checks pass |
 
 ## Placeholders That Need Real Values
 

@@ -1,132 +1,188 @@
 [
   {
+    "id": -2064669900,
+    "regex": "cco",
+    "rawText": "Map Boss is accompanied by a Synthesis Boss",
+    "generalizedText": "^map boss is accompanied by a synthesis boss$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
     "id": -2050206104,
-    "regex": "s rec",
+    "regex": "te o",
     "rawText": "Players have (20-60)% less Recovery Rate of Life and Energy Shield",
     "generalizedText": "^players have #% less recovery rate of life and energy shield$",
     "options": {
       "scary": 650,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
+    }
+  },
+  {
+    "id": -2038489408,
+    "regex": "m resistances$",
+    "rawText": "Players have -20% to all maximum Resistances",
+    "generalizedText": "^players have -#% to all maximum resistances$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": []
+    }
+  },
+  {
+    "id": -1940135977,
+    "regex": "k damage$",
+    "rawText": "Monsters have +50% Chance to Block Attack Damage",
+    "generalizedText": "^monsters have #% chance to block attack damage$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Currency"
+      ]
     }
   },
   {
     "id": -1934587276,
-    "regex": "a$",
+    "regex": "va$",
     "rawText": "Area is inhabited by Cultists of Kitava",
     "generalizedText": "^area is inhabited by cultists of kitava$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
-    "id": -1870026958,
-    "regex": "fier$",
-    "rawText": "(35-45)% increased number of Rare Monsters|Rare Monsters each have 1 additional Modifier",
-    "generalizedText": "^#% increased number of rare monsters$|^rare monsters each have # additional modifier$",
+    "id": -1818595967,
+    "regex": "re sha",
+    "rawText": "Rare monsters in area are Shaper-Touched",
+    "generalizedText": "^rare monsters in area are shaper-touched$",
     "options": {
       "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -1800824096,
-    "regex": "net",
-    "rawText": "Monster Damage Penetrates 15% Elemental Resistances",
-    "generalizedText": "^monster damage penetrates #% elemental resistances$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -1772662453,
-    "regex": "ilm",
+    "regex": "id e",
     "rawText": "Monsters have (30-70)% chance to Avoid Elemental Ailments",
     "generalizedText": "^monsters have #% chance to avoid elemental ailments$",
     "options": {
       "scary": 150,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
+    }
+  },
+  {
+    "id": -1647756153,
+    "regex": "fier$",
+    "rawText": "Rare Monsters each have 1 additional Modifier|(35-45)% increased number of Rare Monsters",
+    "generalizedText": "^rare monsters each have # additional modifier$|^#% increased number of rare monsters$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": -1629200695,
+    "regex": "stab",
+    "rawText": "Area contains Unstable Tentacle Fiends",
+    "generalizedText": "^area contains unstable tentacle fiends$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": []
+    }
+  },
+  {
+    "id": -1621497665,
+    "regex": "mum f",
+    "rawText": "Monsters gain a Frenzy Charge on Hit|Monsters have +1 to Maximum Frenzy Charges",
+    "generalizedText": "^monsters gain a frenzy charge on hit$|^monsters have # to maximum frenzy charges$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Maps"
+      ]
     }
   },
   {
     "id": -1616686189,
-    "regex": "of ma",
-    "rawText": "Monsters gain (20-49)% of Maximum Life as Extra Maximum Energy Shield",
+    "regex": "m energy shield$",
+    "rawText": "Monsters gain (20-80)% of Maximum Life as Extra Maximum Energy Shield",
     "generalizedText": "^monsters gain #% of maximum life as extra maximum energy shield$",
     "options": {
       "scary": 240,
-      "nm": false
-    }
-  },
-  {
-    "id": -1506737291,
-    "regex": "r at",
-    "rawText": "(25-30)% increased Monster Movement Speed|(35-45)% increased Monster Attack Speed|(35-45)% increased Monster Cast Speed",
-    "generalizedText": "^#% increased monster movement speed$|^#% increased monster attack speed$|^#% increased monster cast speed$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -1473394034,
-    "regex": "coo",
+    "regex": "rate$",
     "rawText": "Players have (20-40)% less Cooldown Recovery Rate",
     "generalizedText": "^players have #% less cooldown recovery rate$",
     "options": {
       "scary": 94,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": -1457795514,
-    "regex": "son$",
-    "rawText": "Monsters Poison on Hit|All Damage from Monsters' Hits can Poison|Monsters have 100% increased Poison Duration",
-    "generalizedText": "^monsters poison on hit$|^all damage from monsters' hits can poison$|^monsters have #% increased poison duration$",
+    "id": -1430865583,
+    "regex": "\\d+ e",
+    "rawText": "Rare Monsters have Physical Thorns reflecting 1500 Physical Damage|Rare Monsters have Elemental Thorns reflecting 2500 Elemental Damage",
+    "generalizedText": "^rare monsters have physical thorns reflecting # physical damage$|^rare monsters have elemental thorns reflecting # elemental damage$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Currency"
+      ]
     }
   },
   {
     "id": -1358177810,
-    "regex": "er,",
+    "regex": "r, f",
     "rawText": "Monsters steal Power, Frenzy and Endurance charges on Hit",
     "generalizedText": "^monsters steal power, frenzy and endurance charges on hit$",
     "options": {
       "scary": 80,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": -1344829253,
-    "regex": "tip",
+    "regex": "lier$",
     "rawText": "Monsters have (160-400)% increased Critical Strike Chance|+(30-45)% to Monster Critical Strike Multiplier",
     "generalizedText": "^monsters have #% increased critical strike chance$|^#% to monster critical strike multiplier$",
     "options": {
       "scary": 500,
-      "nm": false
-    }
-  },
-  {
-    "id": -1230902782,
-    "regex": "hock$",
-    "rawText": "All Monster Damage can Ignite, Freeze and Shock|Monsters Ignite, Freeze and Shock on Hit",
-    "generalizedText": "^all monster damage can ignite, freeze and shock$|^monsters ignite, freeze and shock on hit$",
-    "options": {
-      "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -1210904808,
-    "regex": "uct",
-    "rawText": "+50% Monster Physical Damage Reduction|+35% Monster Chaos Resistance|+55% Monster Elemental Resistances",
-    "generalizedText": "^#% monster physical damage reduction$|^#% monster chaos resistance$|^#% monster elemental resistances$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -136,17 +192,33 @@
     "generalizedText": "^monsters' attacks have #% chance to impale on hit$",
     "options": {
       "scary": 98,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": -1158025910,
+    "regex": "trate",
+    "rawText": "Monster Damage Penetrates 15% Elemental Resistances",
+    "generalizedText": "^monster damage penetrates #% elemental resistances$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": -1139261923,
-    "regex": "nsecrate",
+    "regex": "s of co",
     "rawText": "Area has patches of Consecrated Ground",
     "generalizedText": "^area has patches of consecrated ground$",
     "options": {
       "scary": 310,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -156,67 +228,45 @@
     "generalizedText": "^area contains many totems$",
     "options": {
       "scary": 9,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -1094717370,
-    "regex": "a fr",
+    "regex": "n a f",
     "rawText": "Monsters gain a Frenzy Charge on Hit",
     "generalizedText": "^monsters gain a frenzy charge on hit$",
     "options": {
       "scary": 80,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": -1088873049,
-    "regex": "d at",
+    "regex": "oss d",
     "rawText": "Unique Boss deals (15-25)% increased Damage|Unique Boss has (20-30)% increased Attack and Cast Speed",
     "generalizedText": "^unique boss deals #% increased damage$|^unique boss has #% increased attack and cast speed$",
     "options": {
       "scary": 420,
-      "nm": false
-    }
-  },
-  {
-    "id": -1086229775,
-    "regex": "ra c",
-    "rawText": "Monsters gain (80-100)% of their Physical Damage as Extra Chaos Damage",
-    "generalizedText": "^monsters gain #% of their physical damage as extra chaos damage$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -1047451686,
-    "regex": "ged",
+    "regex": "by r",
     "rawText": "Area is inhabited by ranged monsters",
     "generalizedText": "^area is inhabited by ranged monsters$",
     "options": {
       "scary": 4,
-      "nm": false
-    }
-  },
-  {
-    "id": -1020811466,
-    "regex": "byr",
-    "rawText": "Area contains Labyrinth Hazards",
-    "generalizedText": "^area contains labyrinth hazards$",
-    "options": {
-      "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -1016990964,
-    "regex": "sha",
-    "rawText": "Rare monsters in area are Shaper-Touched",
-    "generalizedText": "^rare monsters in area are shaper-touched$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -226,47 +276,83 @@
     "generalizedText": "^players have #% reduced chance to block$|^players have #% less armour$",
     "options": {
       "scary": 295,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
+    }
+  },
+  {
+    "id": -949334443,
+    "regex": "idi",
+    "rawText": "Monsters' skills Chain 3 additional times|Monsters' Projectiles can Chain when colliding with Terrain",
+    "generalizedText": "^monsters' skills chain # additional times$|^monsters' projectiles can chain when colliding with terrain$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -946283701,
     "regex": "^buffs",
-    "rawText": "Buffs on Players expire (30-70)% faster",
+    "rawText": "Buffs on Players expire (30-100)% faster",
     "generalizedText": "^buffs on players expire #% faster$",
     "options": {
       "scary": 96,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": -799369756,
-    "regex": "efe",
-    "rawText": "Players have (25-30)% less Defences",
-    "generalizedText": "^players have #% less defences$",
+    "id": -933231182,
+    "regex": "r cas",
+    "rawText": "(35-45)% increased Monster Cast Speed|(35-45)% increased Monster Attack Speed|(25-30)% increased Monster Movement Speed",
+    "generalizedText": "^#% increased monster cast speed$|^#% increased monster attack speed$|^#% increased monster movement speed$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": -931745379,
+    "regex": "g vi",
+    "rawText": "Monsters inflict 2 Grasping Vines on Hit",
+    "generalizedText": "^monsters inflict # grasping vines on hit$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Maps"
+      ]
+    }
+  },
+  {
+    "id": -887278806,
+    "regex": "g or",
+    "rawText": "Area contains Drowning Orbs",
+    "generalizedText": "^area contains drowning orbs$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -763914456,
-    "regex": "d fl",
+    "regex": "ced f",
     "rawText": "Players gain (30-50)% reduced Flask Charges",
     "generalizedText": "^players gain #% reduced flask charges$",
     "options": {
       "scary": 210,
-      "nm": false
-    }
-  },
-  {
-    "id": -742141454,
-    "regex": "of ma",
-    "rawText": "Monsters gain (70-80)% of Maximum Life as Extra Maximum Energy Shield",
-    "generalizedText": "^monsters gain #% of maximum life as extra maximum energy shield$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -276,27 +362,21 @@
     "generalizedText": "^area is inhabited by lunaris fanatics$",
     "options": {
       "scary": 4,
-      "nm": false
-    }
-  },
-  {
-    "id": -699853279,
-    "regex": "kes",
-    "rawText": "Monsters take (35-45)% reduced Extra Damage from Critical Strikes",
-    "generalizedText": "^monsters take #% reduced extra damage from critical strikes$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -694214737,
-    "regex": "r el",
+    "regex": "ter e",
     "rawText": "+(15-25)% Monster Chaos Resistance|+(20-40)% Monster Elemental Resistances",
     "generalizedText": "^#% monster chaos resistance$|^#% monster elemental resistances$",
     "options": {
       "scary": 100,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -306,47 +386,45 @@
     "generalizedText": "^area is inhabited by undead$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -683043845,
-    "regex": "nu",
+    "regex": "d nu",
     "rawText": "(20-30)% increased number of Rare Monsters",
     "generalizedText": "^#% increased number of rare monsters$",
     "options": {
       "scary": 1,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
-    "id": -677609632,
-    "regex": "wni",
-    "rawText": "Area contains Drowning Orbs",
-    "generalizedText": "^area contains drowning orbs$",
+    "id": -645418310,
+    "regex": "element$",
+    "rawText": "Monsters gain (180-200)% of their Physical Damage as Extra Damage of a random Element",
+    "generalizedText": "^monsters gain #% of their physical damage as extra damage of a random element$",
     "options": {
       "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -646463743,
-    "regex": "mav",
-    "rawText": "The Maven interferes with Players",
-    "generalizedText": "^the maven interferes with players$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -627831782,
-    "regex": "on,",
+    "regex": "son,",
     "rawText": "Monsters have a (20-50)% chance to avoid Poison, Impale, and Bleeding",
     "generalizedText": "^monsters have a #% chance to avoid poison, impale, and bleeding$",
     "options": {
       "scary": 390,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -356,37 +434,33 @@
     "generalizedText": "^area is inhabited by humanoids$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -580302769,
     "regex": "r damage$",
-    "rawText": "(14-25)% increased Monster Damage",
+    "rawText": "(14-40)% increased Monster Damage",
     "generalizedText": "^#% increased monster damage$",
     "options": {
       "scary": 370,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -539026720,
-    "regex": "rses",
+    "regex": "es on m",
     "rawText": "(25-60)% less effect of Curses on Monsters",
     "generalizedText": "^#% less effect of curses on monsters$",
     "options": {
       "scary": 363,
-      "nm": false
-    }
-  },
-  {
-    "id": -520858291,
-    "regex": "ovi",
-    "rawText": "Area contains patches of moving Marked Ground, inflicting random Marks",
-    "generalizedText": "^area contains patches of moving marked ground, inflicting random marks$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -396,107 +470,71 @@
     "generalizedText": "^monsters' skills chain # additional times$",
     "options": {
       "scary": 380,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -477049138,
-    "regex": "o al",
+    "regex": "m resistances$",
     "rawText": "Players have -(5-12)% to all maximum Resistances",
     "generalizedText": "^players have -#% to all maximum resistances$",
     "options": {
       "scary": 980,
-      "nm": false
-    }
-  },
-  {
-    "id": -356807455,
-    "regex": "vola",
-    "rawText": "Rare Monsters have Volatile Cores",
-    "generalizedText": "^rare monsters have volatile cores$",
-    "options": {
-      "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -353866601,
-    "regex": "yn",
-    "rawText": "Map Boss is accompanied by a Synthesis Boss",
-    "generalizedText": "^map boss is accompanied by a synthesis boss$",
-    "options": {
-      "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -352946674,
-    "regex": "k at",
-    "rawText": "Monsters have +50% Chance to Block Attack Damage",
-    "generalizedText": "^monsters have #% chance to block attack damage$",
-    "options": {
-      "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -326897606,
-    "regex": "ff$",
-    "rawText": "Unique Monsters have a random Shrine Buff",
-    "generalizedText": "^unique monsters have a random shrine buff$",
-    "options": {
-      "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": -276176924,
-    "regex": "tota",
-    "rawText": "Players have (50-60)% reduced Maximum total Life, Mana and Energy Shield Recovery per second from Leech",
-    "generalizedText": "^players have #% reduced maximum total life, mana and energy shield recovery per second from leech$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": -268547495,
-    "regex": "o su",
-    "rawText": "Monsters have +(30-60)% chance to Suppress Spell Damage",
+    "regex": "ll damage$",
+    "rawText": "Monsters have +(30-100)% chance to Suppress Spell Damage",
     "generalizedText": "^monsters have #% chance to suppress spell damage$",
     "options": {
       "scary": 290,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": -258709095,
+    "regex": "er ph",
+    "rawText": "+50% Monster Physical Damage Reduction|+55% Monster Elemental Resistances|+35% Monster Chaos Resistance",
+    "generalizedText": "^#% monster physical damage reduction$|^#% monster elemental resistances$|^#% monster chaos resistance$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Maps"
+      ]
     }
   },
   {
     "id": -235013251,
-    "regex": "f ph",
-    "rawText": "Monsters reflect (13-18)% of Physical Damage",
-    "generalizedText": "^monsters reflect #% of physical damage$",
+    "regex": "ve phy",
+    "rawText": "Rare Monsters have Physical Thorns reflecting (400-800) Physical Damage",
+    "generalizedText": "^rare monsters have physical thorns reflecting # physical damage$",
     "options": {
-      "scary": 1000,
-      "nm": false
-    }
-  },
-  {
-    "id": -231352045,
-    "regex": "lid",
-    "rawText": "Monsters' skills Chain 3 additional times|Monsters' Projectiles can Chain when colliding with Terrain",
-    "generalizedText": "^monsters' skills chain # additional times$|^monsters' projectiles can chain when colliding with terrain$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "scary": 0,
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -225071089,
-    "regex": "e charge o",
+    "regex": "e charge on hit$",
     "rawText": "Monsters gain an Endurance Charge on Hit",
     "generalizedText": "^monsters gain an endurance charge on hit$",
     "options": {
       "scary": 80,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -506,107 +544,133 @@
     "generalizedText": "^area is inhabited by goatmen$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -172005981,
-    "regex": "r lif",
-    "rawText": "(20-49)% more Monster Life",
+    "regex": "ore mo",
+    "rawText": "(20-100)% more Monster Life",
     "generalizedText": "^#% more monster life$",
     "options": {
       "scary": 100,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -166549521,
-    "regex": "o ig",
+    "regex": "o ignite,",
     "rawText": "Monsters have a (15-20)% chance to Ignite, Freeze and Shock on Hit",
     "generalizedText": "^monsters have a #% chance to ignite, freeze and shock on hit$",
     "options": {
       "scary": 98,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": -128171261,
-    "regex": "s of d",
+    "regex": "es of d",
     "rawText": "Area has patches of desecrated ground",
     "generalizedText": "^area has patches of desecrated ground$",
     "options": {
       "scary": 310,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": -122129388,
-    "regex": "r damage$",
-    "rawText": "(30-40)% increased Monster Damage",
-    "generalizedText": "^#% increased monster damage$",
+    "id": -126908257,
+    "regex": "hock$",
+    "rawText": "Monsters Ignite, Freeze and Shock on Hit|All Monster Damage can Ignite, Freeze and Shock",
+    "generalizedText": "^monsters ignite, freeze and shock on hit$|^all monster damage can ignite, freeze and shock$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Scarabs"
+      ]
     }
   },
   {
     "id": -114660370,
-    "regex": "ss ac",
+    "regex": "e \\d+% less ac",
     "rawText": "Players have (15-25)% less Accuracy Rating",
     "generalizedText": "^players have #% less accuracy rating$",
     "options": {
       "scary": 85,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": -106750911,
-    "regex": "sed l",
+    "regex": "d life$",
     "rawText": "Unique Boss has (25-35)% increased Life|Unique Boss has (45-70)% increased Area of Effect",
     "generalizedText": "^unique boss has #% increased life$|^unique boss has #% increased area of effect$",
     "options": {
       "scary": 400,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": -106071007,
+    "regex": "sed$",
+    "rawText": "Unique Bosses are Possessed",
+    "generalizedText": "^unique bosses are possessed$",
+    "options": {
+      "scary": 90,
+      "nm": false,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": -105914721,
+    "regex": "em$",
+    "rawText": "Players have 40% less effect of Flasks applied to them",
+    "generalizedText": "^players have #% less effect of flasks applied to them$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Currency"
+      ]
     }
   },
   {
     "id": -80588106,
-    "regex": "mai",
+    "regex": "cks$",
     "rawText": "Monsters Maim on Hit with Attacks",
     "generalizedText": "^monsters maim on hit with attacks$",
     "options": {
       "scary": 50,
-      "nm": false
-    }
-  },
-  {
-    "id": -55469102,
-    "regex": "o su",
-    "rawText": "Monsters have +100% chance to Suppress Spell Damage",
-    "generalizedText": "^monsters have #% chance to suppress spell damage$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": -54649013,
-    "regex": "kes",
-    "rawText": "Monsters take (25-40)% reduced Extra Damage from Critical Strikes",
+    "regex": "kes$",
+    "rawText": "Monsters take (25-45)% reduced Extra Damage from Critical Strikes",
     "generalizedText": "^monsters take #% reduced extra damage from critical strikes$",
     "options": {
       "scary": 250,
-      "nm": false
-    }
-  },
-  {
-    "id": -30056495,
-    "regex": "tun",
-    "rawText": "Monsters cannot be Stunned|Monsters' Action Speed cannot be modified to below Base Value|Monsters' Movement Speed cannot be modified to below Base Value",
-    "generalizedText": "^monsters cannot be stunned$|^monsters' action speed cannot be modified to below base value$|^monsters' movement speed cannot be modified to below base value$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -616,57 +680,69 @@
     "generalizedText": "^monsters deal #% extra physical damage as fire$",
     "options": {
       "scary": 450,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 10729340,
-    "regex": "withe",
+    "regex": "ds on",
     "rawText": "Monsters gain (21-35)% of their Physical Damage as Extra Chaos Damage|Monsters Inflict Withered for 2 seconds on Hit",
     "generalizedText": "^monsters gain #% of their physical damage as extra chaos damage$|^monsters inflict withered for # seconds on hit$",
     "options": {
       "scary": 455,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 17483843,
-    "regex": "r at",
+    "regex": "er at",
     "rawText": "(15-30)% increased Monster Movement Speed|(20-45)% increased Monster Attack Speed|(20-45)% increased Monster Cast Speed",
     "generalizedText": "^#% increased monster movement speed$|^#% increased monster attack speed$|^#% increased monster cast speed$",
     "options": {
       "scary": 420,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 58884108,
-    "regex": "eto",
+    "regex": "tons$",
     "rawText": "Area is inhabited by Skeletons",
     "generalizedText": "^area is inhabited by skeletons$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
-    "id": 145852868,
-    "regex": "r lif",
-    "rawText": "(90-100)% more Monster Life",
-    "generalizedText": "^#% more monster life$",
+    "id": 127168403,
+    "regex": "s damage$",
+    "rawText": "Monsters gain (80-100)% of their Physical Damage as Extra Chaos Damage",
+    "generalizedText": "^monsters gain #% of their physical damage as extra chaos damage$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 151806012,
-    "regex": "prev",
+    "regex": "o am",
     "rawText": "Players have -(10-20)% to amount of Suppressed Spell Damage Prevented|Monsters have (30-50)% increased Accuracy Rating",
     "generalizedText": "^players have -#% to amount of suppressed spell damage prevented$|^monsters have #% increased accuracy rating$",
     "options": {
       "scary": 365,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -676,17 +752,9 @@
     "generalizedText": "^area has increased monster variety$",
     "options": {
       "scary": 8,
-      "nm": false
-    }
-  },
-  {
-    "id": 192226459,
-    "regex": "rs f",
-    "rawText": "Monsters have 100% increased Area of Effect|Monsters fire 2 additional Projectiles",
-    "generalizedText": "^monsters have #% increased area of effect$|^monsters fire # additional projectiles$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -696,37 +764,45 @@
     "generalizedText": "^area is inhabited by solaris fanatics$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": 246480838,
+    "regex": "lier$",
+    "rawText": "+(70-75)% to Monster Critical Strike Multiplier|Monsters have (650-700)% increased Critical Strike Chance",
+    "generalizedText": "^#% to monster critical strike multiplier$|^monsters have #% increased critical strike chance$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 252096506,
-    "regex": "eche",
+    "regex": "from$",
     "rawText": "Monsters cannot be Leeched from",
     "generalizedText": "^monsters cannot be leeched from$",
     "options": {
       "scary": 600,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 256479531,
-    "regex": "poss",
-    "rawText": "Unique Bosses are Possessed",
-    "generalizedText": "^unique bosses are possessed$",
-    "options": {
-      "scary": 90,
-      "nm": false
-    }
-  },
-  {
-    "id": 283278925,
-    "regex": "o al",
-    "rawText": "Players have -20% to all maximum Resistances",
-    "generalizedText": "^players have -#% to all maximum resistances$",
+    "id": 284489036,
+    "regex": "ss are",
+    "rawText": "Players have (25-30)% less Area of Effect",
+    "generalizedText": "^players have #% less area of effect$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -736,47 +812,35 @@
     "generalizedText": "^players are cursed with enfeeble$",
     "options": {
       "scary": 360,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 358866626,
-    "regex": "h vu",
-    "rawText": "Players are Cursed with Vulnerability|Players are Cursed with Temporal Chains|Players are Cursed with Elemental Weakness",
-    "generalizedText": "^players are cursed with vulnerability$|^players are cursed with temporal chains$|^players are cursed with elemental weakness$",
+    "id": 357242916,
+    "regex": "arge w",
+    "rawText": "Monsters have +1 to Maximum Endurance Charges|Monsters gain an Endurance Charge when hit",
+    "generalizedText": "^monsters have # to maximum endurance charges$|^monsters gain an endurance charge when hit$",
     "options": {
       "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": 363247990,
-    "regex": "fra",
-    "rawText": "25% chance for Rare Monsters to Fracture on death",
-    "generalizedText": "^#% chance for rare monsters to fracture on death$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Maps"
+      ]
     }
   },
   {
     "id": 472035128,
-    "regex": "ocke",
+    "regex": "und w",
     "rawText": "Area has patches of Shocked Ground which increase Damage taken by (20-50)%",
     "generalizedText": "^area has patches of shocked ground which increase damage taken by #%$",
     "options": {
       "scary": 310,
-      "nm": false
-    }
-  },
-  {
-    "id": 541806359,
-    "regex": "tab",
-    "rawText": "Area contains Unstable Tentacle Fiends",
-    "generalizedText": "^area contains unstable tentacle fiends$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -786,37 +850,87 @@
     "generalizedText": "^#% increased magic monsters$",
     "options": {
       "scary": 0,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 728127970,
-    "regex": "wb",
-    "rawText": "Players are assaulted by Bloodstained Sawblades",
-    "generalizedText": "^players are assaulted by bloodstained sawblades$",
+    "id": 639399394,
+    "regex": "ff$",
+    "rawText": "Unique Monsters have a random Shrine Buff",
+    "generalizedText": "^unique monsters have a random shrine buff$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Maps"
+      ]
+    }
+  },
+  {
+    "id": 647925005,
+    "regex": "h vu",
+    "rawText": "Players are Cursed with Vulnerability|Players are Cursed with Temporal Chains|Players are Cursed with Elemental Weakness",
+    "generalizedText": "^players are cursed with vulnerability$|^players are cursed with temporal chains$|^players are cursed with elemental weakness$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Scarabs"
+      ]
+    }
+  },
+  {
+    "id": 670500310,
+    "regex": "' m",
+    "rawText": "Monsters cannot be Stunned|Monsters' Action Speed cannot be modified to below Base Value|Monsters' Movement Speed cannot be modified to below Base Value",
+    "generalizedText": "^monsters cannot be stunned$|^monsters' action speed cannot be modified to below base value$|^monsters' movement speed cannot be modified to below base value$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Currency"
+      ]
+    }
+  },
+  {
+    "id": 707446389,
+    "regex": "rch$",
+    "rawText": "Area contains Runes of the Searing Exarch",
+    "generalizedText": "^area contains runes of the searing exarch$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 775962019,
-    "regex": "itc",
+    "regex": "wn$",
     "rawText": "Area is inhabited by Sea Witches and their Spawn",
     "generalizedText": "^area is inhabited by sea witches and their spawn$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 823410479,
-    "regex": "uct",
+    "regex": "er ph",
     "rawText": "+(20-40)% Monster Physical Damage Reduction",
     "generalizedText": "^#% monster physical damage reduction$",
     "options": {
       "scary": 150,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -826,87 +940,133 @@
     "generalizedText": "^players have #% less area of effect$",
     "options": {
       "scary": 60,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 955801458,
-    "regex": "two",
+    "regex": "wo u",
     "rawText": "Area contains two Unique Bosses",
     "generalizedText": "^area contains two unique bosses$",
     "options": {
       "scary": 90,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": 972998450,
+    "regex": "viv",
+    "rawText": "Rare monsters in area Temporarily Revive on death",
+    "generalizedText": "^rare monsters in area temporarily revive on death$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 980061401,
-    "regex": "emons",
+    "regex": "mons$",
     "rawText": "Area is inhabited by Demons",
     "generalizedText": "^area is inhabited by demons$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
-    "id": 1002562134,
-    "regex": "pin",
-    "rawText": "Monsters inflict 2 Grasping Vines on Hit",
-    "generalizedText": "^monsters inflict # grasping vines on hit$",
+    "id": 1014295028,
+    "regex": "son$",
+    "rawText": "Monsters Poison on Hit|Monsters have 100% increased Poison Duration|All Damage from Monsters' Hits can Poison",
+    "generalizedText": "^monsters poison on hit$|^monsters have #% increased poison duration$|^all damage from monsters' hits can poison$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": []
+    }
+  },
+  {
+    "id": 1061710360,
+    "regex": "wb",
+    "rawText": "Players are assaulted by Bloodstained Sawblades",
+    "generalizedText": "^players are assaulted by bloodstained sawblades$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Currency"
+      ]
     }
   },
   {
     "id": 1062763755,
-    "regex": "hil",
+    "regex": "s of ch",
     "rawText": "Area has patches of Chilled Ground",
     "generalizedText": "^area has patches of chilled ground$",
     "options": {
       "scary": 310,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 1078205993,
-    "regex": "% of e",
-    "rawText": "Monsters reflect (13-18)% of Elemental Damage",
-    "generalizedText": "^monsters reflect #% of elemental damage$",
+    "regex": "\\d+ e",
+    "rawText": "Rare Monsters have Elemental Thorns reflecting (900-1500) Elemental Damage",
+    "generalizedText": "^rare monsters have elemental thorns reflecting # elemental damage$",
     "options": {
-      "scary": 1000,
-      "nm": false
+      "scary": 0,
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 1082020744,
-    "regex": "bom",
+    "regex": "ions$",
     "rawText": "Area is inhabited by Abominations",
     "generalizedText": "^area is inhabited by abominations$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 1101434369,
-    "regex": "non",
+    "regex": "ills$",
     "rawText": "Players have (25-60)% reduced effect of Non-Curse Auras from Skills",
     "generalizedText": "^players have #% reduced effect of non-curse auras from skills$",
     "options": {
       "scary": 990,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 1197865431,
-    "regex": "^buffs",
-    "rawText": "Buffs on Players expire 100% faster",
-    "generalizedText": "^buffs on players expire #% faster$",
+    "id": 1117764869,
+    "regex": "^deb",
+    "rawText": "Debuffs on Monsters expire 100% faster",
+    "generalizedText": "^debuffs on monsters expire #% faster$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Currency"
+      ]
     }
   },
   {
@@ -916,7 +1076,21 @@
     "generalizedText": "^players are cursed with vulnerability$",
     "options": {
       "scary": 360,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
+    }
+  },
+  {
+    "id": 1205583947,
+    "regex": "ech$",
+    "rawText": "Players have (50-60)% reduced Maximum total Life, Mana and Energy Shield Recovery per second from Leech",
+    "generalizedText": "^players have #% reduced maximum total life, mana and energy shield recovery per second from leech$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -926,117 +1100,147 @@
     "generalizedText": "^area has patches of burning ground$",
     "options": {
       "scary": 310,
-      "nm": false
-    }
-  },
-  {
-    "id": 1259478420,
-    "regex": "m el",
-    "rawText": "Monsters gain (180-200)% of their Physical Damage as Extra Damage of a random Element",
-    "generalizedText": "^monsters gain #% of their physical damage as extra damage of a random element$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 1283094925,
-    "regex": "a po",
+    "regex": "n a po",
     "rawText": "Monsters gain a Power Charge on Hit",
     "generalizedText": "^monsters gain a power charge on hit$",
     "options": {
       "scary": 80,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 1305115176,
-    "regex": "reg",
+    "regex": "t reg",
     "rawText": "Players cannot Regenerate Life, Mana or Energy Shield",
     "generalizedText": "^players cannot regenerate life, mana or energy shield$",
     "options": {
       "scary": 700,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 1358293706,
-    "regex": "mum p",
-    "rawText": "Monsters have +1 to Maximum Power Charges|Monsters gain a Power Charge on Hit",
-    "generalizedText": "^monsters have # to maximum power charges$|^monsters gain a power charge on hit$",
+    "id": 1313044496,
+    "regex": "frac",
+    "rawText": "25% chance for Rare Monsters to Fracture on death",
+    "generalizedText": "^#% chance for rare monsters to fracture on death$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 1362268742,
-    "regex": "m end",
-    "rawText": "Monsters have +1 to Maximum Endurance Charges|Monsters gain an Endurance Charge when hit",
-    "generalizedText": "^monsters have # to maximum endurance charges$|^monsters gain an endurance charge when hit$",
+    "id": 1333860371,
+    "regex": "teo",
+    "rawText": "Players are targeted by a Meteor when they use a Flask",
+    "generalizedText": "^players are targeted by a meteor when they use a flask$",
     "options": {
       "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": 1417707513,
-    "regex": "sks",
-    "rawText": "Players have 40% less effect of Flasks applied to them",
-    "generalizedText": "^players have #% less effect of flasks applied to them$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Currency"
+      ]
     }
   },
   {
     "id": 1424047266,
-    "regex": "nim",
+    "regex": "mals$",
     "rawText": "Area is inhabited by Animals",
     "generalizedText": "^area is inhabited by animals$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 1428847539,
-    "regex": "ot i",
+    "regex": "rs cannot i",
     "rawText": "Players cannot inflict Exposure",
     "generalizedText": "^players cannot inflict exposure$",
     "options": {
       "scary": 150,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 1441366109,
-    "regex": "ril",
-    "rawText": "Rare monsters in area Temporarily Revive on death",
-    "generalizedText": "^rare monsters in area temporarily revive on death$",
+    "id": 1464066514,
+    "regex": "s def",
+    "rawText": "Players have (25-30)% less Defences",
+    "generalizedText": "^players have #% less defences$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Scarabs"
+      ]
     }
   },
   {
-    "id": 1474220255,
-    "regex": "tip",
-    "rawText": "Monsters have (650-700)% increased Critical Strike Chance|+(70-75)% to Monster Critical Strike Multiplier",
-    "generalizedText": "^monsters have #% increased critical strike chance$|^#% to monster critical strike multiplier$",
+    "id": 1469490158,
+    "regex": "tiles$",
+    "rawText": "Monsters fire 2 additional Projectiles|Monsters have 100% increased Area of Effect",
+    "generalizedText": "^monsters fire # additional projectiles$|^monsters have #% increased area of effect$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": []
+    }
+  },
+  {
+    "id": 1494523238,
+    "regex": "mum p",
+    "rawText": "Monsters gain a Power Charge on Hit|Monsters have +1 to Maximum Power Charges",
+    "generalizedText": "^monsters gain a power charge on hit$|^monsters have # to maximum power charges$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Maps"
+      ]
+    }
+  },
+  {
+    "id": 1538178254,
+    "regex": "haz",
+    "rawText": "Area contains Labyrinth Hazards",
+    "generalizedText": "^area contains labyrinth hazards$",
+    "options": {
+      "scary": 1001,
+      "nm": true,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 1541760497,
-    "regex": "tun",
+    "regex": "unned$",
     "rawText": "Monsters cannot be Stunned|(15-30)% more Monster Life",
     "generalizedText": "^monsters cannot be stunned$|^#% more monster life$",
     "options": {
       "scary": 100,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -1046,97 +1250,95 @@
     "generalizedText": "^monsters are hexproof$",
     "options": {
       "scary": 150,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 1578069823,
-    "regex": "rs p",
+    "regex": "rs po",
     "rawText": "Monsters Poison on Hit",
     "generalizedText": "^monsters poison on hit$",
     "options": {
       "scary": 390,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 1598599541,
-    "regex": "h tem",
+    "regex": "th tem",
     "rawText": "Players are Cursed with Temporal Chains",
     "generalizedText": "^players are cursed with temporal chains$",
     "options": {
       "scary": 360,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 1634487773,
-    "regex": "rs f",
+    "regex": "tiles$",
     "rawText": "Monsters fire 2 additional Projectiles",
     "generalizedText": "^monsters fire # additional projectiles$",
     "options": {
       "scary": 440,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
-    "id": 1639797583,
-    "regex": "rch$",
-    "rawText": "Area contains Runes of the Searing Exarch",
-    "generalizedText": "^area contains runes of the searing exarch$",
+    "id": 1665221611,
+    "regex": "res$",
+    "rawText": "Rare Monsters have Volatile Cores",
+    "generalizedText": "^rare monsters have volatile cores$",
     "options": {
       "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": 1673353923,
-    "regex": "get",
-    "rawText": "Players are targeted by a Meteor when they use a Flask",
-    "generalizedText": "^players are targeted by a meteor when they use a flask$",
-    "options": {
-      "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": 1715183255,
-    "regex": "f ph",
-    "rawText": "Monsters reflect 20% of Physical Damage|Monsters reflect 20% of Elemental Damage",
-    "generalizedText": "^monsters reflect #% of physical damage$|^monsters reflect #% of elemental damage$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": true,
+      "rewards": [
+        "Scarabs"
+      ]
     }
   },
   {
     "id": 1723792253,
-    "regex": "gho",
+    "regex": "sts$",
     "rawText": "Area is inhabited by Ghosts",
     "generalizedText": "^area is inhabited by ghosts$",
     "options": {
       "scary": 4,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 1743546402,
-    "regex": "hind",
+    "regex": "ells$",
     "rawText": "Monsters Hinder on Hit with Spells",
     "generalizedText": "^monsters hinder on hit with spells$",
     "options": {
       "scary": 50,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 1762786407,
-    "regex": "mum f",
-    "rawText": "Monsters have +1 to Maximum Frenzy Charges|Monsters gain a Frenzy Charge on Hit",
-    "generalizedText": "^monsters have # to maximum frenzy charges$|^monsters gain a frenzy charge on hit$",
+    "id": 1756122717,
+    "regex": "rfe",
+    "rawText": "The Maven interferes with Players",
+    "generalizedText": "^the maven interferes with players$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -1146,27 +1348,33 @@
     "generalizedText": "^monsters deal #% extra physical damage as cold$",
     "options": {
       "scary": 450,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
-    "id": 1799964834,
-    "regex": "^au",
+    "id": 1861748274,
+    "regex": "^aur",
     "rawText": "Auras from Player Skills which affect Allies also affect Enemies",
     "generalizedText": "^auras from player skills which affect allies also affect enemies$",
     "options": {
       "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 1882321261,
-    "regex": "h el",
+    "regex": "th el",
     "rawText": "Players are Cursed with Elemental Weakness",
     "generalizedText": "^players are cursed with elemental weakness$",
     "options": {
       "scary": 360,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
@@ -1176,47 +1384,47 @@
     "generalizedText": "^monsters have #% increased area of effect$",
     "options": {
       "scary": 400,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
-    "id": 1982218828,
-    "regex": "ss are",
-    "rawText": "Players have (25-30)% less Area of Effect",
-    "generalizedText": "^players have #% less area of effect$",
+    "id": 1932675161,
+    "regex": "rks",
+    "rawText": "Area contains patches of moving Marked Ground, inflicting random Marks",
+    "generalizedText": "^area contains patches of moving marked ground, inflicting random marks$",
     "options": {
       "scary": 1001,
-      "nm": true
-    }
-  },
-  {
-    "id": 2039847472,
-    "regex": "deb",
-    "rawText": "Debuffs on Monsters expire 100% faster",
-    "generalizedText": "^debuffs on monsters expire #% faster$",
-    "options": {
-      "scary": 1001,
-      "nm": true
+      "nm": true,
+      "prefix": false,
+      "rewards": [
+        "Scarabs"
+      ]
     }
   },
   {
     "id": 2080363489,
-    "regex": "lw",
+    "regex": "tes$",
     "rawText": "All Monster Damage from Hits always Ignites",
     "generalizedText": "^all monster damage from hits always ignites$",
     "options": {
       "scary": 99,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
     "id": 2105788016,
-    "regex": "taun",
+    "regex": "taunte",
     "rawText": "Monsters' Action Speed cannot be modified to below Base Value|Monsters' Movement Speed cannot be modified to below Base Value|Monsters cannot be Taunted",
     "generalizedText": "^monsters' action speed cannot be modified to below base value$|^monsters' movement speed cannot be modified to below base value$|^monsters cannot be taunted$",
     "options": {
       "scary": 89,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   },
   {
@@ -1226,17 +1434,21 @@
     "generalizedText": "^monsters blind on hit$",
     "options": {
       "scary": 50,
-      "nm": false
+      "nm": false,
+      "prefix": false,
+      "rewards": []
     }
   },
   {
     "id": 2132856290,
-    "regex": "as l",
+    "regex": "as li",
     "rawText": "Monsters deal (50-110)% extra Physical Damage as Lightning",
     "generalizedText": "^monsters deal #% extra physical damage as lightning$",
     "options": {
       "scary": 450,
-      "nm": false
+      "nm": false,
+      "prefix": true,
+      "rewards": []
     }
   }
 ]

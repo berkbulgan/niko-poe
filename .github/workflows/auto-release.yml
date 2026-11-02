@@ -94,3 +94,19 @@ jobs:
           git commit -m "chore: bump version to $NEW_VERSION"
           git tag "v$NEW_VERSION"
           git push origin main --tags
+
+      - name: Merge main back into dev
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          # HEAD is the bump commit just pushed; the checkout may be detached, so don't rely on a local "main".
+          RELEASED=$(git rev-parse HEAD)
+          git fetch origin dev
+          git checkout -B dev origin/dev
+          if git merge --no-edit "$RELEASED" && git push origin dev; then
+            echo "dev synced with main"
+          else
+            git merge --abort 2>/dev/null || true
+            gh pr create --base dev --head main --title "Sync main into dev" \
+              --body "Automatic back-merge after release failed (conflict or push rejected); merge manually."
+          fi
