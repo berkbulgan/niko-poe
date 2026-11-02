@@ -1,4 +1,4 @@
-// ABOUTME: Static PoE map modifier data from poe-vendor-string project.
+// ABOUTME: Static PoE map modifier data from the poe.re project (synced by scripts/sync-game-data.mjs).
 // ABOUTME: Includes tokens, optimization table, and helpers for regex generation.
 
 import rawMods from './map-mods-full.json';
