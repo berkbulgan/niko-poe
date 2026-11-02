@@ -2433,11 +2433,12 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "niko"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
  "flate2",
+ "niko-community-api",
  "once_cell",
  "rand 0.8.5",
  "regex",
@@ -2458,6 +2459,13 @@ dependencies = [
  "tokio",
  "urlencoding",
  "uuid",
+]
+
+[[package]]
+name = "niko-community-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

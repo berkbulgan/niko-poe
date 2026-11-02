@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { useImportEntity } from '@/lib/hooks/use-sharing';
 import * as ipc from '@/lib/ipc';
+import { isCommunityId } from '@/lib/community-storage';
 
 interface PreviewItem {
   type: string;
@@ -32,6 +33,8 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
   const [preview, setPreview] = useState<PreviewItem[] | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  /** Share code fetched from the community server when a community id was entered. */
+  const [communityCode, setCommunityCode] = useState<string | null>(null);
   const importEntity = useImportEntity();
 
   const resetState = useCallback(() => {
@@ -39,6 +42,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
     setPreview(null);
     setPreviewError(null);
     setIsPreviewing(false);
+    setCommunityCode(null);
     importEntity.reset();
   }, [importEntity]);
 
@@ -61,6 +65,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
     setIsPreviewing(true);
     setPreviewError(null);
     setPreview(null);
+    setCommunityCode(null);
 
     try {
       let shareCode = trimmed;
@@ -68,6 +73,9 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
       // If it looks like a pastebin URL, fetch the raw content first.
       if (/pastebin\.com/i.test(shareCode)) {
         shareCode = await ipc.importFromPastebin(shareCode);
+      } else if (isCommunityId(shareCode)) {
+        shareCode = (await ipc.communityGet(shareCode)).shareCode;
+        setCommunityCode(shareCode);
       }
 
       const decoded = await ipc.decodeShareCode(shareCode);
@@ -90,8 +98,10 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
       }
 
       setPreview(items);
-    } catch {
-      setPreviewError('Invalid share code. Check and try again.');
+    } catch (err) {
+      setPreviewError(isCommunityId(trimmed)
+        ? `Community strategy not available: ${err instanceof Error ? err.message : String(err)}`
+        : 'Invalid share code. Check and try again.');
       setPreview(null);
     } finally {
       setIsPreviewing(false);
@@ -106,7 +116,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
 
   function handleImport() {
     if (!code.trim()) return;
-    importEntity.mutate({ code: code.trim() }, {
+    importEntity.mutate({ code: communityCode ?? code.trim() }, {
       onSuccess: () => {
         onClose();
       },
@@ -121,7 +131,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
     <Modal isOpen={open} onClose={handleClose} title="Import">
       <div className="space-y-4">
         <div>
-          <label className="mb-1.5 block text-xs text-poe-text-muted">Share Code or Pastebin URL</label>
+          <label className="mb-1.5 block text-xs text-poe-text-muted">Share Code, Pastebin URL or Community ID</label>
           <Input
             value={code}
             onChange={(e) => handleCodeChange(e.target.value)}

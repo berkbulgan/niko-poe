@@ -1,0 +1,14 @@
+# ABOUTME: Wire types shared by the N.I.K.O. app and the community strategies server.
+# ABOUTME: Kept dependency-light so both sides can compile the same contract.
+
+[package]
+name = "niko-community-api"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"
