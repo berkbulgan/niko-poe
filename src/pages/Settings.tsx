@@ -2,18 +2,20 @@
 // ABOUTME: Left sidebar: section nav. Right content: section-specific settings panels.
 
 import { useState } from 'react';
-import { PoeIcon } from '@/components/ui/poe-icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PoeIcon } from '@/components/ui/poe-icon';
+import { useSetTrackerSettings, useTrackerSettings, useTrackerState } from '@/lib/hooks/use-tracking';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
 import { useCommunityServerUrl, useSetCommunityServerUrl } from '@/lib/hooks/use-community';
 import { getServerUrlOverride } from '@/lib/community-storage';
 import { toast } from '@/lib/stores/toast-store';
 
-type SettingsSection = 'general' | 'stash-ignore' | 'about';
+type SettingsSection = 'general' | 'tracking' | 'stash-ignore' | 'about';
 
 const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'general', label: 'General' },
+  { id: 'tracking', label: 'Map Tracking' },
   { id: 'stash-ignore', label: 'Stash Ignore List' },
   { id: 'about', label: 'About' },
 ];
@@ -86,6 +88,52 @@ function CommunityServerSetting() {
       <p className="mt-1 text-[11px] text-poe-text-muted">
         {!inUse ? 'No community server configured.' : getServerUrlOverride() ? `In use: ${inUse}` : 'Using the built-in server.'}
       </p>
+    </div>
+  );
+}
+
+function TrackingSection() {
+  useTrackerState(); // refetches settings when the watcher finds or loses the log
+  const { data: settings } = useTrackerSettings();
+  const save = useSetTrackerSettings();
+  const [draft, setDraft] = useState<string | null>(null);
+
+  if (!settings) return null;
+  const path = draft ?? settings.logPath ?? '';
+  const update = (logPath: string | null, overlayEnabled = settings.overlayEnabled) =>
+    save.mutate({ logPath, overlayEnabled }, { onSuccess: () => setDraft(null) });
+
+  return (
+    <div className="space-y-4 p-6">
+      <h2 className="mb-1 font-display text-sm tracking-wide text-poe-text-dim">Map Tracking</h2>
+      <div>
+        <label className="flex items-center gap-2 text-xs text-poe-text">
+          <input
+            type="checkbox"
+            checked={settings.overlayEnabled}
+            onChange={(e) => update(settings.logPath, e.target.checked)}
+          />
+          Show in-game overlay
+        </label>
+        <p className="mt-1 text-xs text-poe-text-muted">
+          The overlay shows over the game only in Windowed Fullscreen mode, once the game is running.
+        </p>
+      </div>
+      <div>
+        <p className="mb-1 text-xs text-poe-text-dim">Client.txt</p>
+        <p className={`mb-2 text-xs ${settings.logFound ? 'text-poe-success' : 'text-red-400'}`}>
+          {settings.logFound
+            ? `Reading ${settings.activePath ?? ''}`
+            : 'Not found — enter the path to logs\\Client.txt in your Path of Exile folder'}
+        </p>
+        <div className="flex gap-2">
+          <Input value={path} placeholder="Auto-detect" onChange={(e) => setDraft(e.target.value)} />
+          <Button size="sm" onClick={() => update(path || null)} disabled={save.isPending}>Save</Button>
+          {settings.logPath && (
+            <Button size="sm" variant="ghost" onClick={() => update(null)}>Reset to auto-detect</Button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -202,6 +250,7 @@ export function Settings() {
       {/* Right content */}
       <main className="flex-1 overflow-y-auto">
         {activeSection === 'general' && <GeneralSection />}
+        {activeSection === 'tracking' && <TrackingSection />}
         {activeSection === 'stash-ignore' && <StashIgnoreSection />}
         {activeSection === 'about' && <AboutSection />}
       </main>

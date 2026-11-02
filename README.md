@@ -10,6 +10,7 @@
 - **Trade Search** — Search the PoE Trade API using your built map configurations; find maps matching your strategy filters with rate-limited queries
 - **Map Mod Picker** — Two-column avoid/prefer selection with danger values (data from [poe.re](https://github.com/veiset/poe.re))
 - **Stash Viewer** — Browse stash tabs with item details and pricing (requires GGG login)
+- **Map Tracking** — An in-game overlay counts your maps from `Client.txt` and takes stash snapshots at start and stop; the Strategies page shows measured div/hr, maps/hr and profit per map for each strategy (Windowed Fullscreen, English client)
 - **GGG Account Integration** — OAuth2 PKCE login for account-linked features
 - **League Selector** — Auto-fetches PC leagues from PoE API
 
@@ -104,9 +105,9 @@ Found a bug or have a feature request? Please [open an issue](https://github.com
 - [x] Tauri v2 desktop migration
 - [x] GGG OAuth2 PKCE login
 - [x] Stash tab viewer
-- [ ] Stash snapshots + ROI tracking per strategy
+- [x] Stash snapshots + ROI tracking per strategy
 - [ ] Net worth estimation from stash contents
-- [ ] Strategy profit history over time
+- [x] Strategy profit history over time
 - [ ] macOS / Linux builds
 
 ## Support
