@@ -2,6 +2,14 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-11-02
+
+### Added
+- **Community strategies** — Publish a saved strategy (with its linked filter preset and atlas tree) to the N.I.K.O. community server with name, tags, league, patch, budget, difficulty, video link and markdown notes; update or unpublish it later from the same install
+- **Community page** — Browse published strategies by search, league, tag and newest/most favourited; preview notes and items repriced with live poe.ninja prices, then import, favourite or report
+- Import accepts a community strategy ID next to share codes and Pastebin links
+- Settings: optional custom community server address
+
 ## [0.4.1] - 2026-11-02
 
 ### Fixed

@@ -6,6 +6,7 @@ import { AppLayout } from './pages/AppLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Filters } from './pages/Filters';
 import { Strategies } from './pages/Strategies';
+import { Community } from './pages/Community';
 import { AtlasTree } from './pages/AtlasTree';
 import { Stash } from './pages/Stash';
 import { Settings } from './pages/Settings';
@@ -20,6 +21,7 @@ export const router = createHashRouter([
       { path: 'dashboard', element: <Dashboard /> },
       { path: 'filters', element: <Filters /> },
       { path: 'strategies', element: <Strategies /> },
+      { path: 'community', element: <Community /> },
       { path: 'atlas-tree', element: <AtlasTree /> },
       { path: 'stash', element: <Stash /> },
       { path: 'settings', element: <Settings /> },
