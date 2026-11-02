@@ -1,14 +1,15 @@
 // ABOUTME: Filters page — preset sidebar + map mod picker.
 // ABOUTME: Left panel: saved presets with share codes. Right panel: avoid/prefer mod columns.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   useFilterPresets,
   useCreatePreset,
   useUpdatePreset,
   useDuplicatePreset,
   useDeletePreset,
-  type FilterPreset,
+  type FilterPresetParsed,
 } from '@/lib/hooks/use-filter-presets';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
@@ -19,6 +20,8 @@ import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { StatPicker } from '@/components/filters/stat-picker';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/lib/stores/toast-store';
+import { confirmDiscard } from '@/lib/platform';
 import { useFiltersStore } from '@/lib/stores/filters-store';
 
 function PresetRow({
@@ -28,7 +31,7 @@ function PresetRow({
   onDuplicate,
   onExport,
 }: {
-  preset: FilterPreset;
+  preset: FilterPresetParsed;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
@@ -83,6 +86,7 @@ export function Filters() {
       onSuccess: (saved) => {
         setActivePresetId(saved.id);
         void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
+        toast.success(`Saved "${saved.name}"`);
       },
       onError: (err) => { console.error('[Filters] createPreset failed:', err); },
     });
@@ -94,21 +98,36 @@ export function Filters() {
     updatePreset.mutate({ config }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
+        toast.success('Preset saved');
       },
     });
   }
 
-  function handleDuplicate(preset: FilterPreset) {
+  function handleDuplicate(preset: FilterPresetParsed) {
+    if (!confirmDiscard(hasUnsavedChanges)) return;
     duplicatePreset.mutate(
       { name: `${preset.name} (copy)`, config: preset.config },
       { onSuccess: (dup) => { setActivePresetId(dup.id); loadConfig(dup.config); } },
     );
   }
 
-  function handleLoadPreset(preset: FilterPreset) {
+  function handleLoadPreset(preset: FilterPresetParsed) {
+    if (!confirmDiscard(hasUnsavedChanges)) return;
     setActivePresetId(preset.id);
     loadConfig(preset.config);
   }
+
+  // Dashboard links here with ?preset=<id> to open that preset.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedPresetId = searchParams.get('preset');
+  useEffect(() => {
+    if (!linkedPresetId || !presets) return;
+    setSearchParams({}, { replace: true });
+    const preset = presets.find((p) => p.id === linkedPresetId);
+    if (!preset || preset.id === activePresetId || !confirmDiscard(hasUnsavedChanges)) return;
+    setActivePresetId(preset.id);
+    loadConfig(preset.config);
+  }, [linkedPresetId, presets, activePresetId, hasUnsavedChanges, setActivePresetId, loadConfig, setSearchParams]);
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">

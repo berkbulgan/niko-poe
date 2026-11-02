@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLeague } from '@/lib/league-context';
 import { openExternal, copyToClipboard } from '@/lib/platform';
+import { toast } from '@/lib/stores/toast-store';
 import { proxySearch } from '@/lib/ipc';
 import { useTradeStats, matchModTexts } from '@/lib/hooks/use-trade-stats';
 import { MAP_MODS, type MapMod, NIGHTMARE_THRESHOLD } from '@/data';
@@ -189,7 +190,7 @@ export function StatPicker() {
   const {
     avoidIds, preferIds, filters, searchQuery, showNightmare, isNightmareMap,
     setSearchQuery, setShowNightmare, setIsNightmareMap,
-    toggleAvoid, togglePrefer, updateFilter, setFilters, clearAll,
+    toggleAvoid, togglePrefer, updateFilter, clearAll,
   } = store;
   const [copied, setCopied] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -347,7 +348,8 @@ export function StatPicker() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    // Scrolls as a whole on short windows; the mod lists keep a usable minimum height.
+    <div className="flex h-full flex-col overflow-y-auto">
       {/* ── Map stat filters — 3 rows ── */}
       <div className="mx-4 mt-4 shrink-0 space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4 lg:mx-6">
         <div className="flex items-center justify-between">
@@ -393,7 +395,7 @@ export function StatPicker() {
             </label>
             <select
               value={filters.qualityType}
-              onChange={(e) => setFilters((prev) => ({ ...prev, qualityType: e.target.value as QualityType }))}
+              onChange={(e) => updateFilter('qualityType', e.target.value as QualityType)}
               className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
             >
               {QUALITY_TYPE_OPTIONS.map((opt) => (
@@ -418,7 +420,7 @@ export function StatPicker() {
                   <button
                     key={opt}
                     type="button"
-                    onClick={() => setFilters((prev) => ({ ...prev, corrupted: opt }))}
+                    onClick={() => updateFilter('corrupted', opt)}
                     className={`flex-1 border border-poe-border/30 px-2 py-1.5 text-xs transition-all ${colors[opt]} ${filters.corrupted !== opt ? 'text-poe-text-muted hover:bg-poe-panel/40' : ''}`}
                   >
                     {labels[opt]}
@@ -443,13 +445,13 @@ export function StatPicker() {
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         placeholder="Filter mods... (e.g. reflect, regen, life)"
-        className="mx-4 mt-4 text-xs lg:mx-6"
+        className="mx-4 mt-4 w-auto text-xs lg:mx-6"
       />
 
       {/* ── Two columns: Avoid / Prefer ── */}
-      <div className="mt-4 grid min-h-0 flex-1 gap-3 px-4 lg:grid-cols-2 lg:px-6">
+      <div className="mt-4 grid min-h-[280px] flex-1 gap-3 px-4 lg:grid-cols-2 lg:px-6">
         {/* Avoid — high scary first */}
-        <div className="flex min-h-0 flex-col">
+        <div className="flex min-h-[220px] flex-col lg:min-h-0">
           <div className="mb-2 flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-poe-error" />
             <h4 className="text-sm font-semibold text-poe-error/80">
@@ -467,7 +469,7 @@ export function StatPicker() {
         </div>
 
         {/* Prefer — low scary first */}
-        <div className="flex min-h-0 flex-col">
+        <div className="flex min-h-[220px] flex-col lg:min-h-0">
           <div className="mb-2 flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-poe-success" />
             <h4 className="text-sm font-semibold text-poe-success/80">
@@ -495,7 +497,10 @@ export function StatPicker() {
               </h4>
               <button
                 onClick={async () => {
-                  await copyToClipboard(vendorRegex);
+                  if (!(await copyToClipboard(vendorRegex))) {
+                    toast.error('Could not copy to clipboard');
+                    return;
+                  }
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}

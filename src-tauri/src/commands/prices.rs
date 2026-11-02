@@ -55,11 +55,13 @@ pub async fn fetch_all_prices(
 ) -> Result<u32> {
     // Check if cache is still fresh AND for the same league
     {
-        let cache = state.ninja_prices.lock().await;
+        let mut cache = state.ninja_prices.lock().await;
         let same_league = cache.league.as_deref() == Some(&league);
         if same_league {
             if let Some(fetched_at) = cache.fetched_at {
                 if fetched_at.elapsed().as_secs() < cache.ttl_secs {
+                    // Switched back to the cached league: drop any in-flight fetch for another one.
+                    cache.loading_league = None;
                     let count: usize = cache.prices.values().map(|v| v.len()).sum();
                     return Ok(count as u32);
                 }
@@ -69,8 +71,7 @@ pub async fn fetch_all_prices(
 
     {
         let mut cache = state.ninja_prices.lock().await;
-        cache.is_loading = true;
-        cache.league = Some(league.clone());
+        cache.loading_league = Some(league.clone());
     }
 
     let client = &state.http_client;
@@ -127,9 +128,15 @@ pub async fn fetch_all_prices(
 
     {
         let mut cache = state.ninja_prices.lock().await;
+        // The user switched league while this fetch ran; the newer fetch owns the cache.
+        if cache.loading_league.as_deref() != Some(league.as_str()) {
+            return Ok(total as u32);
+        }
+        cache.loading_league = None;
+        cache.league = Some(league);
         cache.prices = all_prices;
-        cache.fetched_at = Some(std::time::Instant::now());
-        cache.is_loading = false;
+        // Don't cache an empty (failed) fetch for an hour — let the next call retry.
+        cache.fetched_at = (total > 0).then(std::time::Instant::now);
     }
 
     Ok(total as u32)
@@ -150,11 +157,14 @@ pub struct PriceLookupEntry {
 #[tauri::command]
 pub async fn lookup_item_prices(
     item_names: Vec<String>,
-    _league: String,
+    league: String,
     state: State<'_, AppState>,
 ) -> Result<HashMap<String, PriceLookupEntry>> {
     let cache = state.ninja_prices.lock().await;
     let mut result = HashMap::new();
+    if cache.league.as_deref() != Some(league.as_str()) {
+        return Ok(result);
+    }
 
     for name in &item_names {
         let key = name.to_lowercase();
@@ -193,11 +203,14 @@ pub struct AdvancedLookupItem {
 #[tauri::command]
 pub async fn lookup_item_prices_advanced(
     items: Vec<AdvancedLookupItem>,
-    _league: String,
+    league: String,
     state: State<'_, AppState>,
 ) -> Result<HashMap<String, PriceLookupEntry>> {
     let cache = state.ninja_prices.lock().await;
     let mut result = HashMap::new();
+    if cache.league.as_deref() != Some(league.as_str()) {
+        return Ok(result);
+    }
 
     for item in &items {
         let key = item.name.to_lowercase();
@@ -222,17 +235,20 @@ pub async fn is_prices_loading(
     state: State<'_, AppState>,
 ) -> Result<bool> {
     let cache = state.ninja_prices.lock().await;
-    Ok(cache.is_loading)
+    Ok(cache.loading_league.is_some())
 }
 
 /// Returns all prices for a specific category (for strategy builder item picker).
 #[tauri::command]
 pub async fn get_prices(
     category: String,
-    _league: String,
+    league: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<NinjaPrice>> {
     let cache = state.ninja_prices.lock().await;
+    if cache.league.as_deref() != Some(league.as_str()) {
+        return Ok(Vec::new());
+    }
 
     let target_category = normalize_category(&category);
 
@@ -289,10 +305,11 @@ fn find_best_match<'a>(entries: &'a [NinjaPrice], item: &AdvancedLookupItem) -> 
             let corrupted = item.corrupted.unwrap_or(false);
 
             // Try exact match first
+            // poe.ninja omits 0 quality and non-corrupted flags, so missing means 0 / false.
             let exact = entries.iter().find(|e| {
                 e.gem_level == Some(level)
-                    && e.gem_quality == Some(quality)
-                    && e.corrupted == Some(corrupted)
+                    && e.gem_quality.unwrap_or(0) == quality
+                    && e.corrupted.unwrap_or(false) == corrupted
             });
             if exact.is_some() {
                 return exact;
@@ -300,7 +317,7 @@ fn find_best_match<'a>(entries: &'a [NinjaPrice], item: &AdvancedLookupItem) -> 
 
             // Try matching level + quality without corruption
             let partial = entries.iter().find(|e| {
-                e.gem_level == Some(level) && e.gem_quality == Some(quality)
+                e.gem_level == Some(level) && e.gem_quality.unwrap_or(0) == quality
             });
             if partial.is_some() {
                 return partial;
@@ -425,7 +442,32 @@ async fn fetch_currency_overview(
         });
     }
 
+    // Chaos Orb is poe.ninja's reference currency and never appears in `lines`.
+    if category == "Currency" {
+        prices.push(chaos_orb(icon_map.get("Chaos Orb").cloned().unwrap_or_default()));
+    }
+
     Ok(prices)
+}
+
+fn chaos_orb(icon: String) -> NinjaPrice {
+    NinjaPrice {
+        name: "Chaos Orb".to_string(),
+        chaos_value: 1.0,
+        icon,
+        category: "currency".to_string(),
+        frame_type: Some(5),
+        links: None,
+        variant: None,
+        gem_level: None,
+        gem_quality: None,
+        corrupted: None,
+        map_tier: None,
+        base_type: None,
+        item_level: None,
+        listing_count: None,
+        details_id: None,
+    }
 }
 
 /// Fetch an item overview from poe.ninja and convert to NinjaPrice entries.
@@ -496,4 +538,46 @@ async fn fetch_item_overview(
     }
 
     Ok(prices)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn gem(level: i32, quality: Option<i32>, corrupted: Option<bool>, value: f64) -> NinjaPrice {
+        NinjaPrice {
+            gem_level: Some(level),
+            gem_quality: quality,
+            corrupted,
+            chaos_value: value,
+            listing_count: Some(if value == 1.0 { 999 } else { 1 }),
+            ..chaos_orb(String::new())
+        }
+    }
+
+    fn lookup(level: i32, quality: i32, corrupted: bool) -> AdvancedLookupItem {
+        AdvancedLookupItem {
+            name: "Enlighten Support".into(),
+            frame_type: Some(4),
+            links: None,
+            gem_level: Some(level),
+            gem_quality: Some(quality),
+            corrupted: Some(corrupted),
+            map_tier: None,
+            variant: None,
+            base_type: None,
+            item_level: None,
+        }
+    }
+
+    #[test]
+    fn gem_without_quality_or_corruption_matches_its_own_entry() {
+        let entries = vec![
+            gem(1, None, None, 1.0),
+            gem(3, None, None, 500.0),
+            gem(4, Some(20), Some(true), 9000.0),
+        ];
+        assert_eq!(find_best_match(&entries, &lookup(3, 0, false)).unwrap().chaos_value, 500.0);
+        assert_eq!(find_best_match(&entries, &lookup(4, 20, true)).unwrap().chaos_value, 9000.0);
+    }
 }

@@ -59,6 +59,7 @@ export interface SnapshotSummary {
 
 export interface RecentSnapshot {
   id: string;
+  configId: string;
   configName: string;
   totalChaos: number;
   divineRate: number;

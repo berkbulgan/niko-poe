@@ -1,7 +1,8 @@
 // ABOUTME: Zustand store for currency display preference (divine vs chaos).
-// ABOUTME: Shared across all pages that show chaos/divine values.
+// ABOUTME: Shared across all pages that show chaos/divine values; persisted via platform storage.
 
 import { create } from 'zustand';
+import { storage } from '@/lib/platform';
 
 type CurrencyUnit = 'divine' | 'chaos';
 
@@ -11,9 +12,18 @@ interface CurrencyDisplayState {
   setUnit: (unit: CurrencyUnit) => void;
 }
 
+const UNIT_STORAGE_KEY = 'niko_currency_unit';
+
 export const useCurrencyDisplay = create<CurrencyDisplayState>((set) => ({
-  unit: 'divine',
+  unit: storage.get(UNIT_STORAGE_KEY) === 'chaos' ? 'chaos' : 'divine',
   toggleUnit: () =>
-    set((state) => ({ unit: state.unit === 'divine' ? 'chaos' : 'divine' })),
-  setUnit: (unit) => set({ unit }),
+    set((state) => {
+      const unit = state.unit === 'divine' ? 'chaos' : 'divine';
+      storage.set(UNIT_STORAGE_KEY, unit);
+      return { unit };
+    }),
+  setUnit: (unit) => {
+    storage.set(UNIT_STORAGE_KEY, unit);
+    set({ unit });
+  },
 }));

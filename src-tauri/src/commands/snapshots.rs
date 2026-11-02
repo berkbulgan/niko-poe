@@ -85,6 +85,7 @@ pub struct SnapshotSummary {
 #[serde(rename_all = "camelCase")]
 pub struct RecentSnapshot {
     pub id: String,
+    pub config_id: String,
     pub config_name: String,
     pub total_chaos: f64,
     pub divine_rate: f64,
@@ -290,6 +291,7 @@ pub async fn delete_snapshot_config(state: State<'_, AppState>, id: String) -> R
 
 #[tauri::command]
 pub async fn take_snapshot(
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
     input: TakeSnapshotInput,
 ) -> Result<StashSnapshot> {
@@ -306,62 +308,26 @@ pub async fn take_snapshot(
 
     let config = row_to_config(&config_row)?;
 
-    // 2. Require auth token
-    let access_token = {
-        let guard = state.ggg_token.lock().await;
-        guard
-            .as_ref()
-            .map(|t| t.access_token.clone())
-            .ok_or_else(|| Error::Auth("not logged in — no GGG token available".into()))?
+    // 2. Prices must be loaded for this config's league, otherwise the snapshot would be
+    //    stored with another league's prices (or silently valued at 0).
+    let ninja_cache = {
+        let cache = state.ninja_prices.lock().await;
+        if cache.league.as_deref() != Some(config.league.as_str()) || cache.prices.is_empty() {
+            return Err(Error::Validation(format!(
+                "prices for {} are not loaded yet — wait for prices to finish loading and try again",
+                config.league
+            )));
+        }
+        cache.prices.clone()
     };
 
     // 3. Fetch items from all configured tabs
-    let client = reqwest::Client::builder()
-        .user_agent("OAuth niko/1.0.0 (contact: niko@example.com)")
-        .build()
-        .map_err(|e| Error::Network(e.to_string()))?;
-
+    let access_token = crate::commands::auth::access_token(&app, &state).await?;
     let mut all_items: Vec<crate::commands::stash::StashItem> = Vec::new();
-
     for tab_id in &config.tab_ids {
-        let url = format!(
-            "https://api.pathofexile.com/stash/{}/{}",
-            urlencoding::encode(&config.league),
-            urlencoding::encode(tab_id),
-        );
-
-        let response = client
-            .get(&url)
-            .bearer_auth(&access_token)
-            .send()
-            .await
-            .map_err(|e| Error::Network(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            return Err(Error::Network(format!(
-                "stash tab fetch failed for {}: HTTP {} — {}",
-                tab_id, status, body
-            )));
-        }
-
-        #[derive(Deserialize)]
-        struct TabResponse {
-            stash: TabDetail,
-        }
-        #[derive(Deserialize)]
-        struct TabDetail {
-            #[serde(default)]
-            items: Vec<crate::commands::stash::StashItem>,
-        }
-
-        let parsed: TabResponse = response
-            .json()
-            .await
-            .map_err(|e| Error::Parse(e.to_string()))?;
-
-        all_items.extend(parsed.stash.items);
+        let items =
+            crate::commands::stash::fetch_tab_items(&config.league, tab_id, &access_token).await?;
+        all_items.extend(items);
     }
 
     // 4. Filter out rare items (frameType=2) and aggregate by display name
@@ -391,11 +357,6 @@ pub async fn take_snapshot(
     }
 
     // 5. Look up prices from ninja cache
-    let ninja_cache = {
-        let cache = state.ninja_prices.lock().await;
-        cache.prices.clone()
-    };
-
     let mut snapshot_items: Vec<SnapshotItem> = Vec::new();
     let mut total_chaos: f64 = 0.0;
     let mut unpriced_count: i32 = 0;
@@ -434,8 +395,13 @@ pub async fn take_snapshot(
         .and_then(|entries| entries.first().map(|e| e.chaos_value))
         .unwrap_or(0.0);
 
-    // 7. Write to database
+    // 7. Write to database in one transaction so a failure can't leave a partial snapshot.
     let snapshot_id = Uuid::new_v4().to_string();
+    let mut tx = state
+        .pool
+        .begin()
+        .await
+        .map_err(|e| Error::Database(e.to_string()))?;
     let total_items = snapshot_items.len() as i32;
 
     sqlx::query(
@@ -449,7 +415,7 @@ pub async fn take_snapshot(
     .bind(total_items)
     .bind(unpriced_count)
     .bind(divine_rate)
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| Error::Database(e.to_string()))?;
 
@@ -466,7 +432,7 @@ pub async fn take_snapshot(
         .bind(item.chaos_value)
         .bind(item.frame_type)
         .bind(&item.icon)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| Error::Database(e.to_string()))?;
     }
@@ -474,7 +440,11 @@ pub async fn take_snapshot(
     // 8. Return the full snapshot
     let created_at: String = sqlx::query_scalar("SELECT created_at FROM stash_snapshots WHERE id = ?")
         .bind(&snapshot_id)
-        .fetch_one(&state.pool)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| Error::Database(e.to_string()))?;
+
+    tx.commit()
         .await
         .map_err(|e| Error::Database(e.to_string()))?;
 
@@ -559,7 +529,7 @@ pub async fn get_snapshot_detail(
 #[tauri::command]
 pub async fn get_recent_snapshots(state: State<'_, AppState>) -> Result<Vec<RecentSnapshot>> {
     let rows = sqlx::query(
-        "SELECT s.id, c.name AS config_name, s.total_chaos, s.divine_rate,
+        "SELECT s.id, s.config_id, c.name AS config_name, s.total_chaos, s.divine_rate,
                 s.total_items, s.unpriced_count, s.created_at
          FROM stash_snapshots s
          JOIN snapshot_configs c ON s.config_id = c.id
@@ -574,6 +544,7 @@ pub async fn get_recent_snapshots(state: State<'_, AppState>) -> Result<Vec<Rece
         .iter()
         .map(|row| RecentSnapshot {
             id: row.get("id"),
+            config_id: row.get("config_id"),
             config_name: row.get("config_name"),
             total_chaos: row.get("total_chaos"),
             divine_rate: row.get("divine_rate"),

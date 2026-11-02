@@ -1,8 +1,9 @@
 // ABOUTME: Stash page — Browse stash tabs + Snapshot management with config CRUD and history.
 // ABOUTME: Requires authentication; Browse shows item table, Snapshots shows config list + snapshot panel.
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type CSSProperties } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/lib/auth-context';
@@ -16,6 +17,8 @@ import {
   useDeleteSnapshotConfig,
 } from '@/lib/hooks/use-snapshots';
 import { lookupItemPrices, fetchAllPrices } from '@/lib/ipc';
+import { toast } from '@/lib/stores/toast-store';
+import { confirmAction } from '@/lib/platform';
 import { SnapshotPanel } from '@/components/stash/snapshot-panel';
 import { SnapshotConfigModal } from '@/components/stash/snapshot-config-modal';
 import { PricedItemTable } from '@/components/ui/priced-item-table';
@@ -42,9 +45,10 @@ function stashTypeIcon(stashType: string): string {
   }
 }
 
-function colorStyle(colour: StashColor | null): string {
-  if (colour === null) return 'bg-poe-panel-light';
-  return `bg-[rgb(${colour.r},${colour.g},${colour.b})]`;
+// Inline style: Tailwind can't generate arbitrary classes built at runtime.
+function colorStyle(colour: StashColor | null): CSSProperties | undefined {
+  if (colour === null) return undefined;
+  return { backgroundColor: `rgb(${colour.r},${colour.g},${colour.b})` };
 }
 
 function parsePrice(note: string | null): { amount: number; currency: string } | null {
@@ -113,7 +117,8 @@ function StashTabItem({
           </span>
         )}
         <span
-          className={`h-2.5 w-2.5 shrink-0 rounded-sm ${colorStyle(tab.colour)}`}
+          className="h-2.5 w-2.5 shrink-0 rounded-sm bg-poe-panel-light"
+          style={colorStyle(tab.colour)}
           aria-hidden="true"
         />
         <span className="text-xs" aria-hidden="true">
@@ -169,7 +174,8 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
         const ninjaEntry = priceMap[displayName] ?? priceMap[item.typeLine];
         const notePrice = parsePrice(item.note);
         const unitPrice = ninjaEntry ? ninjaEntry.chaosValue : (notePrice?.amount ?? 0);
-        const lowListings = (ninjaEntry?.listingCount ?? 0) < 5;
+        // Only flag real poe.ninja entries with few listings, not unpriced items.
+        const lowListings = ninjaEntry?.listingCount != null && ninjaEntry.listingCount < 5;
 
         return {
           id: item.id,
@@ -182,17 +188,29 @@ function StashItemTable({ items, priceMap, divinePrice }: { items: StashItem[]; 
         };
       });
   }, [items, priceMap]);
+  const hiddenRares = items.length - processedItems.length;
 
   if (processedItems.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <p className="text-sm text-poe-text-dim">No items to display</p>
-        <p className="mt-1 text-xs text-poe-text-muted">This tab is empty or contains only rare items</p>
+        <p className="mt-1 text-xs text-poe-text-muted">
+          {hiddenRares > 0 ? `This tab only contains rare items (${hiddenRares} hidden)` : 'This tab is empty'}
+        </p>
       </div>
     );
   }
 
-  return <PricedItemTable items={processedItems} divinePrice={divinePrice} />;
+  return (
+    <>
+      {hiddenRares > 0 && (
+        <p className="px-4 pt-3 text-xs text-poe-text-muted">
+          {hiddenRares} rare item{hiddenRares === 1 ? '' : 's'} hidden — rares can't be priced from poe.ninja
+        </p>
+      )}
+      <PricedItemTable items={processedItems} divinePrice={divinePrice} />
+    </>
+  );
 }
 
 // ── Stash (page) ──────────────────────────────────────────────────────────────
@@ -202,8 +220,11 @@ export function Stash() {
   const { currentLeague } = useLeague();
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
   const [refreshingPrices, setRefreshingPrices] = useState(false);
-  const [activePageTab, setActivePageTab] = useState<StashPageTab>('browse');
-  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
+  // Dashboard links here with ?config=<id> to open that config's snapshots.
+  const [searchParams] = useSearchParams();
+  const linkedConfigId = searchParams.get('config');
+  const [activePageTab, setActivePageTab] = useState<StashPageTab>(linkedConfigId ? 'snapshots' : 'browse');
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(linkedConfigId);
   const [configModalOpen, setConfigModalOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<SnapshotConfig | null>(null);
   const queryClient = useQueryClient();
@@ -225,6 +246,8 @@ export function Stash() {
     try {
       await fetchAllPrices(currentLeague);
       void queryClient.invalidateQueries({ queryKey: ['item-prices'] });
+    } catch (err) {
+      toast.error(`Price refresh failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setRefreshingPrices(false);
     }
@@ -240,6 +263,8 @@ export function Stash() {
   const {
     data: items,
     isLoading: itemsLoading,
+    isError: itemsError,
+    error: itemsErrorValue,
   } = useStashContents(currentLeague, selectedTabId ?? '');
 
   const itemNames = useMemo(() => {
@@ -297,8 +322,9 @@ export function Stash() {
   // ── Access error ──────────────────────────────────────────────────────────
 
   if (tabsError) {
-    const is403 = tabsErrorValue instanceof Error
-      && tabsErrorValue.message.toLowerCase().includes('403');
+    const message = tabsErrorValue instanceof Error ? tabsErrorValue.message : 'Unknown error';
+    const is403 = message.includes('access denied');
+    const needsLogin = message.includes('log in again');
 
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
@@ -315,8 +341,13 @@ export function Stash() {
           <>
             <p className="text-base text-poe-text">Failed to load stash tabs</p>
             <p className="text-sm text-poe-text-muted">
-              {tabsErrorValue instanceof Error ? tabsErrorValue.message : 'Unknown error'}
+              {message}
             </p>
+            {needsLogin && (
+              <Button variant="primary" onClick={() => { void login(); }}>
+                Login again
+              </Button>
+            )}
           </>
         )}
       </div>
@@ -449,6 +480,8 @@ export function Stash() {
                   variant="ghost"
                   size="sm"
                   onClick={() => { setEditingConfig(selectedConfig); setConfigModalOpen(true); }}
+                  aria-label="Edit snapshot config"
+                  title="Edit snapshot config"
                 >
                   <Settings size={14} />
                 </Button>
@@ -456,13 +489,15 @@ export function Stash() {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirm('Delete this config and all its snapshots?')) {
-                      void deleteConfig.mutateAsync(selectedConfig.id).then(() => {
-                        setSelectedConfigId(null);
+                    if (confirmAction('Delete this config and all its snapshots?')) {
+                      deleteConfig.mutate(selectedConfig.id, {
+                        onSuccess: () => setSelectedConfigId(null),
                       });
                     }
                   }}
                   className="text-red-400 hover:text-red-300"
+                  aria-label="Delete snapshot config"
+                  title="Delete snapshot config"
                 >
                   <Trash2 size={14} />
                 </Button>
@@ -484,6 +519,11 @@ export function Stash() {
             ) : itemsLoading ? (
               <div className="flex h-full items-center justify-center">
                 <Spinner size="lg" />
+              </div>
+            ) : itemsError ? (
+              <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+                <p className="text-sm text-poe-text">Failed to load this tab</p>
+                <p className="text-xs text-poe-text-muted">{itemsErrorValue?.message ?? 'Unknown error'}</p>
               </div>
             ) : (
               <StashItemTable items={items ?? []} priceMap={priceMap ?? {}} divinePrice={divinePrice} />

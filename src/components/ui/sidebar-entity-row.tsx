@@ -1,7 +1,9 @@
 // ABOUTME: Shared sidebar row for entity lists (presets, strategies, atlas trees).
-// ABOUTME: Renders name, optional subtitle, active state styling, and Export/Duplicate/Delete actions.
+// ABOUTME: Renders name, optional subtitle, active state styling, and Export/Duplicate/Delete actions
+// ABOUTME: (always on the active row, on hover/focus for the others). Delete asks for confirmation.
 
 import type React from 'react';
+import { confirmAction } from '@/lib/platform';
 
 interface SidebarEntityRowProps {
   name: string;
@@ -26,7 +28,7 @@ export function SidebarEntityRow({
   subtitle,
 }: SidebarEntityRowProps) {
   return (
-    <div className={`border-l-2 transition-all duration-100 ${active ? 'border-poe-gold bg-poe-gold/8' : 'border-transparent hover:bg-poe-panel-light/30'}`}>
+    <div className={`group border-l-2 transition-all duration-100 ${active ? 'border-poe-gold bg-poe-gold/8' : 'border-transparent hover:bg-poe-panel-light/30'}`}>
       <button
         type="button"
         onClick={onSelect}
@@ -35,31 +37,29 @@ export function SidebarEntityRow({
         <span className="block truncate text-sm text-poe-text">{name}</span>
         {subtitle}
       </button>
-      {active && (
-        <div className="flex items-center gap-2 px-3 pb-2">
-          <button
-            onClick={onExport}
-            className="text-xs text-poe-text-dim hover:text-poe-gold"
-          >
-            Export
-          </button>
-          <span className="text-poe-border">&middot;</span>
-          <button
-            onClick={onDuplicate}
-            className="text-xs text-poe-text-dim hover:text-poe-gold"
-          >
-            Duplicate
-          </button>
-          <span className="text-poe-border">&middot;</span>
-          <button
-            onClick={onDelete}
-            disabled={isDeleting}
-            className="text-xs text-poe-text-dim hover:text-poe-error"
-          >
-            {isDeleting ? '...' : 'Delete'}
-          </button>
-        </div>
-      )}
+      <div className={`items-center gap-2 px-3 pb-2 ${active ? 'flex' : 'hidden group-focus-within:flex group-hover:flex'}`}>
+        <button
+          onClick={onExport}
+          className="text-xs text-poe-text-dim hover:text-poe-gold"
+        >
+          Export
+        </button>
+        <span className="text-poe-border">&middot;</span>
+        <button
+          onClick={onDuplicate}
+          className="text-xs text-poe-text-dim hover:text-poe-gold"
+        >
+          Duplicate
+        </button>
+        <span className="text-poe-border">&middot;</span>
+        <button
+          onClick={() => { if (confirmAction(`Delete "${name}"? This can't be undone.`)) onDelete(); }}
+          disabled={isDeleting}
+          className="text-xs text-poe-text-dim hover:text-poe-error"
+        >
+          {isDeleting ? '...' : 'Delete'}
+        </button>
+      </div>
     </div>
   );
 }

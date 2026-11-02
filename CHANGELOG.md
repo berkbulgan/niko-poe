@@ -2,7 +2,7 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.3.0] - 2026-04-09
+## [0.3.0] - 2026-11-02
 
 ### Added
 - **Share Code Export/Import** — PoB-inspired encoding pipeline (JSON → deflate → base64) for filter presets, atlas trees, and strategies
@@ -24,6 +24,13 @@ All notable changes to N.I.K.O. are documented here. Format follows [Keep a Chan
 - **Unsaved Changes Indicator** — Shows next to Save button when current state differs from saved config
 - **Shared UI Components** — Extracted EditorToolbar, SaveEntityModal, SidebarEntityRow, EntitySidebar
 - **Developer Credits** — Settings > About with social links and Buy Me a Coffee donation button
+- **Toast notifications** — Failed saves/deletes/snapshots and login errors are reported; successful saves confirmed
+- **Update to current prices** — Refresh a strategy's saved item prices from poe.ninja
+- Confirmation before deleting presets, strategies, trees, snapshots and snapshot configs
+- Unsaved-changes prompt when loading or duplicating another entity
+- Dashboard recent presets/snapshots open the matching preset or snapshot config
+- Currency unit (divine/chaos) setting in Settings > General, persisted across restarts
+- Ctrl+Z undo in the atlas tree
 
 ### Changed
 - **Pricing source migrated from poe.watch to poe.ninja** — 29 categories (up from 5), 1-hour cache
@@ -35,6 +42,10 @@ All notable changes to N.I.K.O. are documented here. Format follows [Keep a Chan
 - State persistence across navigation via Zustand stores (filters, strategies, atlas tree)
 - Astrolabe mapsPerUse corrected from 8 to 5
 - PoeIcon: added `rarity`, `corrupted`, `currency`, `tier` aliases
+- Expired GGG sessions refresh automatically; login verifies the OAuth `state` parameter
+- Stash requests handle 401/403/429 with clear messages
+- Narrow-screen menu shows full navigation and closes on navigation
+- Higher contrast for muted text; icon buttons have accessible labels
 
 ### Fixed
 - Page state lost when navigating between tabs (Zustand stores replace local useState)
@@ -42,6 +53,13 @@ All notable changes to N.I.K.O. are documented here. Format follows [Keep a Chan
 - Divine Orb price accuracy (use `min` field over unreliable `mean`)
 - Strategy builder mapsPerUse not applied correctly on config load
 - Line chart Y-axis labels clipped on left side
+- Snapshots could be priced with another league's prices or with an empty price cache
+- Price cache race when switching leagues quickly; Chaos Orb missing from currency prices
+- Trade search and result fetch sent wrong IPC arguments
+- Strategy items of the same category could not be edited or removed independently
+- Snapshot ROI used a different strategy cost than the Strategies page
+- Stash low-listings warning, tab colours and empty/error states
+- Filters page unusable at small window heights
 
 ## [0.2.0] - 2026-04-07
 

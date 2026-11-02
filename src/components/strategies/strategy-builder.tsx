@@ -14,9 +14,12 @@ import { useLeague } from '@/lib/league-context';
 import { usePrices, useDivinePrice } from '@/lib/hooks/use-prices';
 import type { PriceCategory } from '@/types/strategies';
 import type { PriceItem } from '@/types/index';
-import { useFilterPresets, type FilterPreset } from '@/lib/hooks/use-filter-presets';
+import { useFilterPresets, type FilterPresetParsed } from '@/lib/hooks/use-filter-presets';
 import { useAtlasTrees, type AtlasTreeParsed } from '@/lib/hooks/use-atlas-trees';
 import { openExternal } from '@/lib/platform';
+import { MAPS_PER_USE } from '@/lib/strategy-cost';
+import { getPrices, proxySearch } from '@/lib/ipc';
+import { toast } from '@/lib/stores/toast-store';
 import { useStrategiesStore, type SelectedItem } from '@/lib/stores/strategies-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type { AtlasTreeRawData } from '@/types/atlas-tree';
@@ -31,11 +34,6 @@ const CATEGORY_OPTIONS: Array<{ value: PriceCategory; label: string }> = [
   { value: 'chisel', label: 'Chisels' },
   { value: 'astrolabe', label: 'Astrolabe' },
 ];
-
-// Categories where 1 unit covers multiple maps
-const MAPS_PER_USE: Partial<Record<PriceCategory, number>> = {
-  astrolabe: 5,
-};
 
 // ── Sub-components ──
 
@@ -176,7 +174,7 @@ function LinkedPresetSection({
   selectedPresetId,
   onSelect,
 }: {
-  presets: FilterPreset[];
+  presets: FilterPresetParsed[];
   selectedPresetId: string | null;
   onSelect: (id: string | null) => void;
 }) {
@@ -184,7 +182,7 @@ function LinkedPresetSection({
   const selectedPreset = presets.find((p) => p.id === selectedPresetId);
   const [searching, setSearching] = useState(false);
 
-  function buildPresetTradeQuery(config: FilterPreset['config']) {
+  function buildPresetTradeQuery(config: FilterPresetParsed['config']) {
     type StatFilter = { id: string; value?: { min?: number }; disabled: boolean };
     const statFilters: StatFilter[] = [];
 
@@ -267,13 +265,16 @@ function LinkedPresetSection({
     };
   }
 
-  // Phase 2: replace stub with ipc.proxyTradeSearch() then openExternal(result.url)
   async function handleOpenTrade() {
     if (!selectedPreset) return;
     setSearching(true);
     try {
-      const fallbackUrl = `https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`;
-      await openExternal(fallbackUrl);
+      const result = await proxySearch(buildPresetTradeQuery(selectedPreset.config), currentLeague);
+      await openExternal(result.url);
+    } catch (err) {
+      console.error('[LinkedPreset] proxySearch failed:', err);
+      // Fallback: open empty trade page so the user isn't stuck
+      await openExternal(`https://www.pathofexile.com/trade/search/${encodeURIComponent(currentLeague)}`);
     } finally {
       setSearching(false);
     }
@@ -418,7 +419,7 @@ export function StrategyBuilder() {
     selectedItems, averageMapCost, mapCount, filterPresetId, atlasTreeId,
     category, showPicker, searchQuery,
     setCategory, setShowPicker, setSearchQuery,
-    addItem, updateItemQuantity, removeItem,
+    addItem, updateItemQuantity, removeItem, setSelectedItems,
     setAverageMapCost, setMapCount, setFilterPresetId, setAtlasTreeId,
   } = store;
 
@@ -458,12 +459,37 @@ export function StrategyBuilder() {
     setSearchQuery('');
   }, [category, addItem, setShowPicker, setSearchQuery]);
 
-  const handleQuantityChange = useCallback((itemId: number, itemCategory: string, qty: number) => {
-    updateItemQuantity(itemId, itemCategory, qty);
+  const handleQuantityChange = useCallback((name: string, itemCategory: string, qty: number) => {
+    updateItemQuantity(name, itemCategory, qty);
   }, [updateItemQuantity]);
 
-  const handleRemove = useCallback((itemId: number, itemCategory: string) => {
-    removeItem(itemId, itemCategory);
+  // Item prices are saved with the strategy; this re-prices them from the current poe.ninja data.
+  const [updatingPrices, setUpdatingPrices] = useState(false);
+  async function handleUpdatePrices() {
+    setUpdatingPrices(true);
+    try {
+      const categories = [...new Set(selectedItems.map((i) => i.category))];
+      const lists = await Promise.all(categories.map((c) => getPrices(c, currentLeague)));
+      const latest = new Map(
+        categories.flatMap((c, i) => lists[i].map((p) => [`${c}|${p.name}`, p.chaosValue] as const)),
+      );
+      let changed = 0;
+      setSelectedItems(selectedItems.map((item) => {
+        const price = latest.get(`${item.category}|${item.name}`);
+        if (price === undefined || price === item.unitPrice) return item;
+        changed++;
+        return { ...item, unitPrice: price };
+      }));
+      toast.success(changed > 0 ? `Updated ${changed} price${changed === 1 ? '' : 's'}` : 'Prices are already current');
+    } catch (err) {
+      toast.error(`Price update failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUpdatingPrices(false);
+    }
+  }
+
+  const handleRemove = useCallback((name: string, itemCategory: string) => {
+    removeItem(name, itemCategory);
   }, [removeItem]);
 
   // ── Render ──
@@ -491,7 +517,7 @@ export function StrategyBuilder() {
         </h4>
         <div className="flex flex-wrap items-center gap-2">
           <CategorySelect value={category} onChange={setCategory} />
-          <Button variant="primary" size="sm" onClick={() => setShowPicker((prev) => !prev)}>
+          <Button variant="primary" size="sm" onClick={() => setShowPicker(!showPicker)}>
             {showPicker ? 'Close' : 'Add Item'}
           </Button>
         </div>
@@ -510,6 +536,12 @@ export function StrategyBuilder() {
       {/* ── Selected Items Table ── */}
       {selectedItems.length > 0 && (
         <div className="border border-poe-border/20 bg-poe-panel/20">
+          <div className="flex items-center justify-between gap-2 border-b border-poe-border/30 px-3 py-1.5">
+            <span className="text-xs text-poe-text-muted">Prices are saved with the strategy</span>
+            <Button variant="ghost" size="sm" onClick={() => { void handleUpdatePrices(); }} disabled={updatingPrices}>
+              {updatingPrices ? 'Updating...' : 'Update to current prices'}
+            </Button>
+          </div>
           <div className="flex items-center gap-2 border-b border-poe-border/30 px-3 py-2">
             <span className="flex-1 text-xs font-medium text-poe-text-dim">Item</span>
             <span className="w-16 text-center text-xs font-medium text-poe-text-dim">Qty/Map</span>
@@ -519,10 +551,10 @@ export function StrategyBuilder() {
           </div>
           {selectedItems.map((item) => (
             <SelectedItemRow
-              key={`${item.category}-${item.itemId}`}
+              key={`${item.category}-${item.name}`}
               item={item}
-              onQuantityChange={(qty) => handleQuantityChange(item.itemId, item.category, qty)}
-              onRemove={() => handleRemove(item.itemId, item.category)}
+              onQuantityChange={(qty) => handleQuantityChange(item.name, item.category, qty)}
+              onRemove={() => handleRemove(item.name, item.category)}
             />
           ))}
         </div>

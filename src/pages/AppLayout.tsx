@@ -1,10 +1,11 @@
 // ABOUTME: Authenticated app shell — sidebar navigation, league selector, user section.
 // ABOUTME: Rendered as the root layout route; child routes render via <Outlet />.
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
+import { Toaster } from '@/components/ui/toaster';
 import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface NavItemProps {
@@ -41,6 +42,12 @@ export function AppLayout() {
   const { pathname } = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navCollapsed, setNavCollapsed] = useState(() => window.innerWidth < 1280);
+  // Below lg the sidebar is a drawer with no collapse toggle, so show it expanded
+  // when opened — otherwise the league selector is unreachable.
+  const collapsed = navCollapsed && !sidebarOpen;
+
+  // Close the mobile drawer after navigating.
+  useEffect(() => { setSidebarOpen(false); }, [pathname]);
 
   const navItems = [
     { href: '/dashboard', icon: <Zap size={18} />, label: 'Dashboard' },
@@ -67,13 +74,13 @@ export function AppLayout() {
         className={`
           fixed inset-y-0 left-0 z-40 flex h-screen flex-col overflow-hidden border-r border-poe-border/40 bg-poe-bg
           transition-all duration-200 lg:static lg:translate-x-0
-          ${navCollapsed ? 'w-14' : 'w-56'}
+          ${collapsed ? 'w-14' : 'w-56'}
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
         {/* Logo + collapse toggle */}
         <div className="flex h-14 items-center justify-between border-b border-poe-border/30 px-3">
-          {!navCollapsed && (
+          {!collapsed && (
             <Link to="/dashboard" className="font-display text-sm tracking-[0.25em] text-poe-gold">
               N.I.K.O.
             </Link>
@@ -82,19 +89,21 @@ export function AppLayout() {
             onClick={() => setNavCollapsed((prev) => !prev)}
             className="hidden rounded p-1 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-text lg:block"
             title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {navCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
           </button>
         </div>
 
         {/* Navigation */}
         <nav className="mt-4 flex-1 space-y-0.5 overflow-y-auto" aria-label="Main navigation">
           {navItems.map((item) => (
-            navCollapsed ? (
+            collapsed ? (
               <Link
                 key={item.href}
                 to={item.href}
                 title={item.label}
+                aria-label={item.label}
                 className={`
                   flex items-center justify-center py-2.5 transition-all duration-150
                   ${pathname === item.href
@@ -121,7 +130,7 @@ export function AppLayout() {
         </nav>
 
         {/* League selector */}
-        {!navCollapsed && (
+        {!collapsed && (
           <div className="mx-4 mt-auto">
             <label className="mb-1 block text-[10px] tracking-wider text-poe-text-muted">
               LEAGUE
@@ -144,17 +153,18 @@ export function AppLayout() {
         )}
 
         {/* Divider */}
-        {!navCollapsed && <div className="mx-4 mt-3 h-px bg-poe-border/30" aria-hidden="true" />}
+        {!collapsed && <div className="mx-4 mt-3 h-px bg-poe-border/30" aria-hidden="true" />}
 
         {/* User section */}
-        <div className={navCollapsed ? 'p-2' : 'p-4'}>
-          {navCollapsed ? (
+        <div className={collapsed ? 'p-2' : 'p-4'}>
+          {collapsed ? (
             <div className="flex justify-center">
               {isAuthenticated ? (
                 <button
                   onClick={() => { void logout(); }}
                   className="rounded p-1.5 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-error"
                   title="Logout"
+                  aria-label="Logout"
                 >
                   <LogOut size={16} />
                 </button>
@@ -164,6 +174,7 @@ export function AppLayout() {
                   disabled={isLoading}
                   className="rounded p-1.5 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-gold disabled:opacity-50"
                   title="Login with GGG"
+                  aria-label="Login with GGG"
                 >
                   <Zap size={16} />
                 </button>
@@ -176,6 +187,7 @@ export function AppLayout() {
                 onClick={() => { void logout(); }}
                 className="shrink-0 rounded p-1.5 text-poe-text-muted transition-colors hover:bg-poe-panel-light hover:text-poe-error"
                 title="Logout"
+                aria-label="Logout"
               >
                 <LogOut size={16} aria-hidden="true" />
               </button>
@@ -219,6 +231,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <Toaster />
     </div>
   );
 }

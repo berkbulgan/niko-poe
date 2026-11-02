@@ -27,7 +27,8 @@ const GGG_PROFILE_URL: &str = "https://www.pathofexile.com/api/profile";
 const OAUTH_TIMEOUT_SECS: u64 = 120;
 const OAUTH_PORT: u16 = 14782;
 const OAUTH_CALLBACK_PATH: &str = "/callback";
-const USER_AGENT: &str = "OAuth niko/0.1.0 (contact: berkbulgan@gmail.com)";
+pub(crate) const USER_AGENT: &str =
+    concat!("OAuth niko/", env!("CARGO_PKG_VERSION"), " (contact: berkbulgan@gmail.com)");
 const OAUTH_SCOPES: &str = "account:profile account:stashes account:leagues";
 
 /// PKCE parameters generated before opening the browser.
@@ -187,28 +188,36 @@ pub async fn start_oauth_login(
         pkce.code_challenge,
     );
 
-    // Open the browser via the shell plugin (opens the default system browser).
-    #[allow(deprecated)]
-    tauri_plugin_shell::ShellExt::shell(&app)
-        .open(&auth_url, None)
-        .map_err(|e| Error::Auth(format!("failed to open browser: {}", e)))?;
+    // Open the browser and wait for the callback URL with timeout.
+    let callback_url: Result<String> = async {
+        #[allow(deprecated)]
+        tauri_plugin_shell::ShellExt::shell(&app)
+            .open(&auth_url, None)
+            .map_err(|e| Error::Auth(format!("failed to open browser: {}", e)))?;
 
-    // Wait for callback URL with timeout.
-    let callback_url = tokio::time::timeout(
-        Duration::from_secs(OAUTH_TIMEOUT_SECS),
-        rx,
-    )
-    .await
-    .map_err(|_| Error::OAuthTimeout("GGG login timed out — no callback received".into()))?
-    .map_err(|_| Error::Auth("OAuth callback channel closed unexpectedly".into()))?;
+        tokio::time::timeout(Duration::from_secs(OAUTH_TIMEOUT_SECS), rx)
+            .await
+            .map_err(|_| Error::OAuthTimeout("GGG login timed out — no callback received".into()))?
+            .map_err(|_| Error::Auth("OAuth callback channel closed unexpectedly".into()))
+    }
+    .await;
+    // The listener only stops by itself after a callback. Stop it on timeout/error too,
+    // otherwise the fixed port stays bound and every later login attempt fails.
+    let _ = tauri_plugin_oauth::cancel(port);
+    let callback_url = callback_url?;
 
-    // Extract the `code` query param from the callback URL.
     let parsed = Url::parse(&callback_url)
         .map_err(|e| Error::Parse(format!("invalid callback URL: {}", e)))?;
-    let code = parsed
-        .query_pairs()
-        .find(|(k, _v)| k == "code")
-        .map(|(_k, v)| v.into_owned())
+    let param = |name: &str| {
+        parsed
+            .query_pairs()
+            .find(|(k, _v)| k == name)
+            .map(|(_k, v)| v.into_owned())
+    };
+    if param("state").as_deref() != Some(state_param.as_str()) {
+        return Err(Error::Auth("OAuth state mismatch — please try logging in again".into()));
+    }
+    let code = param("code")
         .ok_or_else(|| Error::Auth("callback URL missing 'code' parameter".into()))?;
 
     // Exchange the authorization code for tokens.
@@ -264,12 +273,8 @@ pub async fn logout_ggg(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<()> {
-    {
-        let mut guard = state.ggg_token.lock().await;
-        *guard = None;
-    }
-    clear_tokens_from_store(&app)?;
-    Ok(())
+    let mut guard = state.ggg_token.lock().await;
+    clear_session(&app, &mut guard)
 }
 
 /// Uses the stored refresh_token to obtain a new access_token from GGG.
@@ -279,13 +284,46 @@ pub async fn refresh_ggg_token(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<GggProfile> {
-    let refresh_token = {
-        let guard = state.ggg_token.lock().await;
-        guard
-            .as_ref()
-            .and_then(|t| t.refresh_token.clone())
-            .ok_or_else(|| Error::Auth("no refresh token available".into()))?
-    };
+    let mut guard = state.ggg_token.lock().await;
+    let token = refresh_tokens(&app, &mut guard).await?;
+    Ok(GggProfile {
+        account_name: token.account_name,
+        expires_at: token.expires_at,
+    })
+}
+
+/// Returns a usable access token, refreshing it first when it is expired or about to expire.
+/// Holds the token lock for the whole refresh so concurrent callers don't race on the
+/// (possibly rotated) refresh token. Clears the session if GGG rejects the refresh.
+pub(crate) async fn access_token(app: &tauri::AppHandle, state: &AppState) -> Result<String> {
+    let mut guard = state.ggg_token.lock().await;
+    let token = guard
+        .as_ref()
+        .ok_or_else(|| Error::Auth("not logged in — no GGG token available".into()))?;
+
+    if token.expires_at > chrono::Utc::now().timestamp() + 60 {
+        return Ok(token.access_token.clone());
+    }
+
+    match refresh_tokens(app, &mut guard).await {
+        Ok(token) => Ok(token.access_token),
+        // Offline / transient failure: keep the session, the next call retries.
+        Err(Error::Network(e)) => Err(Error::Network(e)),
+        Err(_) => {
+            clear_session(app, &mut guard)?;
+            Err(Error::Auth("GGG session expired — please log in again".into()))
+        }
+    }
+}
+
+async fn refresh_tokens(
+    app: &tauri::AppHandle,
+    slot: &mut Option<GggTokenState>,
+) -> Result<GggTokenState> {
+    let (refresh_token, account_name) = slot
+        .as_ref()
+        .and_then(|t| Some((t.refresh_token.clone()?, t.account_name.clone())))
+        .ok_or_else(|| Error::Auth("no refresh token available".into()))?;
 
     let http_client = reqwest::Client::builder()
         .user_agent(USER_AGENT)
@@ -318,39 +356,22 @@ pub async fn refresh_ggg_token(
         .await
         .map_err(|e| Error::Parse(e.to_string()))?;
 
-    let new_refresh = token_response
-        .refresh_token
-        .or(Some(refresh_token));
-
-    let expires_at = chrono::Utc::now().timestamp() + token_response.expires_in;
-
-    // Retain existing account_name; refresh does not return profile info.
-    let account_name = {
-        let guard = state.ggg_token.lock().await;
-        guard
-            .as_ref()
-            .map(|t| t.account_name.clone())
-            .unwrap_or_default()
-    };
-
+    // Refresh does not return profile info, so the account_name is retained.
     let token_state = GggTokenState {
         access_token: token_response.access_token,
-        refresh_token: new_refresh,
-        expires_at,
-        account_name: account_name.clone(),
+        refresh_token: token_response.refresh_token.or(Some(refresh_token)),
+        expires_at: chrono::Utc::now().timestamp() + token_response.expires_in,
+        account_name,
     };
 
-    {
-        let mut guard = state.ggg_token.lock().await;
-        *guard = Some(token_state.clone());
-    }
+    *slot = Some(token_state.clone());
+    persist_tokens_to_store(app, &token_state)?;
+    Ok(token_state)
+}
 
-    persist_tokens_to_store(&app, &token_state)?;
-
-    Ok(GggProfile {
-        account_name,
-        expires_at,
-    })
+fn clear_session(app: &tauri::AppHandle, slot: &mut Option<GggTokenState>) -> Result<()> {
+    *slot = None;
+    clear_tokens_from_store(app)
 }
 
 // ---------------------------------------------------------------------------
@@ -393,8 +414,8 @@ pub fn try_load_tokens_from_store(app: &tauri::AppHandle, state: &AppState) {
     let Some(raw) = store.get(STORE_KEY_TOKEN) else { return };
     let Ok(token) = serde_json::from_value::<GggTokenState>(raw) else { return };
 
-    // Discard tokens that are already expired.
-    if token.expires_at <= chrono::Utc::now().timestamp() {
+    // Discard expired tokens that can't be refreshed; refreshable ones are renewed on first use.
+    if token.expires_at <= chrono::Utc::now().timestamp() && token.refresh_token.is_none() {
         return;
     }
 

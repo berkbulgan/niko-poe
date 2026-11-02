@@ -1,7 +1,7 @@
 // ABOUTME: Atlas skill tree planner page with saved build sidebar, Canvas tree, and stats panel.
 // ABOUTME: Manages allocated node state, undo history, save/load/import/share/delete operations.
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TreeRenderer } from '@/components/atlas-tree/tree-renderer';
@@ -23,6 +23,8 @@ import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
+import { toast } from '@/lib/stores/toast-store';
+import { confirmDiscard } from '@/lib/platform';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type {
   AtlasTreeRawData,
@@ -119,6 +121,20 @@ export function AtlasTree() {
     undo();
   }, [undo]);
 
+  // Ctrl+Z undoes the last allocation (except while typing in a field).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undo();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [undo]);
+
   const handleReset = useCallback(() => {
     reset();
   }, [reset]);
@@ -130,13 +146,16 @@ export function AtlasTree() {
   function handleSaveAs(name: string) {
     const config = getConfig(treeData.tree);
     createTree.mutate({ name, config }, {
-      onSuccess: (saved) => { setActiveTreeId(saved.id); },
+      onSuccess: (saved) => {
+        setActiveTreeId(saved.id);
+        toast.success(`Saved "${saved.name}"`);
+      },
     });
   }
 
-  const overwriteMutation = useMutation<AtlasTreeType, Error, { config: AtlasTreeConfig }>({
+  const overwriteMutation = useMutation<void, Error, { config: AtlasTreeConfig }>({
     mutationFn: async ({ config }) => {
-      return ipc.updateAtlasTree(activeTreeId!, { config: JSON.stringify(config) }) as Promise<AtlasTreeType>;
+      await ipc.updateAtlasTree(activeTreeId!, { config: JSON.stringify(config) });
     },
     onSettled: () => { void queryClient.invalidateQueries({ queryKey: ['atlas-trees'] }); },
   });
@@ -144,10 +163,11 @@ export function AtlasTree() {
   function handleSaveOverwrite() {
     if (!activeTreeId) return;
     const config = getConfig(treeData.tree);
-    overwriteMutation.mutate({ config });
+    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success('Atlas build saved') });
   }
 
   function handleDuplicate(tree: AtlasTreeType) {
+    if (!confirmDiscard(hasUnsavedChanges)) return;
     duplicateTree.mutate(
       { name: `${tree.name} (copy)`, config: tree.config },
       {
@@ -159,6 +179,7 @@ export function AtlasTree() {
   }
 
   function handleLoadTree(tree: AtlasTreeType) {
+    if (!confirmDiscard(hasUnsavedChanges)) return;
     loadTree(tree.id, tree.config.allocatedNodeIds);
   }
 
