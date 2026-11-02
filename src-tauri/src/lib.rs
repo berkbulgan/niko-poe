@@ -17,6 +17,10 @@ use commands::{
         create_atlas_tree, delete_atlas_tree, get_atlas_tree, get_atlas_trees, update_atlas_tree,
     },
     auth::{get_ggg_profile, logout_ggg, refresh_ggg_token, start_oauth_login},
+    community::{
+        community_delete, community_favourite, community_get, community_list, community_publish,
+        community_report, community_tags, community_update, set_community_base_url,
+    },
     filter_presets::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
         update_filter_preset,
@@ -90,6 +94,9 @@ pub fn run() {
                 league_cache: Arc::new(Mutex::new(state::LeagueCache::new())),
                 stat_cache: Arc::new(Mutex::new(state::StatCache::new())),
                 ggg_token: Arc::new(Mutex::new(None)),
+                community_base_url: Arc::new(Mutex::new(
+                    commands::community::DEFAULT_BASE_URL.map(str::to_string),
+                )),
             };
 
             // Restore previously stored GGG tokens (silent — ignores missing/expired).
@@ -158,6 +165,16 @@ pub fn run() {
             get_snapshot_detail,
             get_recent_snapshots,
             delete_snapshot,
+            // community
+            community_list,
+            community_get,
+            community_tags,
+            community_publish,
+            community_update,
+            community_delete,
+            community_favourite,
+            community_report,
+            set_community_base_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
