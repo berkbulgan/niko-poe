@@ -6,6 +6,7 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { Toaster } from '@/components/ui/toaster';
+import { checkForUpdate } from '@/lib/updater';
 import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface NavItemProps {
@@ -48,6 +49,8 @@ export function AppLayout() {
 
   // Close the mobile drawer after navigating.
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
+
+  useEffect(() => { void checkForUpdate(); }, []);
 
   const navItems = [
     { href: '/dashboard', icon: <Zap size={18} />, label: 'Dashboard' },
