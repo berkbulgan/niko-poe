@@ -2,6 +2,13 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.1] - 2026-11-02
+
+### Fixed
+- Prices load again — poe.ninja moved its economy API, so every price request failed and stash snapshots could not be taken
+- League list updated to Allflame
+- The Astrolabe picker lists astrolabes instead of all currency
+
 ## [0.4.0] - 2026-11-02
 
 ### Added
