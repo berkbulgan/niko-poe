@@ -16,6 +16,7 @@ import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
 import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { StrategyBuilder } from '@/components/strategies/strategy-builder';
+import { StrategyResults } from '@/components/strategies/strategy-results';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
@@ -148,6 +149,7 @@ export function Strategies() {
         />
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           <StrategyBuilder />
+          {activeStrategy && <StrategyResults strategyId={activeStrategy.id} />}
         </div>
       </main>
 
