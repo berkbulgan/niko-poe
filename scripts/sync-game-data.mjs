@@ -5,7 +5,8 @@ import { appendFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  checkAtlas, checkMapMods, insertChangelogEntry, latestTag, nextPatchVersion, summarizeAtlas, summarizeMapMods,
+  checkAtlas, checkMapMods, insertChangelogEntry, latestTag, modIdAliases, nextPatchVersion, summarizeAtlas,
+  summarizeMapMods,
 } from './game-data.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -66,14 +67,19 @@ if (commit.sha !== sources.poeReSha) {
   const prevTokens = await readJson('src/data/map-mods-full.json');
   const prevTable = await readJson('src/data/optimization-table.json');
 
-  const line = summarizeMapMods(prevTokens, next.tokens ?? [], prevTable, next.optimizationTable);
+  const nextTokens = Array.isArray(next.tokens) ? next.tokens : [];
+  // Saved presets store mod ids; keep them pointing at the same mods when upstream re-ids them.
+  const aliases = modIdAliases(prevTokens, nextTokens);
+  const line = summarizeMapMods(prevTokens, nextTokens, prevTable, next.optimizationTable, aliases);
   // Upstream commits that don't touch fields we use are ignored (and re-checked next run).
   if (line) {
     problems.push(...checkMapMods(next, prevTokens.length));
-    changelog.push(line);
+    const remapped = Object.keys(aliases).length;
+    changelog.push(remapped ? `${line}; ${remapped} saved mod ids remapped` : line);
     if (!dryRun) {
       await writeJson('src/data/map-mods-full.json', next.tokens);
       await writeJson('src/data/optimization-table.json', next.optimizationTable);
+      await writeJson('src/data/mod-id-aliases.json', { ...(await readJson('src/data/mod-id-aliases.json')), ...aliases });
     }
     sources.poeReSha = commit.sha;
   }

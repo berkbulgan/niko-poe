@@ -79,11 +79,38 @@ export function summarizeAtlas(prev, next, tag) {
   return `Atlas tree data updated to ${tag} (+${added} / -${removed} nodes)`;
 }
 
+// Upstream ids are hashes of the mod text, so reordering the lines of a multi-line mod or
+// retuning its numbers gives it a new id. Order-insensitive text keys find the same mod again.
+const sortedParts = (text) => text.replace(/[\^$]/g, '').toLowerCase().split('|').map((p) => p.trim()).sort().join('|');
+
+/** Maps ids that disappeared to the upstream mod with the same text (exact first, then number-agnostic). */
+export function modIdAliases(prevTokens, nextTokens) {
+  const index = (key) => {
+    const map = new Map();
+    for (const t of nextTokens) {
+      const k = sortedParts(t[key]);
+      map.set(k, map.has(k) ? null : t.id); // null = ambiguous, never alias to a guess
+    }
+    return map;
+  };
+  const byRaw = index('rawText');
+  const byGeneral = index('generalizedText');
+  const nextIds = new Set(nextTokens.map((t) => t.id));
+
+  const aliases = {};
+  for (const t of prevTokens) {
+    if (nextIds.has(t.id)) continue;
+    const id = byRaw.get(sortedParts(t.rawText)) ?? byGeneral.get(sortedParts(t.generalizedText));
+    if (id != null) aliases[t.id] = id;
+  }
+  return aliases;
+}
+
 // Only the fields src/data/index.ts reads count as a change.
 const usedFields = (t) => JSON.stringify([t.regex, t.rawText, t.generalizedText, t.options?.scary, t.options?.nm]);
 
-export function summarizeMapMods(prevTokens, nextTokens, prevTable, nextTable) {
-  const before = new Map(prevTokens.map((t) => [t.id, usedFields(t)]));
+export function summarizeMapMods(prevTokens, nextTokens, prevTable, nextTable, aliases = {}) {
+  const before = new Map(prevTokens.map((t) => [aliases[t.id] ?? t.id, usedFields(t)]));
   const after = new Map(nextTokens.map((t) => [t.id, usedFields(t)]));
   const added = [...after.keys()].filter((id) => !before.has(id)).length;
   const removed = [...before.keys()].filter((id) => !after.has(id)).length;

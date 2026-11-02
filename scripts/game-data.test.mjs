@@ -8,6 +8,7 @@ import {
   checkMapMods,
   insertChangelogEntry,
   latestTag,
+  modIdAliases,
   nextPatchVersion,
   summarizeAtlas,
   summarizeMapMods,
@@ -104,6 +105,38 @@ describe('summarizeMapMods', () => {
   it('reports a table-only change', () => {
     expect(summarizeMapMods([token(1, 'a')], [token(1, 'a')], table, {}))
       .toBe('Map mod regex optimization table updated');
+  });
+});
+
+describe('modIdAliases', () => {
+  const mod = (id, rawText, generalizedText) => ({ id, regex: 'x', rawText, generalizedText, options: { scary: 1 } });
+
+  it('maps a reordered multi-line mod and a retuned mod to their new ids', () => {
+    const prev = [
+      mod(1, 'A (1-2)%|B', '^a #%$|^b$'),
+      mod(2, '(30-40)% more Life', '^#% more life$'),
+      mod(3, 'Kept', '^kept$'),
+      mod(4, 'Gone', '^gone$'),
+    ];
+    const next = [
+      mod(10, 'B|A (1-2)%', '^b$|^a #%$'),
+      mod(20, '(90-100)% more Life', '^#% more life$'),
+      mod(3, 'Kept', '^kept$'),
+    ];
+    expect(modIdAliases(prev, next)).toEqual({ 1: 10, 2: 20 });
+  });
+
+  it('never aliases to an ambiguous match', () => {
+    const prev = [mod(1, '(1-2)% more Life', '^#% more life$')];
+    const next = [mod(10, '(3-4)% more Life', '^#% more life$'), mod(11, '(5-6)% more Life', '^#% more life$')];
+    expect(modIdAliases(prev, next)).toEqual({});
+  });
+
+  it('lets summarizeMapMods count remapped ids as the same mod', () => {
+    const prev = [token(1, 'a')];
+    expect(summarizeMapMods(prev, [{ ...token(1, 'a'), id: 2 }], {}, {}, { 1: 2 })).toBeNull();
+    expect(summarizeMapMods(prev, [{ ...token(1, 'b'), id: 2 }], {}, {}, { 1: 2 }))
+      .toBe('Map mod regex data updated (0 added, 0 removed, 1 changed)');
   });
 });
 
