@@ -21,6 +21,9 @@ import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
 import * as ipc from '@/lib/ipc';
 import { useStrategiesStore } from '@/lib/stores/strategies-store';
+import { toast } from '@/lib/stores/toast-store';
+import { confirmDiscard } from '@/lib/platform';
+import { MAPS_PER_USE } from '@/lib/strategy-cost';
 
 function StrategyRow({
   strategy,
@@ -50,10 +53,6 @@ function StrategyRow({
   );
 }
 
-// Categories where 1 unit covers multiple maps (mirrored from strategy-builder for loadConfig)
-const MAPS_PER_USE: Partial<Record<string, number>> = {
-  astrolabe: 5,
-};
 
 export function Strategies() {
   const [showSaveAs, setShowSaveAs] = useState(false);
@@ -82,6 +81,7 @@ export function Strategies() {
       onSuccess: (saved) => {
         setActiveStrategyId(saved.id);
         void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+        toast.success(`Saved "${saved.name}"`);
       },
       onError: (err) => { console.error('[Strategies] createStrategy failed:', err); },
     });
@@ -98,10 +98,11 @@ export function Strategies() {
   function handleSaveOverwrite() {
     if (!activeStrategyId) return;
     const config = getConfig();
-    overwriteMutation.mutate({ config });
+    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success('Strategy saved') });
   }
 
   function handleDuplicate(strategy: StrategyParsed) {
+    if (!confirmDiscard(hasUnsavedChanges)) return;
     duplicateStrategy.mutate(
       { name: `${strategy.name} (copy)`, config: strategy.config },
       { onSuccess: (dup) => { setActiveStrategyId(dup.id); loadConfig(dup.config, MAPS_PER_USE); } },
@@ -109,6 +110,7 @@ export function Strategies() {
   }
 
   function handleLoadStrategy(strategy: StrategyParsed) {
+    if (!confirmDiscard(hasUnsavedChanges)) return;
     setActiveStrategyId(strategy.id);
     loadConfig(strategy.config, MAPS_PER_USE);
   }

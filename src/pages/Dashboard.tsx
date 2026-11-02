@@ -74,7 +74,11 @@ export function Dashboard() {
       {/* Greeting */}
       <div>
         <h1 className="font-display text-xl tracking-wide text-poe-text">
-          Welcome back, <span className="text-poe-gold">{user?.displayName}</span>
+          {user ? (
+            <>Welcome back, <span className="text-poe-gold">{user.displayName}</span></>
+          ) : (
+            'Welcome, Exile'
+          )}
         </h1>
         <p className="mt-1 text-sm text-poe-text-muted">
           League: <span className="text-poe-currency">{currentLeague}</span>
@@ -122,7 +126,7 @@ export function Dashboard() {
               return (
                 <Link
                   key={snap.id}
-                  to="/stash"
+                  to={`/stash?config=${snap.configId}`}
                   className="flex items-center justify-between border border-poe-border/20 bg-poe-panel/20 px-4 py-3 transition-colors hover:bg-poe-panel/40"
                 >
                   <div className="min-w-0 flex-1">
@@ -182,7 +186,7 @@ export function Dashboard() {
               {recentPresets.map((preset) => (
                 <Link
                   key={preset.id}
-                  to="/filters"
+                  to={`/filters?preset=${preset.id}`}
                   className="flex items-center justify-between border border-poe-border/20 bg-poe-panel/20 px-4 py-3 transition-colors hover:bg-poe-panel/40"
                 >
                   <div className="min-w-0">

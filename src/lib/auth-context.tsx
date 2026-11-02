@@ -3,6 +3,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/lib/stores/toast-store';
 import type { GggProfile, UserProfile } from '@/types';
 import { getGggProfile, logoutGgg, startOAuthLogin } from '@/lib/ipc';
 
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(async () => {
+    setIsLoading(true);
     try {
       await startOAuthLogin();
       const profile = await getGggProfile();
@@ -58,8 +60,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       void queryClient.invalidateQueries({ queryKey: ['ggg-profile'] });
       void queryClient.invalidateQueries({ queryKey: ['stash'] });
     } catch (err: unknown) {
-      console.error('[auth] login failed:', JSON.stringify(err));
-      throw err;
+      console.error('[auth] login failed:', err);
+      toast.error(`Login failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsLoading(false);
     }
   }, [queryClient]);
 

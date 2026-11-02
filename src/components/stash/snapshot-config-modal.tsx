@@ -11,7 +11,7 @@ import type { SnapshotConfig } from '@/types/snapshots';
 interface SnapshotConfigModalProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: { name: string; tabIds: string[]; strategyId: string | null }) => void;
+  onSave: (data: { name: string; tabIds: string[]; strategyId: string | null }) => Promise<void>;
   tabs: StashTab[];
   existing?: SnapshotConfig | null;
 }
@@ -26,6 +26,7 @@ export function SnapshotConfigModal({
   const [name, setName] = useState('');
   const [selectedTabs, setSelectedTabs] = useState<Set<string>>(new Set());
   const [strategyId, setStrategyId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const { data: strategies } = useStrategies();
 
   useEffect(() => {
@@ -42,6 +43,13 @@ export function SnapshotConfigModal({
     }
   }, [open, existing]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   function toggleTab(tabId: string) {
@@ -56,21 +64,28 @@ export function SnapshotConfigModal({
     });
   }
 
-  function handleSubmit() {
-    if (name.trim() === '' || selectedTabs.size === 0) return;
-    onSave({ name: name.trim(), tabIds: Array.from(selectedTabs), strategyId });
+  async function handleSubmit() {
+    if (name.trim() === '' || selectedTabs.size === 0 || saving) return;
+    setSaving(true);
+    try {
+      await onSave({ name: name.trim(), tabIds: Array.from(selectedTabs), strategyId });
+    } catch {
+      // Shown as a toast by the global mutation error handler; keep the modal open.
+    } finally {
+      setSaving(false);
+    }
   }
 
   const flatTabs = flattenTabs(tabs);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="w-full max-w-md border border-poe-border/40 bg-poe-bg p-6 shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-label={existing ? 'Edit Config' : 'New Snapshot Config'} className="w-full max-w-md border border-poe-border/40 bg-poe-bg p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-sm tracking-wide text-poe-text">
             {existing ? 'Edit Config' : 'New Snapshot Config'}
           </h3>
-          <button type="button" onClick={onClose} className="text-poe-text-muted hover:text-poe-text">
+          <button type="button" onClick={onClose} className="text-poe-text-muted hover:text-poe-text" aria-label="Close">
             <X size={16} />
           </button>
         </div>
@@ -142,10 +157,10 @@ export function SnapshotConfigModal({
           <Button
             variant="primary"
             size="sm"
-            onClick={handleSubmit}
-            disabled={name.trim() === '' || selectedTabs.size === 0}
+            onClick={() => { void handleSubmit(); }}
+            disabled={name.trim() === '' || selectedTabs.size === 0 || saving}
           >
-            {existing ? 'Update' : 'Create'}
+            {saving ? 'Saving...' : existing ? 'Update' : 'Create'}
           </Button>
         </div>
       </div>

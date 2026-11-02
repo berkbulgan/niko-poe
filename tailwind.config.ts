@@ -30,7 +30,7 @@ const config: Config = {
           normal: '#C8C8C8',
           text: '#E8E4D9',
           'text-dim': '#8B8680',
-          'text-muted': '#5A5650',
+          'text-muted': '#7F7A74',
           success: '#22C55E',
           warning: '#F59E0B',
           error: '#EF4444',
