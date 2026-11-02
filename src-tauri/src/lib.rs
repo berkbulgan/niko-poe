@@ -117,6 +117,14 @@ pub fn run() {
                     }
                 });
             }
+            // Alt+F4 on the overlay would destroy it for the rest of the session; Settings hides it instead.
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                overlay.on_window_event(|event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
