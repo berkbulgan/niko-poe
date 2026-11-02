@@ -189,7 +189,7 @@ export function StatPicker() {
   const {
     avoidIds, preferIds, filters, searchQuery, showNightmare, isNightmareMap,
     setSearchQuery, setShowNightmare, setIsNightmareMap,
-    toggleAvoid, togglePrefer, updateFilter, setFilters, clearAll,
+    toggleAvoid, togglePrefer, updateFilter, clearAll,
   } = store;
   const [copied, setCopied] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -393,7 +393,7 @@ export function StatPicker() {
             </label>
             <select
               value={filters.qualityType}
-              onChange={(e) => setFilters((prev) => ({ ...prev, qualityType: e.target.value as QualityType }))}
+              onChange={(e) => updateFilter('qualityType', e.target.value as QualityType)}
               className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
             >
               {QUALITY_TYPE_OPTIONS.map((opt) => (
@@ -418,7 +418,7 @@ export function StatPicker() {
                   <button
                     key={opt}
                     type="button"
-                    onClick={() => setFilters((prev) => ({ ...prev, corrupted: opt }))}
+                    onClick={() => updateFilter('corrupted', opt)}
                     className={`flex-1 border border-poe-border/30 px-2 py-1.5 text-xs transition-all ${colors[opt]} ${filters.corrupted !== opt ? 'text-poe-text-muted hover:bg-poe-panel/40' : ''}`}
                   >
                     {labels[opt]}

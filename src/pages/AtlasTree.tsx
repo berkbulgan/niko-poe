@@ -134,9 +134,9 @@ export function AtlasTree() {
     });
   }
 
-  const overwriteMutation = useMutation<AtlasTreeType, Error, { config: AtlasTreeConfig }>({
+  const overwriteMutation = useMutation<void, Error, { config: AtlasTreeConfig }>({
     mutationFn: async ({ config }) => {
-      return ipc.updateAtlasTree(activeTreeId!, { config: JSON.stringify(config) }) as Promise<AtlasTreeType>;
+      await ipc.updateAtlasTree(activeTreeId!, { config: JSON.stringify(config) });
     },
     onSettled: () => { void queryClient.invalidateQueries({ queryKey: ['atlas-trees'] }); },
   });

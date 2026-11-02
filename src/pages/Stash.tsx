@@ -297,8 +297,9 @@ export function Stash() {
   // ── Access error ──────────────────────────────────────────────────────────
 
   if (tabsError) {
-    const is403 = tabsErrorValue instanceof Error
-      && tabsErrorValue.message.toLowerCase().includes('403');
+    const message = tabsErrorValue instanceof Error ? tabsErrorValue.message : 'Unknown error';
+    const is403 = message.includes('access denied');
+    const needsLogin = message.includes('log in again');
 
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
@@ -315,8 +316,13 @@ export function Stash() {
           <>
             <p className="text-base text-poe-text">Failed to load stash tabs</p>
             <p className="text-sm text-poe-text-muted">
-              {tabsErrorValue instanceof Error ? tabsErrorValue.message : 'Unknown error'}
+              {message}
             </p>
+            {needsLogin && (
+              <Button variant="primary" onClick={() => { void login(); }}>
+                Login again
+              </Button>
+            )}
           </>
         )}
       </div>

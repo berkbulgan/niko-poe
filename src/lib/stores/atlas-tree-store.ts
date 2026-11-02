@@ -2,7 +2,7 @@
 // ABOUTME: Replaces local useState so node allocations and undo stack survive page unmount/remount.
 
 import { create } from 'zustand';
-import type { AtlasTreeConfig } from '@/types/atlas-tree';
+import type { AtlasNodeData, AtlasTreeConfig } from '@/types/atlas-tree';
 
 const MAX_HISTORY = 50;
 
@@ -21,7 +21,7 @@ interface AtlasTreeState {
   setSearchQuery: (query: string) => void;
 
   // History-aware mutations
-  toggleNode: (nodeId: number, rawNodes: Record<string, { out?: string[] }>, pruneDisconnected: (nodeId: string, allocated: Set<string>, rawNodes: Record<string, { out?: string[] }>) => Set<string>) => void;
+  toggleNode: (nodeId: number, rawNodes: Record<string, AtlasNodeData>, pruneDisconnected: (nodeId: string, allocated: Set<string>, rawNodes: Record<string, AtlasNodeData>) => Set<string>) => void;
   allocatePath: (nodeIds: number[]) => void;
   undo: () => void;
   reset: () => void;

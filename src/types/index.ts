@@ -186,11 +186,12 @@ export interface TradeResult {
   listing: TradeResultListing;
 }
 
+// Mirrors src-tauri/src/commands/trade.rs ProxySearchResult
 export interface ProxySearchResult {
-  /** Raw GGG trade response forwarded verbatim by the Rust proxy. */
   id: string;
-  result: string[];
   total: number;
+  /** Direct pathofexile.com trade URL for the search. */
+  url: string;
 }
 
 /** One price entry from poe.ninja, mirroring NinjaPrice in state.rs. */

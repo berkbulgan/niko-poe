@@ -1,7 +1,7 @@
 // ABOUTME: Typed wrappers around Tauri IPC invoke calls for all backend commands.
 // ABOUTME: This is the single file that calls @tauri-apps/api — all hooks go through here.
 
-import { invoke } from '@tauri-apps/api/core';
+import { invoke as tauriInvoke, type InvokeArgs } from '@tauri-apps/api/core';
 import type {
   GggProfile,
   RegexFilter,
@@ -30,6 +30,26 @@ import type {
   StashTab,
   StashItem,
 } from '@/types/index';
+
+/**
+ * Rust commands reject with the serialized `Error` enum (e.g. `{ Auth: "..." }`), not an Error.
+ * Normalize so every caller can rely on `err.message`.
+ */
+export function toError(err: unknown): Error {
+  if (err instanceof Error) return err;
+  if (typeof err === 'string') return new Error(err);
+  if (err !== null && typeof err === 'object') {
+    const [message] = Object.values(err);
+    if (typeof message === 'string') return new Error(message);
+  }
+  return new Error(String(err));
+}
+
+function invoke<T>(cmd: string, args?: InvokeArgs): Promise<T> {
+  return tauriInvoke<T>(cmd, args).catch((err: unknown) => {
+    throw toError(err);
+  });
+}
 
 // --- Regex Filters ---
 
@@ -130,11 +150,11 @@ export function getTradeStats(): Promise<TradeStat[]> {
 }
 
 export function searchTrade(filterId: string, league: string): Promise<TradeSearchResult> {
-  return invoke<TradeSearchResult>('search_trade', { filterId, league });
+  return invoke<TradeSearchResult>('search_trade', { args: { filterIds: [filterId], league } });
 }
 
 export function fetchTradeResults(queryId: string, resultIds: string[]): Promise<TradeResult[]> {
-  return invoke<TradeResult[]>('fetch_trade_results', { queryId, resultIds });
+  return invoke<TradeResult[]>('fetch_trade_results', { queryId, ids: resultIds });
 }
 
 export function proxySearch(query: object, league: string): Promise<ProxySearchResult> {
@@ -223,8 +243,8 @@ export function logoutGgg(): Promise<void> {
 }
 
 /** Attempts a silent token refresh using the stored refresh token. */
-export function refreshGggToken(): Promise<void> {
-  return invoke<void>('refresh_ggg_token');
+export function refreshGggToken(): Promise<GggProfile> {
+  return invoke<GggProfile>('refresh_ggg_token');
 }
 
 // --- Stash ---
