@@ -91,7 +91,7 @@ GGG's official `data.json` export from [atlastree-export](https://github.com/gri
 ## External APIs
 
 - **PoE Trade**: `www.pathofexile.com/api/trade/` — rate limited, proxied through Rust (PoE 1 uses `/api/trade/`, NOT `/api/trade2/`)
-- **poe.ninja**: `poe.ninja/api/data` — price data (currency + 27 item categories), 1-hour cache
+- **poe.ninja**: `poe.ninja/poe1/api/economy` ([docs](https://poe.ninja/docs/api)) — exchange overview for bulk types (currency, scarabs, div cards…), stash item overview for uniques/gems/maps; 1-hour cache, app User-Agent
 - **GGG OAuth**: `oauth.pathofexile.com` — PKCE flow, localhost callback via tauri-plugin-oauth
 - **GGG Stash**: `api.pathofexile.com/stash/` — requires OAuth token
 

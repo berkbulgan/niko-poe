@@ -151,4 +151,6 @@ pub struct AppState {
     pub ggg_token: Arc<Mutex<Option<GggTokenState>>>,
     /// Map tracking state (log watcher, active run). See commands::tracking.
     pub tracker: Arc<Mutex<crate::commands::tracking::Tracker>>,
+    /// Community strategies server URL; `None` when neither a build default nor an override is set.
+    pub community_base_url: Arc<Mutex<Option<String>>>,
 }

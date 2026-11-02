@@ -7,6 +7,9 @@ import { Input } from '@/components/ui/input';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import { useSetTrackerSettings, useTrackerSettings, useTrackerState } from '@/lib/hooks/use-tracking';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
+import { useCommunityServerUrl, useSetCommunityServerUrl } from '@/lib/hooks/use-community';
+import { getServerUrlOverride } from '@/lib/community-storage';
+import { toast } from '@/lib/stores/toast-store';
 
 type SettingsSection = 'general' | 'tracking' | 'stash-ignore' | 'about';
 
@@ -43,6 +46,48 @@ function GeneralSection() {
           ))}
         </div>
       </div>
+      <CommunityServerSetting />
+    </div>
+  );
+}
+
+function CommunityServerSetting() {
+  const { data: inUse } = useCommunityServerUrl();
+  const setUrl = useSetCommunityServerUrl();
+  const [value, setValue] = useState(() => getServerUrlOverride() ?? '');
+
+  function save(url: string | null) {
+    setUrl.mutate(url, {
+      onSuccess: () => {
+        if (!url) setValue('');
+        toast.success(url ? 'Community server updated' : 'Using the built-in community server');
+      },
+    });
+  }
+
+  return (
+    <div>
+      <p className="mb-1 text-xs text-poe-text-dim">Community server</p>
+      <div className="flex max-w-lg gap-2">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="Leave empty to use the built-in server"
+          className="h-8 text-xs"
+        />
+        <Button variant="secondary" size="sm" onClick={() => save(value.trim() || null)} disabled={setUrl.isPending}>
+          Save
+        </Button>
+        {getServerUrlOverride() && (
+          <Button variant="ghost" size="sm" onClick={() => save(null)} disabled={setUrl.isPending}>
+            Reset
+          </Button>
+        )}
+      </div>
+      {setUrl.isError && <p className="mt-1 text-xs text-poe-error">{setUrl.error.message}</p>}
+      <p className="mt-1 text-[11px] text-poe-text-muted">
+        {!inUse ? 'No community server configured.' : getServerUrlOverride() ? `In use: ${inUse}` : 'Using the built-in server.'}
+      </p>
     </div>
   );
 }

@@ -17,13 +17,17 @@ import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { StrategyBuilder } from '@/components/strategies/strategy-builder';
 import { StrategyResults } from '@/components/strategies/strategy-results';
+import { PublishModal } from '@/components/strategies/publish-modal';
+import { Button } from '@/components/ui/button';
+import { useUnpublish } from '@/lib/hooks/use-community';
+import { getPublished } from '@/lib/community-storage';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import type { StrategyConfig } from '@/lib/hooks/use-strategies';
 import * as ipc from '@/lib/ipc';
 import { useStrategiesStore } from '@/lib/stores/strategies-store';
 import { toast } from '@/lib/stores/toast-store';
-import { confirmDiscard } from '@/lib/platform';
+import { confirmAction, confirmDiscard } from '@/lib/platform';
 import { MAPS_PER_USE } from '@/lib/strategy-cost';
 
 function StrategyRow({
@@ -59,6 +63,8 @@ export function Strategies() {
   const [showSaveAs, setShowSaveAs] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+  const [publishTarget, setPublishTarget] = useState<StrategyParsed | null>(null);
+  const unpublish = useUnpublish();
 
   const { activeStrategyId, setActiveStrategyId, getConfig, loadConfig } = useStrategiesStore();
 
@@ -110,6 +116,13 @@ export function Strategies() {
     );
   }
 
+  const published = activeStrategy ? getPublished(activeStrategy.id) : null;
+
+  function handleUnpublish() {
+    if (!activeStrategy || !confirmAction(`Remove "${activeStrategy.name}" from the community list?`)) return;
+    unpublish.mutate(activeStrategy.id, { onSuccess: () => toast.success('Strategy unpublished') });
+  }
+
   function handleLoadStrategy(strategy: StrategyParsed) {
     if (!confirmDiscard(hasUnsavedChanges)) return;
     setActiveStrategyId(strategy.id);
@@ -146,6 +159,18 @@ export function Strategies() {
           hasActiveEntity={!!activeStrategy}
           onSave={handleSaveOverwrite}
           onSaveAs={() => setShowSaveAs(true)}
+          actions={activeStrategy && (
+            <>
+              {published && (
+                <Button variant="ghost" size="sm" onClick={handleUnpublish} disabled={unpublish.isPending}>
+                  Unpublish
+                </Button>
+              )}
+              <Button variant="secondary" size="sm" onClick={() => setPublishTarget(activeStrategy)}>
+                {published ? 'Update Published' : 'Publish'}
+              </Button>
+            </>
+          )}
         />
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           <StrategyBuilder />
@@ -163,6 +188,7 @@ export function Strategies() {
       />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
       <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
+      <PublishModal strategy={publishTarget} onClose={() => setPublishTarget(null)} />
     </div>
   );
 }

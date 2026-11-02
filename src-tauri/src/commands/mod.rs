@@ -3,6 +3,7 @@
 
 pub mod atlas_trees;
 pub mod auth;
+pub mod community;
 pub mod filter_presets;
 pub mod prices;
 pub mod regex_filters;

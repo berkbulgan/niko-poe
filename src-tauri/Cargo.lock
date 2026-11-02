@@ -2438,6 +2438,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "flate2",
+ "niko-community-api",
  "once_cell",
  "rand 0.8.5",
  "regex",
@@ -2458,6 +2459,13 @@ dependencies = [
  "tokio",
  "urlencoding",
  "uuid",
+]
+
+[[package]]
+name = "niko-community-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
