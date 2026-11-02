@@ -1,6 +1,7 @@
 // ABOUTME: Tauri application builder and plugin registration.
 // ABOUTME: AppState is managed here; commands are registered per phase.
 
+pub mod client_log;
 pub mod commands;
 pub mod db;
 pub mod error;
