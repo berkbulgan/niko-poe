@@ -2,6 +2,9 @@
 // ABOUTME: This is the single file that calls @tauri-apps/api — all hooks go through here.
 
 import { invoke as tauriInvoke, type InvokeArgs } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { PhysicalPosition } from '@tauri-apps/api/dpi';
 import type {
   GggProfile,
   RegexFilter,
@@ -30,6 +33,7 @@ import type {
   StashTab,
   StashItem,
 } from '@/types/index';
+import type { TrackerState, TrackingRunDetail, TrackerSettings, TrackerSettingsInput } from '@/types/tracking';
 
 /**
  * Rust commands reject with the serialized `Error` enum (e.g. `{ Auth: "..." }`), not an Error.
@@ -305,4 +309,62 @@ export function getRecentSnapshots(): Promise<RecentSnapshot[]> {
 
 export function deleteSnapshot(snapshotId: string): Promise<void> {
   return invoke<void>('delete_snapshot', { snapshotId });
+}
+
+// --- Map Tracking ---
+
+export function getTrackerState(): Promise<TrackerState> {
+  return invoke<TrackerState>('get_tracker_state');
+}
+
+export function startTrackingRun(strategyId: string, configId: string): Promise<void> {
+  return invoke<void>('start_tracking_run', { input: { strategyId, configId } });
+}
+
+export function switchTrackingStrategy(strategyId: string): Promise<void> {
+  return invoke<void>('switch_tracking_strategy', { strategyId });
+}
+
+export function stopTrackingRun(skipSnapshot: boolean): Promise<void> {
+  return invoke<void>('stop_tracking_run', { skipSnapshot });
+}
+
+export function dismissTrackingSuggestion(): Promise<void> {
+  return invoke<void>('dismiss_tracking_suggestion');
+}
+
+export function getTrackingHistory(): Promise<TrackingRunDetail[]> {
+  return invoke<TrackingRunDetail[]>('get_tracking_history');
+}
+
+export function reassignMapRuns(mapIds: string[], strategyId: string | null): Promise<void> {
+  return invoke<void>('reassign_map_runs', { mapIds, strategyId });
+}
+
+export function deleteTrackingRun(id: string): Promise<void> {
+  return invoke<void>('delete_tracking_run', { id });
+}
+
+export function getTrackerSettings(): Promise<TrackerSettings> {
+  return invoke<TrackerSettings>('get_tracker_settings');
+}
+
+export function setTrackerSettings(input: TrackerSettingsInput): Promise<void> {
+  return invoke<void>('set_tracker_settings', { input });
+}
+
+/** Subscribes to tracker state pushed by the backend after every change. */
+export function onTrackerState(cb: (state: TrackerState) => void): Promise<UnlistenFn> {
+  return listen<TrackerState>('tracker-state', (event) => cb(event.payload));
+}
+
+/** Moves the current window to the saved position, then saves it whenever the window moves. */
+export async function persistOverlayPosition(
+  load: () => { x: number; y: number } | null,
+  save: (pos: { x: number; y: number }) => void,
+): Promise<UnlistenFn> {
+  const win = getCurrentWindow();
+  const pos = load();
+  if (pos) await win.setPosition(new PhysicalPosition(pos.x, pos.y));
+  return win.onMoved(({ payload }) => save({ x: payload.x, y: payload.y }));
 }
