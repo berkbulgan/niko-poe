@@ -95,6 +95,34 @@ const MIGRATIONS: &[(&str, &str)] = &[
         CREATE INDEX IF NOT EXISTS idx_snapshot_items_snapshot_id
             ON snapshot_items(snapshot_id);",
     ),
+    (
+        "006_create_tracking_tables",
+        "CREATE TABLE IF NOT EXISTS tracking_runs (
+            id                 TEXT PRIMARY KEY NOT NULL,
+            strategy_id        TEXT NOT NULL,
+            config_id          TEXT NOT NULL,
+            before_snapshot_id TEXT NOT NULL,
+            after_snapshot_id  TEXT,
+            started_at         TEXT NOT NULL DEFAULT (datetime('now')),
+            ended_at           TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS map_runs (
+            id            TEXT PRIMARY KEY NOT NULL,
+            run_id        TEXT NOT NULL,
+            area_name     TEXT NOT NULL,
+            area_id       TEXT NOT NULL,
+            area_level    INTEGER NOT NULL,
+            seed          INTEGER NOT NULL,
+            entered_at    TEXT NOT NULL DEFAULT (datetime('now')),
+            duration_secs INTEGER NOT NULL DEFAULT 0,
+            strategy_id   TEXT,
+            FOREIGN KEY (run_id) REFERENCES tracking_runs(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_map_runs_run_id
+            ON map_runs(run_id);",
+    ),
 ];
 
 /// Runs all pending migrations on the given pool.

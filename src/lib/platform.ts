@@ -49,3 +49,10 @@ export function confirmAction(message: string): boolean {
 export function confirmDiscard(hasUnsavedChanges: boolean): boolean {
   return !hasUnsavedChanges || confirmAction('You have unsaved changes. Discard them?');
 }
+
+// --- Windows ---
+
+/** The in-game overlay is a second Tauri window loading `#/overlay`. */
+export function isOverlayWindow(): boolean {
+  return window.location.hash.startsWith('#/overlay');
+}

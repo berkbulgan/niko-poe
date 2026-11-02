@@ -33,7 +33,9 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 - **`lib/platform.ts`** — Abstracts browser APIs (storage, clipboard, external links). No raw `window.*` or `localStorage` calls should exist outside this file.
 - **`lib/auth-context.tsx`** — GGG OAuth state. App works fully without login; OAuth unlocks stash features only.
 - **`lib/league-context.tsx`** — Active PoE league selection, persisted via platform.storage.
-- **`lib/hooks/`** — TanStack Query hooks for each data domain. Pattern: `useQuery({ queryFn: () => ipc.commandName() })`.
+- **`lib/hooks/`** — TanStack Query hooks for each data domain. Pattern: `useQuery({ queryFn: () => ipc.commandName() })`. `use-tracking.ts` also subscribes to the `tracker-state` event.
+- **`pages/Overlay.tsx`** — In-game overlay, rendered alone in the `overlay` Tauri window (`main.tsx` checks `isOverlayWindow()`).
+- **`lib/tracking-results.ts`** — Per-strategy profit attribution for tracked runs (a run's profit and time split evenly across its maps).
 - **`lib/atlas-sprite-loader.ts`** — Loads GGG sprite sheets by zoom level, caches images, provides drawSprite API for Canvas rendering.
 - **`lib/atlas-canvas-renderer.ts`** — Canvas-based atlas tree renderer with 6 layers: background, group bg, start node, connections (orbit arcs + straight lines), node icons/frames, highlights. Handles hit testing, path/prune previews, mastery group highlights, blinking animations, off-screen arrows.
 - **`lib/atlas-tree-utils.ts`** — Pure utility functions: node positioning, stat aggregation, BFS pathfinding, hub node detection, allocatable neighbor computation, connectivity pruning, connection building.
@@ -59,7 +61,9 @@ GGG's official `data.json` export from [atlastree-export](https://github.com/gri
 - **`lib.rs`** — Tauri builder, plugin registration, all commands registered in one `generate_handler!` call.
 - **`state.rs`** — `AppState` singleton: SQLite pool, HTTP client, rate limiter, price/league/stat caches (Arc<Mutex<T>>), GGG token state.
 - **`commands/`** — 8 modules, 32 commands total. CRUD for 4 entities + trade + prices + auth + stash.
-- **`db/migrations.rs`** — 4 versioned SQLite migrations. Append-only, no down migrations.
+- **`db/migrations.rs`** — 6 versioned SQLite migrations. Append-only, no down migrations.
+- **`client_log.rs`** — Pure `Client.txt` parsing: area lines → map started/resumed/left events, plus a file tail. Unit tested.
+- **`commands/tracking.rs`** — Map tracking: 1 s log watcher task, `Tracker` state in `AppState`, run/map commands, `tracker-state` event, overlay show/hide.
 - **`error.rs`** — `Error` enum with `serde::Serialize` (required for IPC boundary crossing).
 
 ### Key Patterns
@@ -68,6 +72,7 @@ GGG's official `data.json` export from [atlastree-export](https://github.com/gri
 - **Config columns**: Complex objects stored as `TEXT` (JSON string) in SQLite. Hooks handle `JSON.parse/stringify` at the boundary.
 - **Rate limiting**: Rust-side token bucket for PoE Trade API. Reads `X-Rate-Limit-Ip-State` headers for adaptive backoff.
 - **Caching**: Two layers — TanStack Query in frontend (UI cache), `Arc<Mutex<Cache>>` in Rust (API response cache with TTL).
+- **Two windows**: `main` and a frameless always-on-top `overlay`. Closing `main` exits the app. Tracking state lives in Rust so both windows stay in sync.
 - **Auth is optional**: `isAuthenticated: false` does not block any route. Stash page shows login prompt; all other features work without OAuth.
 
 ## Adding a New Rust Command

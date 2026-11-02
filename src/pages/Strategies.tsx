@@ -16,6 +16,7 @@ import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
 import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { StrategyBuilder } from '@/components/strategies/strategy-builder';
+import { StrategyResults } from '@/components/strategies/strategy-results';
 import { PublishModal } from '@/components/strategies/publish-modal';
 import { Button } from '@/components/ui/button';
 import { useUnpublish } from '@/lib/hooks/use-community';
@@ -173,6 +174,7 @@ export function Strategies() {
         />
         <div className="flex-1 overflow-y-auto p-4 lg:p-6">
           <StrategyBuilder />
+          {activeStrategy && <StrategyResults strategyId={activeStrategy.id} />}
         </div>
       </main>
 
