@@ -7,7 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { Toaster } from '@/components/ui/toaster';
 import { checkForUpdate } from '@/lib/updater';
-import { Zap, Sword, BarChart3, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { useCommunityServerUrl } from '@/lib/hooks/use-community';
+import { Zap, Sword, BarChart3, Globe, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 interface NavItemProps {
   href: string;
@@ -52,10 +53,14 @@ export function AppLayout() {
 
   useEffect(() => { void checkForUpdate(); }, []);
 
+  // Push any saved community server override to Rust before anything talks to the server.
+  useCommunityServerUrl();
+
   const navItems = [
     { href: '/dashboard', icon: <Zap size={18} />, label: 'Dashboard' },
     { href: '/filters', icon: <Sword size={18} />, label: 'Regex Filters' },
     { href: '/strategies', icon: <BarChart3 size={18} />, label: 'Strategies' },
+    { href: '/community', icon: <Globe size={18} />, label: 'Community' },
     { href: '/atlas-tree', icon: <TreePine size={18} />, label: 'Atlas Tree' },
     { href: '/stash', icon: <Archive size={18} />, label: 'Stash', requiresAuth: true },
     { href: '/settings', icon: <Settings size={18} />, label: 'Settings' },

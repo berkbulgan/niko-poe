@@ -30,6 +30,14 @@ import type {
   StashTab,
   StashItem,
 } from '@/types/index';
+import type {
+  ListQuery,
+  ListResponse,
+  PublishRequest,
+  PublishResponse,
+  StrategyDetail,
+  TagCount,
+} from '@/types/community';
 
 /**
  * Rust commands reject with the serialized `Error` enum (e.g. `{ Auth: "..." }`), not an Error.
@@ -223,6 +231,45 @@ export function importFromPastebin(url: string): Promise<string> {
 
 export function contentHash(json: string): Promise<string> {
   return invoke<string>('content_hash', { json });
+}
+
+// --- Community strategies ---
+
+export function communityList(query: ListQuery): Promise<ListResponse> {
+  return invoke<ListResponse>('community_list', { query });
+}
+
+export function communityGet(id: string): Promise<StrategyDetail> {
+  return invoke<StrategyDetail>('community_get', { id });
+}
+
+export function communityTags(league: string | null): Promise<TagCount[]> {
+  return invoke<TagCount[]>('community_tags', { league });
+}
+
+export function communityPublish(requestBody: PublishRequest): Promise<PublishResponse> {
+  return invoke<PublishResponse>('community_publish', { requestBody });
+}
+
+export function communityUpdate(id: string, token: string, requestBody: PublishRequest): Promise<StrategyDetail> {
+  return invoke<StrategyDetail>('community_update', { id, token, requestBody });
+}
+
+export function communityDelete(id: string, token: string): Promise<void> {
+  return invoke<void>('community_delete', { id, token });
+}
+
+export function communityFavourite(id: string, on: boolean): Promise<{ favouriteCount: number }> {
+  return invoke<{ favouriteCount: number }>('community_favourite', { id, on });
+}
+
+export function communityReport(id: string, reason: string): Promise<void> {
+  return invoke<void>('community_report', { id, reason });
+}
+
+/** Sets the server URL override (null restores the built-in default). Returns the URL now in use. */
+export function setCommunityBaseUrl(url: string | null): Promise<string | null> {
+  return invoke<string | null>('set_community_base_url', { url });
 }
 
 // --- GGG Auth ---
