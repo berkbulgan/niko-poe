@@ -7,23 +7,33 @@ use tauri::State;
 use crate::error::Result;
 use crate::state::{AppState, NinjaPrice};
 
-const NINJA_BASE: &str = "https://poe.ninja/api/data";
+const NINJA_BASE: &str = "https://poe.ninja/poe1/api/economy";
+/// poe.ninja asks API clients for a User-Agent that names the app and a contact.
+const NINJA_USER_AGENT: &str =
+    concat!("N.I.K.O./", env!("CARGO_PKG_VERSION"), " (+https://github.com/berkbulgan/niko-poe)");
 
-/// All poe.ninja currency overview types (use currencyoverview endpoint).
-const CURRENCY_TYPES: &[&str] = &["Currency", "Fragment"];
-
-/// All poe.ninja item overview types (use itemoverview endpoint).
-const ITEM_TYPES: &[&str] = &[
+/// Bulk-tradeable types, served by the currency exchange endpoint.
+const EXCHANGE_TYPES: &[&str] = &[
+    "Currency",
+    "Fragment",
+    "Astrolabe",
     "Oil",
-    "Incubator",
     "Scarab",
     "Fossil",
     "Resonator",
     "Essence",
     "DivinationCard",
-    "SkillGem",
     "Tattoo",
     "Omen",
+    "DeliriumOrb",
+    "Artifact",
+    "AllflameEmber",
+];
+
+/// Types priced from stash listings (uniques, gems, maps...), served by the item overview endpoint.
+const ITEM_TYPES: &[&str] = &[
+    "Incubator",
+    "SkillGem",
     "UniqueMap",
     "Map",
     "UniqueJewel",
@@ -32,18 +42,14 @@ const ITEM_TYPES: &[&str] = &[
     "UniqueArmour",
     "UniqueRelic",
     "UniqueAccessory",
-    "DeliriumOrb",
     "Beast",
     "Vial",
     "Invitation",
-    "Artifact",
     "Memory",
     "BlightedMap",
     "BlightRavagedMap",
-    "Coffin",
-    "AllflameEmber",
-    "KalguuranRune",
 ];
+
 
 /// Fetches all poe.ninja prices for a league (currency + item overviews).
 /// Called when the user selects a league. Invalidates cache if league changed.
@@ -77,16 +83,16 @@ pub async fn fetch_all_prices(
     let client = &state.http_client;
     let mut all_prices: HashMap<String, Vec<NinjaPrice>> = HashMap::new();
 
-    // Fetch currency overviews
-    for currency_type in CURRENCY_TYPES {
+    // Fetch currency exchange overviews
+    for exchange_type in EXCHANGE_TYPES {
         let url = format!(
-            "{}/currencyoverview?league={}&type={}",
+            "{}/exchange/current/overview?league={}&type={}",
             NINJA_BASE,
             urlencoding::encode(&league),
-            currency_type,
+            exchange_type,
         );
 
-        match fetch_currency_overview(client, &url, currency_type).await {
+        match fetch_exchange_overview(client, &url, exchange_type).await {
             Ok(prices) => {
                 for price in prices {
                     let key = price.name.to_lowercase();
@@ -94,7 +100,7 @@ pub async fn fetch_all_prices(
                 }
             }
             Err(e) => {
-                eprintln!("poe.ninja currency fetch failed for {}: {}", currency_type, e);
+                eprintln!("poe.ninja exchange fetch failed for {}: {}", exchange_type, e);
             }
         }
     }
@@ -102,7 +108,7 @@ pub async fn fetch_all_prices(
     // Fetch item overviews
     for item_type in ITEM_TYPES {
         let url = format!(
-            "{}/itemoverview?league={}&type={}",
+            "{}/stash/current/item/overview?league={}&type={}",
             NINJA_BASE,
             urlencoding::encode(&league),
             item_type,
@@ -273,7 +279,8 @@ fn normalize_category(category: &str) -> String {
     match category {
         "scarab" => "scarab".to_string(),
         "deliriumOrb" | "delirium_orb" => "deliriumorb".to_string(),
-        "currency" | "chisel" | "astrolabe" => "currency".to_string(),
+        "currency" | "chisel" => "currency".to_string(),
+        "astrolabe" => "astrolabe".to_string(),
         "fragment" => "fragment".to_string(),
         "divinationCard" | "divination" => "divinationcard".to_string(),
         "essence" => "essence".to_string(),
@@ -371,14 +378,15 @@ fn find_best_match<'a>(entries: &'a [NinjaPrice], item: &AdvancedLookupItem) -> 
     }
 }
 
-/// Fetch a currency overview from poe.ninja and convert to NinjaPrice entries.
-async fn fetch_currency_overview(
+/// Fetch a currency exchange overview from poe.ninja and convert to NinjaPrice entries.
+async fn fetch_exchange_overview(
     client: &reqwest::Client,
     url: &str,
     category: &str,
 ) -> std::result::Result<Vec<NinjaPrice>, String> {
     let resp = client
         .get(url)
+        .header("User-Agent", NINJA_USER_AGENT)
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -388,47 +396,40 @@ async fn fetch_currency_overview(
     }
 
     let raw: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    Ok(parse_exchange_overview(&raw, category))
+}
 
-    // Build icon lookup from currencyDetails
-    let mut icon_map: HashMap<String, String> = HashMap::new();
-    if let Some(details) = raw.get("currencyDetails").and_then(|v| v.as_array()) {
-        for d in details {
-            if let (Some(name), Some(icon)) = (d["name"].as_str(), d["icon"].as_str()) {
-                icon_map.insert(name.to_string(), icon.to_string());
-            }
-        }
-    }
-
-    let lines = raw
-        .get("lines")
-        .and_then(|v| v.as_array())
-        .cloned()
-        .unwrap_or_default();
+/// Exchange overviews list prices (`lines`, chaos value in `primaryValue`) and names/icons (`items`) by id.
+fn parse_exchange_overview(raw: &serde_json::Value, category: &str) -> Vec<NinjaPrice> {
+    let empty = Vec::new();
+    let items = raw["items"].as_array().unwrap_or(&empty);
+    let item_by_id: HashMap<&str, &serde_json::Value> =
+        items.iter().filter_map(|i| Some((i["id"].as_str()?, i))).collect();
+    let icon_of = |item: &serde_json::Value| match item["image"].as_str() {
+        Some(path) if path.starts_with('/') => format!("https://web.poecdn.com{path}"),
+        Some(url) => url.to_string(),
+        None => String::new(),
+    };
+    let frame_type = if category == "DivinationCard" { 6 } else { 5 };
 
     let mut prices = Vec::new();
-    for line in &lines {
-        let name = match line["currencyTypeName"].as_str() {
+    for line in raw["lines"].as_array().unwrap_or(&empty) {
+        let Some(item) = line["id"].as_str().and_then(|id| item_by_id.get(id)) else { continue };
+        let name = match item["name"].as_str() {
             Some(n) if !n.is_empty() => n,
             _ => continue,
         };
-        let chaos_value = match line["chaosEquivalent"].as_f64() {
+        let chaos_value = match line["primaryValue"].as_f64() {
             Some(v) if v > 0.0 => v,
             _ => continue,
         };
 
-        let icon = icon_map.get(name).cloned().unwrap_or_default();
-        let count = line.get("receive")
-            .and_then(|r| r["count"].as_i64())
-            .map(|c| c as i32);
-
-        let details_id = line["detailsId"].as_str().map(|s| s.to_string());
-
         prices.push(NinjaPrice {
             name: name.to_string(),
             chaos_value,
-            icon,
+            icon: icon_of(item),
             category: category.to_lowercase(),
-            frame_type: Some(5),
+            frame_type: Some(frame_type),
             links: None,
             variant: None,
             gem_level: None,
@@ -437,17 +438,17 @@ async fn fetch_currency_overview(
             map_tier: None,
             base_type: None,
             item_level: None,
-            listing_count: count,
-            details_id,
+            listing_count: None,
+            details_id: item["detailsId"].as_str().map(|s| s.to_string()),
         });
     }
 
-    // Chaos Orb is poe.ninja's reference currency and never appears in `lines`.
-    if category == "Currency" {
-        prices.push(chaos_orb(icon_map.get("Chaos Orb").cloned().unwrap_or_default()));
+    // Chaos Orb is the reference currency; add it if this overview leaves it out.
+    if category == "Currency" && !prices.iter().any(|p| p.name == "Chaos Orb") {
+        prices.push(chaos_orb(String::new()));
     }
 
-    Ok(prices)
+    prices
 }
 
 fn chaos_orb(icon: String) -> NinjaPrice {
@@ -478,6 +479,7 @@ async fn fetch_item_overview(
 ) -> std::result::Result<Vec<NinjaPrice>, String> {
     let resp = client
         .get(url)
+        .header("User-Agent", NINJA_USER_AGENT)
         .send()
         .await
         .map_err(|e| e.to_string())?;
@@ -568,6 +570,29 @@ mod tests {
             base_type: None,
             item_level: None,
         }
+    }
+
+    #[test]
+    fn exchange_overview_joins_lines_to_items_by_id() {
+        let raw = serde_json::json!({
+            "core": { "primary": "chaos" },
+            "lines": [
+                { "id": "divine", "primaryValue": 680.6 },
+                { "id": "unpriced", "primaryValue": 0 },
+                { "id": "missing-item", "primaryValue": 3.0 }
+            ],
+            "items": [
+                { "id": "divine", "name": "Divine Orb", "image": "/gen/image/x/CurrencyModValues.png", "detailsId": "divine-orb" },
+                { "id": "unpriced", "name": "Unpriced Orb", "image": "/gen/image/y.png" }
+            ]
+        });
+        let prices = parse_exchange_overview(&raw, "Currency");
+        let names: Vec<&str> = prices.iter().map(|p| p.name.as_str()).collect();
+        assert_eq!(names, vec!["Divine Orb", "Chaos Orb"]);
+        assert_eq!(prices[0].chaos_value, 680.6);
+        assert_eq!(prices[0].icon, "https://web.poecdn.com/gen/image/x/CurrencyModValues.png");
+        assert_eq!(prices[0].category, "currency");
+        assert_eq!(prices[0].details_id.as_deref(), Some("divine-orb"));
     }
 
     #[test]
