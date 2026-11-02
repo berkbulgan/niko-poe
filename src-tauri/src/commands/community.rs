@@ -153,6 +153,13 @@ mod tests {
     }
 
     #[test]
+    fn list_query_encodes_without_empty_filters() {
+        let query = ListQuery { tag: Some(" Delirium ".into()), sort: niko_community_api::Sort::Favourites, ..Default::default() };
+        let req = reqwest::Client::new().get("http://x/v1/strategies").query(&query.normalize()).build().unwrap();
+        assert_eq!(req.url().query(), Some("tag=delirium&sort=favourites&page=1&limit=20"));
+    }
+
+    #[test]
     fn rejects_malformed_ids() {
         assert!(id_path("../admin").is_err());
         assert_eq!(id_path("aZ09bC12").unwrap(), "/v1/strategies/aZ09bC12");
