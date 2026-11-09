@@ -55,6 +55,13 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
   const [storedLeague, setStoredLeague] = useState(() => storage.get(LEAGUE_STORAGE_KEY));
   const currentLeague = storedLeague && leagues.some((l) => l.id === storedLeague) ? storedLeague : leagues[0].id;
 
+  // The overlay has no provider and reads storage directly, so keep the resolved league there.
+  useEffect(() => {
+    if (!leaguesPending && storage.get(LEAGUE_STORAGE_KEY) !== currentLeague) {
+      storage.set(LEAGUE_STORAGE_KEY, currentLeague);
+    }
+  }, [leaguesPending, currentLeague]);
+
   // Fetch poe.ninja prices whenever the active league changes.
   // Sets pricesLoading=true before fetch, false after + invalidates queries.
   // Waits for the league list so a stale built-in list never triggers a fetch for the wrong league.

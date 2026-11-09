@@ -25,7 +25,7 @@
         "title": "N.I.K.O. overlay",
         "url": "index.html#/overlay",
         "width": 280,
-        "height": 120,
+        "height": 150,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,

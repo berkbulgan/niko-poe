@@ -1,5 +1,5 @@
 // ABOUTME: Decides which strategies of a stopped tracking run can share their result with the community.
-// ABOUTME: A strategy qualifies only while its config still matches the community version it came from.
+// ABOUTME: Only single-strategy runs qualify, and only while the strategy's config still matches its community version.
 
 import { linkedCommunityId } from '@/lib/community-storage';
 import type { StrategyParsed } from '@/lib/hooks/use-strategies';
@@ -19,12 +19,13 @@ export interface ShareCandidate {
   payload: ResultPayload;
 }
 
-/** `communityIds` maps local strategy id → the community id it is still linked to. */
+/** `communityIds` maps local strategy id → the community id it is still linked to. Runs spanning several strategies are never shared. */
 export function shareCandidates(
   run: TrackingRunDetail,
   strategies: StrategyParsed[],
   communityIds: Record<string, string>,
 ): ShareCandidate[] {
+  if (new Set(run.maps.map((m) => m.strategyId ?? run.strategyId)).size !== 1) return [];
   return strategies.flatMap((s) => {
     const communityId = communityIds[s.id];
     if (!communityId) return [];
@@ -40,6 +41,7 @@ export async function findShareCandidates(
   strategies: StrategyParsed[],
 ): Promise<ShareCandidate[]> {
   const played = new Set(run.maps.map((m) => m.strategyId ?? run.strategyId));
+  if (played.size !== 1) return [];
   const communityIds: Record<string, string> = {};
   for (const s of strategies.filter((x) => played.has(x.id))) {
     const id = linkedCommunityId(s.id, await strategyHash(s.config));

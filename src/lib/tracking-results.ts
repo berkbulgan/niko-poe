@@ -92,6 +92,11 @@ export function strategyResults(
 /** Fewest maps a run needs before its result is worth sharing (the server enforces the same floor). */
 export const MIN_SHARED_MAPS = 5;
 
+/** Server limits; these mirror SubmitResultRequest::normalize in src-tauri/community-api. */
+export const MAX_SHARED_HOURS = 24;
+export const MAX_SHARED_MAPS_PER_HOUR = 60;
+export const MAX_SHARED_DIV_PER_HOUR = 500;
+
 export interface ResultPayload {
   maps: number;
   hours: number;
@@ -102,5 +107,9 @@ export interface ResultPayload {
 export function resultPayload(row: RunResult): ResultPayload | null {
   if (row.maps < MIN_SHARED_MAPS || row.hours === null || row.net === null) return null;
   if (row.divineRate === null || row.divineRate <= 0) return null;
-  return { maps: row.maps, hours: row.hours, netDivine: row.net / row.divineRate };
+  const { maps, hours } = row;
+  const netDivine = row.net / row.divineRate;
+  if (hours <= 0 || hours > MAX_SHARED_HOURS) return null;
+  if (maps / hours > MAX_SHARED_MAPS_PER_HOUR || Math.abs(netDivine / hours) > MAX_SHARED_DIV_PER_HOUR) return null;
+  return { maps, hours, netDivine };
 }

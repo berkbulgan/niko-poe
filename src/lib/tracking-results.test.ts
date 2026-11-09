@@ -59,4 +59,16 @@ describe('resultPayload', () => {
     expect(resultPayload({ ...row, divineRate: null })).toBeNull();
     expect(resultPayload({ ...row, divineRate: 0 })).toBeNull();
   });
+
+  it('enforces the server limits on hours, maps per hour and profit per hour', () => {
+    expect(resultPayload({ ...row, hours: 0 })).toBeNull();
+    expect(resultPayload({ ...row, hours: 24.01 })).toBeNull();
+    expect(resultPayload({ ...row, maps: 24, hours: 24, net: 0 })).toEqual({ maps: 24, hours: 24, netDivine: 0 });
+    expect(resultPayload({ ...row, maps: 121, hours: 2 })).toBeNull();
+    expect(resultPayload({ ...row, maps: 120, hours: 2 })).toMatchObject({ maps: 120 });
+    expect(resultPayload({ ...row, hours: 1, net: 100_001 * 1 })).toBeNull(); // 500.005 div/hr
+    expect(resultPayload({ ...row, hours: 1, net: 100_000 })).toMatchObject({ netDivine: 500 });
+    expect(resultPayload({ ...row, hours: 1, net: -100_001 })).toBeNull();
+    expect(resultPayload({ ...row, hours: 1, net: -100_000 })).toMatchObject({ netDivine: -500 });
+  });
 });

@@ -1,5 +1,5 @@
 // ABOUTME: Tests which strategies of a stopped run are offered for sharing.
-// ABOUTME: Covers unlinked strategies, short runs and runs split across two strategies.
+// ABOUTME: Covers unlinked strategies, short runs and that runs split across two strategies are never offered.
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -20,11 +20,16 @@ const run = (maps: MapRun[]): TrackingRunDetail => ({
 });
 
 describe('shareCandidates', () => {
-  it('offers only linked strategies with enough maps', () => {
-    const maps = [...['1', '2', '3', '4', '5', '6'].map((i) => map(i)), map('7', 'B'), map('8', 'B')];
+  it('offers a single-strategy run', () => {
+    const maps = ['1', '2', '3', '4', '5', '6'].map((i) => map(i));
     const result = shareCandidates(run(maps), [strategy('A'), strategy('B')], { A: 'aaaaaaaa', B: 'bbbbbbbb' });
-    // B has only 2 maps, so only A qualifies: 6 of 8 maps → 1.5 h, 1500 chaos → 7.5 div.
-    expect(result).toEqual([{ communityId: 'aaaaaaaa', strategyName: 'Strategy A', payload: { maps: 6, hours: 1.5, netDivine: 7.5 } }]);
+    // 2 h, 2000 chaos → 10 div.
+    expect(result).toEqual([{ communityId: 'aaaaaaaa', strategyName: 'Strategy A', payload: { maps: 6, hours: 2, netDivine: 10 } }]);
+  });
+
+  it('offers nothing when the run spans more than one strategy', () => {
+    const maps = [...['1', '2', '3', '4', '5', '6'].map((i) => map(i)), map('7', 'B'), map('8', 'B')];
+    expect(shareCandidates(run(maps), [strategy('A'), strategy('B')], { A: 'aaaaaaaa', B: 'bbbbbbbb' })).toEqual([]);
   });
 
   it('skips strategies that are not linked', () => {

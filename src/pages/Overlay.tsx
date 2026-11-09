@@ -65,8 +65,9 @@ function ShareCard({ candidate, onDone }: { candidate: ShareCandidate; onDone: (
   if (state === 'duplicate') return <p data-tauri-drag-region className="text-poe-text-dim">Already shared today for this strategy</p>;
   return (
     <>
+      <p data-tauri-drag-region className="truncate text-poe-gold">{candidate.strategyName}</p>
       <p data-tauri-drag-region className="text-poe-gold">
-        {candidate.strategyName}: {maps} maps · {(netDivine / hours).toFixed(1)} div/hr — share to community?
+        {maps} maps · {(netDivine / hours).toFixed(1)} div/hr — share to community?
       </p>
       {firstTime && <p data-tauri-drag-region className="text-poe-text-muted">Only map count, time and profit are sent. Anonymous.</p>}
       {typeof state === 'object' && <p data-tauri-drag-region className="text-red-400">{state.error}</p>}
@@ -82,7 +83,7 @@ function ShareCard({ candidate, onDone }: { candidate: ShareCandidate; onDone: (
 
 export function Overlay() {
   const tracker = useTrackerState();
-  const { data: strategies } = useStrategies();
+  const { data: strategies, refetch: refetchStrategies } = useStrategies();
   const { data: configs } = useSnapshotConfigs();
   const [strategyId, setStrategyId] = useState<string | null>(() => storage.get(LAST_STRATEGY_KEY));
   const [error, setError] = useState<{ message: string; retry: Action } | null>(null);
@@ -129,10 +130,12 @@ export function Overlay() {
       } else {
         const stoppedId = run?.id;
         await ipc.stopTrackingRun(false);
-        if (stoppedId && strategies) {
+        if (stoppedId) {
           try {
+            // The overlay's query cache is never invalidated, so read the strategies fresh.
+            const fresh = (await refetchStrategies()).data;
             const stopped = (await ipc.getTrackingHistory()).find((r) => r.id === stoppedId);
-            if (stopped) setShares(await findShareCandidates(stopped, strategies));
+            if (stopped && fresh) setShares(await findShareCandidates(stopped, fresh));
           } catch {
             // Sharing is optional; a lookup failure must not show up as a stop error.
           }
@@ -194,7 +197,7 @@ export function Overlay() {
       </>
     );
   } else if (shares.length > 0) {
-    body = <ShareCard key={shares[0].communityId} candidate={shares[0]} onDone={() => setShares((s) => s.slice(1))} />;
+    body = <ShareCard key={shares.length} candidate={shares[0]} onDone={() => setShares((s) => s.slice(1))} />;
   } else if (tracker.suggestTracking) {
     body = !strategies?.length ? (
       <p data-tauri-drag-region>Save a strategy first to track maps.</p>
