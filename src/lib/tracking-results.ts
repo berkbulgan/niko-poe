@@ -88,3 +88,19 @@ export function strategyResults(
     },
   };
 }
+
+/** Fewest maps a run needs before its result is worth sharing (the server enforces the same floor). */
+export const MIN_SHARED_MAPS = 5;
+
+export interface ResultPayload {
+  maps: number;
+  hours: number;
+  netDivine: number;
+}
+
+/** The anonymous aggregate sent to the community, or null when the row is too short or not fully measured. */
+export function resultPayload(row: RunResult): ResultPayload | null {
+  if (row.maps < MIN_SHARED_MAPS || row.hours === null || row.net === null) return null;
+  if (row.divineRate === null || row.divineRate <= 0) return null;
+  return { maps: row.maps, hours: row.hours, netDivine: row.net / row.divineRate };
+}

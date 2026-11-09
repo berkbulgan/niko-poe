@@ -34,6 +34,11 @@ const FALLBACK_LEAGUES: League[] = [
   { id: 'Hardcore', text: 'Hardcore' },
 ];
 
+/** The selected league for windows without LeagueProvider (the overlay); the default league until one is picked. */
+export function storedLeagueId(): string {
+  return storage.get(LEAGUE_STORAGE_KEY) ?? FALLBACK_LEAGUES[0].id;
+}
+
 export function LeagueProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [pricesLoading, setPricesLoading] = useState(true);
