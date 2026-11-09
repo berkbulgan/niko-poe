@@ -89,7 +89,8 @@ export function AppLayout() {
         {/* Logo + collapse toggle */}
         <div className="flex h-14 items-center justify-between border-b border-poe-border/30 px-3">
           {!collapsed && (
-            <Link to="/dashboard" className="font-display text-sm tracking-[0.25em] text-poe-gold">
+            <Link to="/dashboard" className="flex items-center gap-2 font-display text-sm tracking-[0.25em] text-poe-gold">
+              <img src="/logo.png" alt="" className="h-6 w-6" />
               N.I.K.O.
             </Link>
           )}
