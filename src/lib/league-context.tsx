@@ -1,5 +1,5 @@
 // ABOUTME: League selection context — provides current league and league switching.
-// ABOUTME: Hardcoded to the 4 leagues supported by poe.ninja. Fetches prices on league change.
+// ABOUTME: Leagues come from poe.ninja (a built-in list until it answers or if it fails). Fetches prices on league change.
 
 import {
   createContext,
@@ -9,8 +9,8 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { fetchAllPrices } from '@/lib/ipc';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchAllPrices, getPriceLeagues } from '@/lib/ipc';
 import type { League } from '@/types/index';
 import { storage } from '@/lib/platform';
 
@@ -25,10 +25,9 @@ interface LeagueContextValue {
 const LeagueContext = createContext<LeagueContextValue | null>(null);
 
 const LEAGUE_STORAGE_KEY = 'niko_league';
-const DEFAULT_LEAGUE = 'Allflame';
 
-// poe.ninja only supports these 4 leagues — updated manually each league launch.
-const LEAGUES: League[] = [
+// Used until poe.ninja's league list arrives, or when it can't be reached. First entry is the default.
+const FALLBACK_LEAGUES: League[] = [
   { id: 'Allflame', text: 'Allflame' },
   { id: 'Hardcore Allflame', text: 'Hardcore Allflame' },
   { id: 'Standard', text: 'Standard' },
@@ -39,18 +38,23 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [pricesLoading, setPricesLoading] = useState(true);
 
-  const [currentLeague, setCurrentLeague] = useState(() => {
-    const stored = storage.get(LEAGUE_STORAGE_KEY);
-    if (stored && LEAGUES.some((l) => l.id === stored)) {
-      return stored;
-    }
-    return DEFAULT_LEAGUE;
+  const { data: ninjaLeagues, isPending: leaguesPending } = useQuery({
+    queryKey: ['price-leagues'],
+    queryFn: getPriceLeagues,
+    staleTime: Infinity,
+    retry: 1,
   });
+  const leagues = ninjaLeagues?.length ? ninjaLeagues : FALLBACK_LEAGUES;
+
+  // A stored league that poe.ninja no longer lists (e.g. last league) falls back to the current one.
+  const [storedLeague, setStoredLeague] = useState(() => storage.get(LEAGUE_STORAGE_KEY));
+  const currentLeague = storedLeague && leagues.some((l) => l.id === storedLeague) ? storedLeague : leagues[0].id;
 
   // Fetch poe.ninja prices whenever the active league changes.
   // Sets pricesLoading=true before fetch, false after + invalidates queries.
+  // Waits for the league list so a stale built-in list never triggers a fetch for the wrong league.
   useEffect(() => {
-    if (!currentLeague) return;
+    if (leaguesPending) return;
 
     let cancelled = false;
     setPricesLoading(true);
@@ -69,19 +73,19 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
       });
 
     return () => { cancelled = true; };
-  }, [currentLeague, queryClient]);
+  }, [currentLeague, leaguesPending, queryClient]);
 
   const setLeague = useCallback((id: string) => {
-    setCurrentLeague(id);
+    setStoredLeague(id);
     storage.set(LEAGUE_STORAGE_KEY, id);
   }, []);
 
   const value = useMemo<LeagueContextValue>(() => ({
-    leagues: LEAGUES,
+    leagues,
     currentLeague,
     setLeague,
     pricesLoading,
-  }), [currentLeague, setLeague, pricesLoading]);
+  }), [leagues, currentLeague, setLeague, pricesLoading]);
 
   return (
     <LeagueContext.Provider value={value}>

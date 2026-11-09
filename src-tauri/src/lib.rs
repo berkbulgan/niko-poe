@@ -26,7 +26,10 @@ use commands::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
         update_filter_preset,
     },
-    prices::{fetch_all_prices, get_prices, is_prices_loading, lookup_item_prices, lookup_item_prices_advanced},
+    prices::{
+        fetch_all_prices, get_price_leagues, get_prices, is_prices_loading, lookup_item_prices,
+        lookup_item_prices_advanced,
+    },
     regex_filters::{
         create_regex_filter, delete_regex_filter, get_regex_filter, get_regex_filters,
         update_regex_filter,
@@ -169,6 +172,7 @@ pub fn run() {
             lookup_item_prices_advanced,
             fetch_all_prices,
             is_prices_loading,
+            get_price_leagues,
             // auth (Phase 4)
             start_oauth_login,
             get_ggg_profile,
