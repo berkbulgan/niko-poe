@@ -3,7 +3,7 @@
 
 use niko_community_api::{
     ApiErrorBody, FavouriteResponse, ListQuery, ListResponse, PublishRequest, PublishResponse, ReportRequest,
-    StrategyDetail, TagCount,
+    StrategyDetail, SubmitResultRequest, TagCount,
 };
 use reqwest::{Method, RequestBuilder};
 use serde::de::DeserializeOwned;
@@ -125,6 +125,46 @@ pub async fn community_report(state: State<'_, AppState>, id: String, reason: St
     Ok(())
 }
 
+/// 2xx = stored, 409 = this install already shared a result for the strategy today.
+fn submit_outcome(status: u16, body: &str) -> Result<bool> {
+    match status {
+        200..=299 => Ok(true),
+        409 => Ok(false),
+        _ => Err(map_status(status, body)),
+    }
+}
+
+#[tauri::command]
+pub async fn community_submit_result(
+    state: State<'_, AppState>,
+    id: String,
+    install_id: String,
+    league: String,
+    maps: i32,
+    hours: f64,
+    net_divine: f64,
+) -> Result<bool> {
+    let body = SubmitResultRequest {
+        install_id,
+        league,
+        maps,
+        hours,
+        net_divine,
+        app_version: env!("CARGO_PKG_VERSION").into(),
+    }
+    .normalize()
+    .map_err(validation)?;
+    let response = request(&state, Method::POST, &format!("{}/results", id_path(&id)?))
+        .await?
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| Error::Network(format!("community server unreachable: {e}")))?;
+    let status = response.status().as_u16();
+    let text = response.text().await.unwrap_or_default();
+    submit_outcome(status, &text)
+}
+
 /// Overrides the server URL for this run; `None` (or blank) restores the built-in default.
 #[tauri::command]
 pub async fn set_community_base_url(state: State<'_, AppState>, url: Option<String>) -> Result<Option<String>> {
@@ -157,6 +197,14 @@ mod tests {
         let query = ListQuery { tag: Some(" Delirium ".into()), sort: niko_community_api::Sort::Favourites, ..Default::default() };
         let req = reqwest::Client::new().get("http://x/v1/strategies").query(&query.normalize()).build().unwrap();
         assert_eq!(req.url().query(), Some("tag=delirium&sort=favourites&page=1&limit=20"));
+    }
+
+    #[test]
+    fn submit_outcome_treats_conflict_as_already_shared() {
+        assert!(matches!(submit_outcome(201, ""), Ok(true)));
+        assert!(matches!(submit_outcome(409, r#"{"error":"conflict","message":"x"}"#), Ok(false)));
+        assert!(matches!(submit_outcome(400, r#"{"error":"validation","message":"bad"}"#), Err(Error::Validation(m)) if m == "bad"));
+        assert!(matches!(submit_outcome(500, ""), Err(Error::Network(_))));
     }
 
     #[test]
