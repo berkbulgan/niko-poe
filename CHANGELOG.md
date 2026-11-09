@@ -2,6 +2,15 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.6.1] - 2026-11-09
+
+### Changed
+- Prices and the league list are fetched through the N.I.K.O. community server (cached), falling back to poe.ninja directly if it can't be reached
+- The league list now comes from poe.ninja, so new leagues show up without an app update
+
+### Fixed
+- Trade requests send the proper GGG User-Agent
+
 ## [0.6.0] - 2026-11-02
 
 ### Added
