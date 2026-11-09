@@ -4,10 +4,12 @@
 use std::collections::HashMap;
 use tauri::State;
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::state::{AppState, NinjaPrice};
 
 const NINJA_BASE: &str = "https://poe.ninja/poe1/api/economy";
+/// Short, so a down community server costs little before each request falls back to poe.ninja.
+const PROXY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(8);
 /// poe.ninja asks API clients for a User-Agent that names the app and a contact.
 const NINJA_USER_AGENT: &str =
     concat!("N.I.K.O./", env!("CARGO_PKG_VERSION"), " (+https://github.com/berkbulgan/niko-poe)");
@@ -80,19 +82,18 @@ pub async fn fetch_all_prices(
         cache.loading_league = Some(league.clone());
     }
 
-    let client = &state.http_client;
+    let mut use_proxy = true;
     let mut all_prices: HashMap<String, Vec<NinjaPrice>> = HashMap::new();
 
     // Fetch currency exchange overviews
     for exchange_type in EXCHANGE_TYPES {
-        let url = format!(
-            "{}/exchange/current/overview?league={}&type={}",
-            NINJA_BASE,
+        let path = format!(
+            "exchange/current/overview?league={}&type={}",
             urlencoding::encode(&league),
             exchange_type,
         );
 
-        match fetch_exchange_overview(client, &url, exchange_type).await {
+        match ninja_get(&state, &path, &mut use_proxy).await.map(|raw| parse_exchange_overview(&raw, exchange_type)) {
             Ok(prices) => {
                 for price in prices {
                     let key = price.name.to_lowercase();
@@ -107,14 +108,13 @@ pub async fn fetch_all_prices(
 
     // Fetch item overviews
     for item_type in ITEM_TYPES {
-        let url = format!(
-            "{}/stash/current/item/overview?league={}&type={}",
-            NINJA_BASE,
+        let path = format!(
+            "stash/current/item/overview?league={}&type={}",
             urlencoding::encode(&league),
             item_type,
         );
 
-        match fetch_item_overview(client, &url, item_type).await {
+        match ninja_get(&state, &path, &mut use_proxy).await.map(|raw| parse_item_overview(&raw, item_type)) {
             Ok(prices) => {
                 for price in prices {
                     let key = price.name.to_lowercase();
@@ -378,25 +378,59 @@ fn find_best_match<'a>(entries: &'a [NinjaPrice], item: &AdvancedLookupItem) -> 
     }
 }
 
-/// Fetch a currency exchange overview from poe.ninja and convert to NinjaPrice entries.
-async fn fetch_exchange_overview(
-    client: &reqwest::Client,
-    url: &str,
-    category: &str,
-) -> std::result::Result<Vec<NinjaPrice>, String> {
-    let resp = client
-        .get(url)
-        .header("User-Agent", NINJA_USER_AGENT)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
+/// GETs a poe.ninja economy path (`<endpoint>?<query>`), through the community server's caching proxy when one
+/// is configured (poe.ninja asks apps to proxy), falling back to poe.ninja directly if the server fails.
+/// A failure clears `use_proxy`, so the rest of a batch skips a server that is down.
+async fn ninja_get(
+    state: &AppState,
+    path: &str,
+    use_proxy: &mut bool,
+) -> std::result::Result<serde_json::Value, String> {
+    let proxy_base = state.community_base_url.lock().await.clone().filter(|_| *use_proxy);
+    if let Some(base) = proxy_base {
+        let req = state.http_client.get(format!("{base}/v1/ninja/{path}")).timeout(PROXY_TIMEOUT);
+        match get_json(req).await {
+            Ok(raw) => return Ok(raw),
+            Err(e) => {
+                eprintln!("poe.ninja proxy failed for {path}, going direct: {e}");
+                *use_proxy = false;
+            }
+        }
+    }
+    get_json(state.http_client.get(format!("{NINJA_BASE}/{path}")).header("User-Agent", NINJA_USER_AGENT)).await
+}
 
+async fn get_json(req: reqwest::RequestBuilder) -> std::result::Result<serde_json::Value, String> {
+    let resp = req.send().await.map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
     }
+    resp.json().await.map_err(|e| e.to_string())
+}
 
-    let raw: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-    Ok(parse_exchange_overview(&raw, category))
+/// Leagues poe.ninja has prices for, current challenge league first.
+#[tauri::command]
+pub async fn get_price_leagues(state: State<'_, AppState>) -> Result<Vec<PriceLeague>> {
+    let raw = ninja_get(&state, "leagues", &mut true).await.map_err(Error::Network)?;
+    Ok(parse_leagues(&raw))
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PriceLeague {
+    pub id: String,
+    pub text: String,
+}
+
+fn parse_leagues(raw: &serde_json::Value) -> Vec<PriceLeague> {
+    raw.as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|l| {
+            let id = l["id"].as_str()?.to_string();
+            let text = l["name"].as_str().unwrap_or(&id).to_string();
+            Some(PriceLeague { id, text })
+        })
+        .collect()
 }
 
 /// Exchange overviews list prices (`lines`, chaos value in `primaryValue`) and names/icons (`items`) by id.
@@ -471,25 +505,8 @@ fn chaos_orb(icon: String) -> NinjaPrice {
     }
 }
 
-/// Fetch an item overview from poe.ninja and convert to NinjaPrice entries.
-async fn fetch_item_overview(
-    client: &reqwest::Client,
-    url: &str,
-    category: &str,
-) -> std::result::Result<Vec<NinjaPrice>, String> {
-    let resp = client
-        .get(url)
-        .header("User-Agent", NINJA_USER_AGENT)
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status()));
-    }
-
-    let raw: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-
+/// Converts a poe.ninja item overview to NinjaPrice entries.
+fn parse_item_overview(raw: &serde_json::Value, category: &str) -> Vec<NinjaPrice> {
     let lines = raw
         .get("lines")
         .and_then(|v| v.as_array())
@@ -539,12 +556,19 @@ async fn fetch_item_overview(
         });
     }
 
-    Ok(prices)
+    prices
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn leagues_keep_order_and_fall_back_to_id_for_text() {
+        let raw = serde_json::json!([{ "id": "Allflame", "name": "Allflame" }, { "id": "Standard" }, { "name": "x" }]);
+        let leagues: Vec<_> = parse_leagues(&raw).into_iter().map(|l| (l.id, l.text)).collect();
+        assert_eq!(leagues, [("Allflame".into(), "Allflame".into()), ("Standard".into(), "Standard".into())]);
+    }
 
     fn gem(level: i32, quality: Option<i32>, corrupted: Option<bool>, value: f64) -> NinjaPrice {
         NinjaPrice {

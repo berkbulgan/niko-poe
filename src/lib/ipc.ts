@@ -184,6 +184,11 @@ export function fetchAllPrices(league: string): Promise<number> {
   return invoke<number>('fetch_all_prices', { league });
 }
 
+/** Leagues poe.ninja has prices for, current challenge league first. */
+export function getPriceLeagues(): Promise<League[]> {
+  return invoke<League[]>('get_price_leagues');
+}
+
 export interface PriceLookupEntry {
   chaosValue: number;
   icon: string;
