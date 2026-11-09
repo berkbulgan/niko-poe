@@ -52,3 +52,36 @@ describe('favourites', () => {
     expect(lib.isFavourited('abcdEFGH')).toBe(false);
   });
 });
+
+describe('linkedCommunityId', () => {
+  it('uses a published record whose hash matches', () => {
+    lib.setPublished('s1', { communityId: 'aZ09bC12', token: 't', hash: 'h1' });
+    expect(lib.linkedCommunityId('s1', 'h1')).toBe('aZ09bC12');
+    expect(lib.linkedCommunityId('s1', 'changed')).toBeNull();
+  });
+
+  it('uses an import link whose hash matches', () => {
+    lib.setLinked('s2', { communityId: 'bbbbbbbb', hash: 'h2' });
+    expect(lib.linkedCommunityId('s2', 'h2')).toBe('bbbbbbbb');
+    expect(lib.linkedCommunityId('s2', 'other')).toBeNull();
+    lib.setLinked('s2', null);
+    expect(lib.linkedCommunityId('s2', 'h2')).toBeNull();
+  });
+
+  it('treats published records without a hash as unlinked', () => {
+    lib.setPublished('s3', { communityId: 'cccccccc', token: 't' });
+    expect(lib.linkedCommunityId('s3', 'anything')).toBeNull();
+  });
+
+  it('returns null without any record', () => {
+    expect(lib.linkedCommunityId('nope', 'h')).toBeNull();
+  });
+});
+
+describe('getInstallId', () => {
+  it('creates the id once and reuses it', () => {
+    const id = lib.getInstallId();
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(lib.getInstallId()).toBe(id);
+  });
+});

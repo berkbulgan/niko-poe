@@ -81,7 +81,7 @@ export function StrategyDetailPanel({ id }: { id: string }) {
   const favourited = isFavourited(detail.id);
 
   function handleImport() {
-    importEntity.mutate({ code: detail!.shareCode }, {
+    importEntity.mutate({ code: detail!.shareCode, communityId: detail!.id }, {
       onSuccess: () => toast.success(`Imported "${detail!.name}" into Strategies`),
     });
   }
