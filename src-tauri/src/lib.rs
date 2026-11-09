@@ -91,7 +91,7 @@ pub fn run() {
                 tauri::async_runtime::block_on(commands::tracking::load_tracker(app.handle(), &pool));
 
             let http_client = reqwest::Client::builder()
-                .user_agent("NIKO-TradeHelper/0.1.0")
+                .user_agent(commands::auth::USER_AGENT)
                 .build()
                 .expect("failed to build HTTP client");
 

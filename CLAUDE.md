@@ -29,7 +29,7 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 
 ### Frontend (`src/`)
 
-- **`lib/ipc.ts`** — THE single point of Tauri IPC contact. Every `invoke()` call lives here. 34 typed wrappers for all Rust commands.
+- **`lib/ipc.ts`** — THE single point of Tauri IPC contact. Every `invoke()` call lives here, one typed wrapper per Rust command.
 - **`lib/platform.ts`** — Abstracts browser APIs (storage, clipboard, external links). No raw `window.*` or `localStorage` calls should exist outside this file.
 - **`lib/auth-context.tsx`** — GGG OAuth state. App works fully without login; OAuth unlocks stash features only.
 - **`lib/league-context.tsx`** — Active PoE league selection, persisted via platform.storage.
@@ -60,7 +60,7 @@ GGG's official `data.json` export from [atlastree-export](https://github.com/gri
 
 - **`lib.rs`** — Tauri builder, plugin registration, all commands registered in one `generate_handler!` call.
 - **`state.rs`** — `AppState` singleton: SQLite pool, HTTP client, rate limiter, price/league/stat caches (Arc<Mutex<T>>), GGG token state.
-- **`commands/`** — 8 modules, 32 commands total. CRUD for 4 entities + trade + prices + auth + stash.
+- **`commands/`** — One module per domain: CRUD for 4 entities + trade + prices + auth + stash + sharing + snapshots + tracking + community.
 - **`db/migrations.rs`** — 6 versioned SQLite migrations. Append-only, no down migrations.
 - **`client_log.rs`** — Pure `Client.txt` parsing: area lines → map started/resumed/left events, plus a file tail. Unit tested.
 - **`commands/tracking.rs`** — Map tracking: 1 s log watcher task, `Tracker` state in `AppState`, run/map commands, `tracker-state` event, overlay show/hide.
@@ -123,7 +123,4 @@ feature branch → PR → dev → PR (with semver label) → main → auto tag +
 
 ## Placeholders That Need Real Values
 
-- `NIKO_CLIENT_ID` in `src-tauri/src/commands/auth.rs` — GGG OAuth client ID
-- `REPLACE_WITH_PUBLIC_KEY_FROM_KEYGEN_SCRIPT` in `tauri.conf.json` — updater signing pubkey
-- `YOUR_GITHUB_USERNAME` in `.github/workflows/release.yml`
 - `src-tauri/icons/` — placeholder icons, need real 1024x1024 source PNG

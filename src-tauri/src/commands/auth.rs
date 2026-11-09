@@ -14,10 +14,7 @@ use tokio::sync::Mutex;
 use crate::error::{Error, Result};
 use crate::state::{AppState, GggTokenState};
 
-// NOTE: CLIENT_ID is a placeholder constant. In production this will be injected
-// via a build-time environment variable (e.g. NIKO_GGG_CLIENT_ID). GGG requires
-// you register your app at https://www.pathofexile.com/developer/docs/authorization
-// before receiving a real client_id.
+// Registered public (PKCE) client id from https://www.pathofexile.com/developer/docs/authorization.
 const GGG_CLIENT_ID: &str = "niko";
 
 const GGG_AUTH_URL: &str = "https://www.pathofexile.com/oauth/authorize";

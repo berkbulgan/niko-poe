@@ -5,11 +5,11 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use crate::commands::auth::USER_AGENT;
 use crate::error::{Error, Result};
 use crate::state::{AppState, League, TradeStat};
 
 const BASE_URL: &str = "https://www.pathofexile.com/api/trade";
-const USER_AGENT: &str = "NIKO-TradeHelper/0.1.0";
 
 // ---- Fallback stat definitions (subset of GGG stats for offline/error resilience) ----
 
