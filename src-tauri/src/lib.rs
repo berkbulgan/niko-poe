@@ -20,7 +20,7 @@ use commands::{
     auth::{get_ggg_profile, logout_ggg, refresh_ggg_token, start_oauth_login},
     community::{
         community_delete, community_favourite, community_get, community_list, community_publish,
-        community_report, community_tags, community_update, set_community_base_url,
+        community_report, community_submit_result, community_tags, community_update, set_community_base_url,
     },
     filter_presets::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
@@ -216,6 +216,7 @@ pub fn run() {
             community_delete,
             community_favourite,
             community_report,
+            community_submit_result,
             set_community_base_url,
         ])
         .run(tauri::generate_context!())

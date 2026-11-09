@@ -3,7 +3,16 @@
 
 export type Budget = 'low' | 'medium' | 'high';
 export type Difficulty = 'easy' | 'medium' | 'hard';
-export type CommunitySort = 'new' | 'favourites';
+export type CommunitySort = 'new' | 'favourites' | 'profit';
+
+/** Medians over measured results in the strategy's league; null below 3 results. */
+export interface StrategyStats {
+  runs: number;
+  players: number;
+  medianDivPerHour: number;
+  medianMapsPerHour: number;
+  medianProfitPerMap: number;
+}
 
 export interface PublishRequest {
   name: string;
@@ -36,6 +45,7 @@ export interface StrategySummary {
   favouriteCount: number;
   createdAt: string;
   updatedAt: string;
+  stats: StrategyStats | null;
 }
 
 export interface StrategyDetail extends StrategySummary {

@@ -276,6 +276,19 @@ export function communityReport(id: string, reason: string): Promise<void> {
   return invoke<void>('community_report', { id, reason });
 }
 
+export interface ResultSubmission {
+  installId: string;
+  league: string;
+  maps: number;
+  hours: number;
+  netDivine: number;
+}
+
+/** Resolves true when stored, false when this install already shared a result for the strategy today. */
+export function communitySubmitResult(id: string, result: ResultSubmission): Promise<boolean> {
+  return invoke<boolean>('community_submit_result', { id, ...result });
+}
+
 /** Sets the server URL override (null restores the built-in default). Returns the URL now in use. */
 export function setCommunityBaseUrl(url: string | null): Promise<string | null> {
   return invoke<string | null>('set_community_base_url', { url });

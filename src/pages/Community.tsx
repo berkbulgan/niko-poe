@@ -74,6 +74,7 @@ export function Community() {
             <select className={selectClass} value={sort} onChange={(e) => filter(() => setSort(e.target.value as CommunitySort))} aria-label="Sort">
               <option value="new">Newest</option>
               <option value="favourites">Most favourited</option>
+              <option value="profit">Most profitable</option>
             </select>
           </div>
           {tags.data && tags.data.length > 0 && (
@@ -124,6 +125,11 @@ export function Community() {
                     <p className="mt-0.5 truncate text-[11px] capitalize text-poe-text-muted">
                       {[s.authorName, s.league, `${s.budget} budget`, s.difficulty, ...s.tags].filter(Boolean).join(' · ')}
                     </p>
+                    {s.stats && (
+                      <p className="mt-0.5 text-[11px] tabular-nums text-poe-gold">
+                        {s.stats.medianDivPerHour.toFixed(1)} div/hr · {s.stats.runs} runs · {s.stats.players} players
+                      </p>
+                    )}
                   </button>
                 </li>
               ))}

@@ -10,6 +10,8 @@ import {
   setPublished,
   setServerUrlOverride,
 } from '@/lib/community-storage';
+import { strategyHash } from '@/lib/result-sharing';
+import type { StrategyConfig } from '@/types/strategies';
 import type { ListQuery, PublishRequest } from '@/types/community';
 
 const COMMUNITY_KEY = ['community'] as const;
@@ -77,20 +79,22 @@ export function useCommunityTags(league: string | null, enabled: boolean) {
 /** Publishes a local strategy, or updates it when this install published it before. Returns the community id. */
 export function useSavePublished() {
   const queryClient = useQueryClient();
-  return useMutation<string, Error, { strategyId: string; request: PublishRequest }>({
+  return useMutation<string, Error, { strategyId: string; config: StrategyConfig; request: PublishRequest }>({
     meta: { inlineError: true },
-    mutationFn: async ({ strategyId, request }) => {
+    mutationFn: async ({ strategyId, config, request }) => {
+      const hash = await strategyHash(config);
       const existing = getPublished(strategyId);
       if (existing) {
         try {
           await ipc.communityUpdate(existing.communityId, existing.token, request);
+          setPublished(strategyId, { ...existing, hash });
           return existing.communityId;
         } catch (err) {
           if (!isGone(err)) throw err;
         }
       }
       const created = await ipc.communityPublish(request);
-      setPublished(strategyId, { communityId: created.id, token: created.editToken });
+      setPublished(strategyId, { communityId: created.id, token: created.editToken, hash });
       return created.id;
     },
     onSettled: () => { void queryClient.invalidateQueries({ queryKey: COMMUNITY_KEY }); },

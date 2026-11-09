@@ -5,16 +5,20 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { getInstallId } from '@/lib/community-storage';
 import { useSnapshotConfigs } from '@/lib/hooks/use-snapshots';
 import { useStrategies } from '@/lib/hooks/use-strategies';
 import { useTrackerState } from '@/lib/hooks/use-tracking';
 import * as ipc from '@/lib/ipc';
+import { storedLeagueId } from '@/lib/league-context';
 import { storage } from '@/lib/platform';
+import { findShareCandidates, type ShareCandidate } from '@/lib/result-sharing';
 import type { SnapshotConfig } from '@/types/snapshots';
 
 const POS_KEY = 'niko_overlay_pos';
 const LAST_STRATEGY_KEY = 'niko_last_tracking_strategy';
 const LAST_CONFIG_KEY = 'niko_last_tracking_config';
+const EXPLAINED_KEY = 'niko_results_explained';
 
 type Action = { kind: 'start' } | { kind: 'stop' } | { kind: 'switch'; strategyId: string };
 
@@ -34,13 +38,57 @@ function elapsed(startedAt: string, now: number): string {
   return `${Math.floor(mins / 60)}:${String(mins % 60).padStart(2, '0')}`;
 }
 
+type ShareState = 'idle' | 'sending' | 'shared' | 'duplicate' | { error: string };
+
+function ShareCard({ candidate, onDone }: { candidate: ShareCandidate; onDone: () => void }) {
+  const [state, setState] = useState<ShareState>('idle');
+  const [firstTime] = useState(() => storage.get(EXPLAINED_KEY) === null);
+  const { maps, hours, netDivine } = candidate.payload;
+
+  async function share() {
+    setState('sending');
+    storage.set(EXPLAINED_KEY, '1');
+    try {
+      const stored = await ipc.communitySubmitResult(candidate.communityId, {
+        installId: getInstallId(),
+        league: storedLeagueId(),
+        ...candidate.payload,
+      });
+      setState(stored ? 'shared' : 'duplicate');
+      setTimeout(onDone, 2500);
+    } catch (err) {
+      setState({ error: ipc.toError(err).message });
+    }
+  }
+
+  if (state === 'shared') return <p data-tauri-drag-region className="text-poe-gold">Shared — thanks!</p>;
+  if (state === 'duplicate') return <p data-tauri-drag-region className="text-poe-text-dim">Already shared today for this strategy</p>;
+  return (
+    <>
+      <p data-tauri-drag-region className="truncate text-poe-gold">{candidate.strategyName}</p>
+      <p data-tauri-drag-region className="text-poe-gold">
+        {maps} maps · {(netDivine / hours).toFixed(1)} div/hr — share to community?
+      </p>
+      {firstTime && <p data-tauri-drag-region className="text-poe-text-muted">Only map count, time and profit are sent. Anonymous.</p>}
+      {typeof state === 'object' && <p data-tauri-drag-region className="text-red-400">{state.error}</p>}
+      <div className="mt-1 flex gap-1">
+        <Button size="sm" onClick={() => void share()} disabled={state === 'sending'}>
+          {typeof state === 'object' ? 'Retry' : 'Share'}
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onDone} disabled={state === 'sending'}>No</Button>
+      </div>
+    </>
+  );
+}
+
 export function Overlay() {
   const tracker = useTrackerState();
-  const { data: strategies } = useStrategies();
+  const { data: strategies, refetch: refetchStrategies } = useStrategies();
   const { data: configs } = useSnapshotConfigs();
   const [strategyId, setStrategyId] = useState<string | null>(() => storage.get(LAST_STRATEGY_KEY));
   const [error, setError] = useState<{ message: string; retry: Action } | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [shares, setShares] = useState<ShareCandidate[]>([]);
 
   useEffect(() => {
     const unlisten = ipc.persistOverlayPosition(
@@ -80,7 +128,18 @@ export function Overlay() {
         storage.set(LAST_STRATEGY_KEY, action.strategyId);
         await ipc.switchTrackingStrategy(action.strategyId);
       } else {
+        const stoppedId = run?.id;
         await ipc.stopTrackingRun(false);
+        if (stoppedId) {
+          try {
+            // The overlay's query cache is never invalidated, so read the strategies fresh.
+            const fresh = (await refetchStrategies()).data;
+            const stopped = (await ipc.getTrackingHistory()).find((r) => r.id === stoppedId);
+            if (stopped && fresh) setShares(await findShareCandidates(stopped, fresh));
+          } catch {
+            // Sharing is optional; a lookup failure must not show up as a stop error.
+          }
+        }
       }
     } catch (err) {
       setError({ message: ipc.toError(err).message, retry: action });
@@ -137,6 +196,8 @@ export function Overlay() {
         <p data-tauri-drag-region className="text-poe-text-muted">Stash your loot before stopping.</p>
       </>
     );
+  } else if (shares.length > 0) {
+    body = <ShareCard key={shares.length} candidate={shares[0]} onDone={() => setShares((s) => s.slice(1))} />;
   } else if (tracker.suggestTracking) {
     body = !strategies?.length ? (
       <p data-tauri-drag-region>Save a strategy first to track maps.</p>

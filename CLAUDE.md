@@ -120,7 +120,3 @@ feature branch → PR → dev → PR (with semver label) → main → auto tag +
 | `auto-release.yml` | PR with semver label merged to `main` | Version bump → commit → tag push → merge `main` back into `dev` |
 | `release.yml` | Tag push (`v*.*.*`) | Tauri build → NSIS installer → GitHub Release (published) |
 | `data-sync.yml` | Daily 06:00 UTC + manual | Pulls atlas/regex data → PR (label `patch`) → auto-merge when checks pass |
-
-## Placeholders That Need Real Values
-
-- `src-tauri/icons/` — placeholder icons, need real 1024x1024 source PNG

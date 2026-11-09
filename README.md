@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/logo.png" alt="N.I.K.O." width="420"></p>
+
 # N.I.K.O.
 
 **Path of Exile 1 strategy helper & profit tracker** — a native desktop app for map strategy optimization, cost analysis, and stash-based profit tracking.

@@ -90,6 +90,7 @@ export function PublishModal({ strategy, onClose }: PublishModalProps) {
       const shareCode = await exportEntity.mutateAsync({ type: 'S', name: form.name, config: strategy.config });
       const id = await save.mutateAsync({
         strategyId: strategy.id,
+        config: strategy.config,
         request: {
           name: form.name,
           authorName: form.authorName || null,

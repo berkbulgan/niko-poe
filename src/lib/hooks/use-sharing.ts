@@ -3,6 +3,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
+import { setLinked } from '@/lib/community-storage';
 import type { FilterPresetConfig } from '@/types/filters';
 import type { StrategyConfig } from '@/types/strategies';
 import type { AtlasTreeConfig } from '@/types/atlas-tree';
@@ -153,6 +154,8 @@ export function useExportEntity() {
 
 interface ImportInput {
   code: string;
+  /** Set when the code came from a community strategy, so its results can be shared back. */
+  communityId?: string;
 }
 
 export function useImportEntity() {
@@ -160,7 +163,7 @@ export function useImportEntity() {
 
   return useMutation<ImportResult, Error, ImportInput>({
     meta: { inlineError: true },
-    mutationFn: async ({ code }) => {
+    mutationFn: async ({ code, communityId }) => {
       let shareCode = code.trim();
 
       // If it's a pastebin URL, fetch the raw content first.
@@ -181,7 +184,13 @@ export function useImportEntity() {
       }
 
       if (entityType === 'S') {
-        return importStrategyBundle(parsedPayload as StrategyBundlePayload);
+        const result = await importStrategyBundle(parsedPayload as StrategyBundlePayload);
+        const strategyId = result.createdIds.strategyId;
+        if (communityId && strategyId) {
+          const created = await ipc.getStrategy(strategyId);
+          setLinked(strategyId, { communityId, hash: await ipc.contentHash(created.config) });
+        }
+        return result;
       }
 
       throw new Error(`Unknown entity type: ${entityType}`);

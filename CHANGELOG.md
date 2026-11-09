@@ -2,6 +2,13 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0] - 2026-11-09
+
+### Added
+- **Measured community results** — After you stop a tracked run, the overlay offers to share its result (maps, time and profit only, anonymous) with the community strategy you played; strategies imported from the community or published by you qualify while unchanged
+- Community strategies show median div/hr, maps/hr and profit per map from players' shared runs, and can be sorted by "Most profitable"
+- App icon, installer images and logo
+
 ## [0.6.1] - 2026-11-09
 
 ### Changed

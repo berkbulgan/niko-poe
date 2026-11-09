@@ -116,7 +116,7 @@ export function ImportModal({ open, onClose }: ImportModalProps) {
 
   function handleImport() {
     if (!code.trim()) return;
-    importEntity.mutate({ code: communityCode ?? code.trim() }, {
+    importEntity.mutate({ code: communityCode ?? code.trim(), communityId: communityCode ? code.trim() : undefined }, {
       onSuccess: () => {
         onClose();
       },
