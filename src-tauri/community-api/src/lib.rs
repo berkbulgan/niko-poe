@@ -32,6 +32,8 @@ pub enum Sort {
     #[default]
     New,
     Favourites,
+    /// Highest median div/hr first; strategies without stats last.
+    Profit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,6 +163,19 @@ pub struct StrategySummary {
     pub created_at: String,
     /// RFC 3339.
     pub updated_at: String,
+    /// Medians over measured results in the strategy's league; `None` below 3 results.
+    #[serde(default)]
+    pub stats: Option<Stats>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Stats {
+    pub runs: i64,
+    pub players: i64,
+    pub median_div_per_hour: f64,
+    pub median_maps_per_hour: f64,
+    pub median_profit_per_map: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -237,6 +252,45 @@ pub struct ReportRequest {
 impl ReportRequest {
     pub fn normalize(self) -> Result<ReportRequest, ValidationError> {
         Ok(ReportRequest { reason: required_text(&self.reason, "reason", 1, 500)? })
+    }
+}
+
+pub const MIN_RESULT_MAPS: i32 = 5;
+
+/// One measured run, sent anonymously by an install to the strategy it was played with.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitResultRequest {
+    pub install_id: String,
+    pub league: String,
+    pub maps: i32,
+    pub hours: f64,
+    pub net_divine: f64,
+    pub app_version: String,
+}
+
+impl SubmitResultRequest {
+    /// Trims text fields and rejects results that cannot come from a real session.
+    pub fn normalize(self) -> Result<SubmitResultRequest, ValidationError> {
+        let install_id = required_text(&self.install_id, "install id", 1, 36)?;
+        let league = required_text(&self.league, "league", 1, 64)?;
+        let app_version = required_text(&self.app_version, "app version", 1, 32)?;
+        if self.maps < MIN_RESULT_MAPS {
+            return invalid(format!("a result needs at least {MIN_RESULT_MAPS} maps"));
+        }
+        if !self.hours.is_finite() || self.hours <= 0.0 || self.hours > 24.0 {
+            return invalid("hours must be above 0 and at most 24");
+        }
+        if !self.net_divine.is_finite() {
+            return invalid("profit must be a finite number");
+        }
+        if f64::from(self.maps) / self.hours > 60.0 {
+            return invalid("more than 60 maps per hour is not plausible");
+        }
+        if (self.net_divine / self.hours).abs() > 500.0 {
+            return invalid("more than 500 divine per hour is not plausible");
+        }
+        Ok(SubmitResultRequest { install_id, league, app_version, ..self })
     }
 }
 
@@ -335,5 +389,61 @@ mod tests {
         assert!(is_community_id("aZ09bC12"));
         assert!(!is_community_id("aZ09bC1"));
         assert!(!is_community_id("aZ09-C12"));
+    }
+
+    fn result() -> SubmitResultRequest {
+        SubmitResultRequest {
+            install_id: " 1b4e28ba-2fa1-11d2-883f-0016d3cca427 ".into(),
+            league: " Allflame ".into(),
+            maps: 30,
+            hours: 1.5,
+            net_divine: 6.0,
+            app_version: "0.7.0".into(),
+        }
+    }
+
+    fn result_err(req: SubmitResultRequest) -> String {
+        req.normalize().unwrap_err().0
+    }
+
+    #[test]
+    fn normalizes_valid_result() {
+        let n = result().normalize().unwrap();
+        assert_eq!(n.install_id, "1b4e28ba-2fa1-11d2-883f-0016d3cca427");
+        assert_eq!(n.league, "Allflame");
+        assert_eq!((n.maps, n.hours, n.net_divine), (30, 1.5, 6.0));
+    }
+
+    #[test]
+    fn rejects_implausible_results() {
+        assert!(result_err(SubmitResultRequest { maps: 4, ..result() }).contains("at least 5"));
+        assert!(result_err(SubmitResultRequest { hours: 0.0, ..result() }).contains("hours"));
+        assert!(result_err(SubmitResultRequest { hours: 24.5, ..result() }).contains("hours"));
+        assert!(result_err(SubmitResultRequest { hours: f64::NAN, ..result() }).contains("hours"));
+        assert!(result_err(SubmitResultRequest { maps: 61, hours: 1.0, ..result() }).contains("maps per hour"));
+        assert!(result_err(SubmitResultRequest { net_divine: -501.0, hours: 1.0, ..result() }).contains("divine per hour"));
+        assert!(result_err(SubmitResultRequest { net_divine: f64::INFINITY, ..result() }).contains("profit"));
+        assert!(result_err(SubmitResultRequest { install_id: "x".repeat(37), ..result() }).contains("install id"));
+        assert!(result_err(SubmitResultRequest { league: " ".into(), ..result() }).contains("league"));
+        assert!(result_err(SubmitResultRequest { app_version: "".into(), ..result() }).contains("app version"));
+    }
+
+    #[test]
+    fn result_and_stats_wire_format() {
+        let json = serde_json::to_value(result()).unwrap();
+        assert_eq!(json["installId"], " 1b4e28ba-2fa1-11d2-883f-0016d3cca427 ");
+        assert_eq!(json["netDivine"], 6.0);
+        let q: ListQuery = serde_json::from_str(r#"{"sort":"profit"}"#).unwrap();
+        assert_eq!(q.sort, Sort::Profit);
+        // Servers from before stats existed omit the field.
+        let s: StrategySummary = serde_json::from_value(serde_json::json!({
+            "id": "aZ09bC12", "name": "n", "authorName": null, "league": "l", "patch": null, "tags": [],
+            "budget": "low", "difficulty": "easy", "videoUrl": null, "favouriteCount": 0,
+            "createdAt": "2026-11-09T00:00:00Z", "updatedAt": "2026-11-09T00:00:00Z"
+        }))
+        .unwrap();
+        assert_eq!(s.stats, None);
+        let stats = Stats { runs: 3, players: 2, median_div_per_hour: 4.0, median_maps_per_hour: 20.0, median_profit_per_map: 0.2 };
+        assert_eq!(serde_json::to_value(&stats).unwrap()["medianDivPerHour"], 4.0);
     }
 }
