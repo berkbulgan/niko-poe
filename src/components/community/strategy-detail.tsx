@@ -20,6 +20,7 @@ import { toast } from '@/lib/stores/toast-store';
 import { strategyCostPerMap } from '@/lib/strategy-cost';
 import * as ipc from '@/lib/ipc';
 import type { StrategyConfig } from '@/types/strategies';
+import type { StrategyStats } from '@/types/community';
 
 interface StrategyBundle {
   name: string;
@@ -30,6 +31,30 @@ interface StrategyBundle {
 
 function Chip({ children }: { children: React.ReactNode }) {
   return <span className="rounded bg-poe-panel-light/60 px-1.5 py-0.5 text-[11px] capitalize text-poe-text-dim">{children}</span>;
+}
+
+function MeasuredResults({ stats }: { stats: StrategyStats | null }) {
+  if (!stats) return <p className="text-xs text-poe-text-muted">No measured results yet</p>;
+  const boxes: [string, string][] = [
+    ['Median div/hr', stats.medianDivPerHour.toFixed(1)],
+    ['Median maps/hr', stats.medianMapsPerHour.toFixed(1)],
+    ['Median profit/map', `${stats.medianProfitPerMap.toFixed(2)} div`],
+  ];
+  return (
+    <section>
+      <div className="grid grid-cols-3 gap-3 text-xs">
+        {boxes.map(([label, value]) => (
+          <div key={label} className="border border-poe-border/30 px-3 py-2">
+            <p className="text-poe-text-muted">{label}</p>
+            <p className="mt-1 text-sm tabular-nums text-poe-gold">{value}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-[11px] text-poe-text-muted">
+        From {stats.runs} runs by {stats.players} players
+      </p>
+    </section>
+  );
 }
 
 export function StrategyDetailPanel({ id }: { id: string }) {
@@ -81,7 +106,7 @@ export function StrategyDetailPanel({ id }: { id: string }) {
   const favourited = isFavourited(detail.id);
 
   function handleImport() {
-    importEntity.mutate({ code: detail!.shareCode }, {
+    importEntity.mutate({ code: detail!.shareCode, communityId: detail!.id }, {
       onSuccess: () => toast.success(`Imported "${detail!.name}" into Strategies`),
     });
   }
@@ -157,6 +182,7 @@ export function StrategyDetailPanel({ id }: { id: string }) {
           <p className="mt-1 truncate text-sm text-poe-text">{bundle.data?.atlasTree?.name ?? '—'}</p>
         </div>
       </div>
+      <MeasuredResults stats={detail.stats} />
 
       {detail.videoUrl && (
         <button

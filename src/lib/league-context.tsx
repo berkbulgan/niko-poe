@@ -34,6 +34,11 @@ const FALLBACK_LEAGUES: League[] = [
   { id: 'Hardcore', text: 'Hardcore' },
 ];
 
+/** The selected league for windows without LeagueProvider (the overlay); the default league until one is picked. */
+export function storedLeagueId(): string {
+  return storage.get(LEAGUE_STORAGE_KEY) ?? FALLBACK_LEAGUES[0].id;
+}
+
 export function LeagueProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [pricesLoading, setPricesLoading] = useState(true);
@@ -49,6 +54,13 @@ export function LeagueProvider({ children }: { children: React.ReactNode }) {
   // A stored league that poe.ninja no longer lists (e.g. last league) falls back to the current one.
   const [storedLeague, setStoredLeague] = useState(() => storage.get(LEAGUE_STORAGE_KEY));
   const currentLeague = storedLeague && leagues.some((l) => l.id === storedLeague) ? storedLeague : leagues[0].id;
+
+  // The overlay has no provider and reads storage directly, so keep the resolved league there.
+  useEffect(() => {
+    if (!leaguesPending && storage.get(LEAGUE_STORAGE_KEY) !== currentLeague) {
+      storage.set(LEAGUE_STORAGE_KEY, currentLeague);
+    }
+  }, [leaguesPending, currentLeague]);
 
   // Fetch poe.ninja prices whenever the active league changes.
   // Sets pricesLoading=true before fetch, false after + invalidates queries.
