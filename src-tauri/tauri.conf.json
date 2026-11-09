@@ -60,7 +60,10 @@
         "languages": [
           "English"
         ],
-        "installerHooks": "nsis-hooks.nsh"
+        "installerHooks": "nsis-hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/installer-header.bmp",
+        "sidebarImage": "icons/installer-sidebar.bmp"
       },
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
