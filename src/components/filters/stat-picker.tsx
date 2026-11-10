@@ -139,13 +139,13 @@ function StatFilterInput({
       <label className="mb-1 flex items-center gap-1.5 text-xs text-poe-text-muted">
         <PoeIcon name={iconName} size={16} /> {label}
       </label>
-      <input
+      <Input
         type="number"
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="min"
-        className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-currency tabular-nums placeholder:text-poe-text-muted focus:border-poe-gold/40 focus:outline-none"
+        className="tabular-nums text-poe-currency"
       />
     </div>
   );
