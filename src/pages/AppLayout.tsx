@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { Toaster } from '@/components/ui/toaster';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
+import { IconTooltip, TooltipProvider } from '@/components/ui/tooltip';
 import { checkForUpdate } from '@/lib/updater';
 import { useCommunityServerUrl } from '@/lib/hooks/use-community';
 import { Zap, Sword, BarChart3, Globe, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -69,6 +70,7 @@ export function AppLayout() {
   ];
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="flex h-screen overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -96,37 +98,38 @@ export function AppLayout() {
               N.I.K.O.
             </Link>
           )}
-          <button
-            onClick={() => setNavCollapsed((prev) => !prev)}
-            className="hidden rounded p-1 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-text lg:block"
-            title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-          </button>
+          <IconTooltip label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            <button
+              onClick={() => setNavCollapsed((prev) => !prev)}
+              className="hidden rounded p-1 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-text lg:block"
+              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            </button>
+          </IconTooltip>
         </div>
 
         {/* Navigation */}
         <nav className="mt-4 flex-1 space-y-0.5 overflow-y-auto" aria-label="Main navigation">
           {navItems.map((item) => (
             collapsed ? (
-              <Link
-                key={item.href}
-                to={item.href}
-                title={item.label}
-                aria-label={item.label}
-                className={`
-                  flex items-center justify-center py-2.5 transition-all duration-150
-                  ${pathname === item.href
-                    ? 'border-r-2 border-poe-gold bg-poe-gold/5 text-poe-gold'
-                    : 'requiresAuth' in item && item.requiresAuth && !isAuthenticated
-                      ? 'text-poe-text-muted opacity-50 hover:bg-poe-panel-light hover:opacity-70'
-                      : 'text-poe-text-dim hover:bg-poe-panel-light hover:text-poe-text'
-                  }
-                `}
-              >
-                {item.icon}
-              </Link>
+              <IconTooltip key={item.href} label={item.label}>
+                <Link
+                  to={item.href}
+                  aria-label={item.label}
+                  className={`
+                    flex items-center justify-center py-2.5 transition-all duration-150
+                    ${pathname === item.href
+                      ? 'border-r-2 border-poe-gold bg-poe-gold/5 text-poe-gold'
+                      : 'requiresAuth' in item && item.requiresAuth && !isAuthenticated
+                        ? 'text-poe-text-muted opacity-50 hover:bg-poe-panel-light hover:opacity-70'
+                        : 'text-poe-text-dim hover:bg-poe-panel-light hover:text-poe-text'
+                    }
+                  `}
+                >
+                  {item.icon}
+                </Link>
+              </IconTooltip>
             ) : (
               <NavItem
                 key={item.href}
@@ -243,5 +246,6 @@ export function AppLayout() {
       <Toaster />
       <ConfirmProvider />
     </div>
+    </TooltipProvider>
   );
 }

@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
+import { IconTooltip } from '@/components/ui/tooltip';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { useStashTabs, useStashContents } from '@/lib/hooks/use-stash';
@@ -392,14 +394,16 @@ export function Stash() {
         <div className="border-t border-poe-border/30">
           <div className="flex items-center justify-between px-3 py-2">
             <h3 className="text-xs font-semibold tracking-wider text-poe-text-muted">CONFIGS</h3>
-            <button
-              type="button"
-              onClick={() => { setEditingConfig(null); setConfigModalOpen(true); }}
-              className="text-poe-text-muted transition-colors hover:text-poe-gold"
-              title="New snapshot config"
-            >
-              <Plus size={14} />
-            </button>
+            <IconTooltip label="New snapshot config" side="bottom">
+              <button
+                type="button"
+                onClick={() => { setEditingConfig(null); setConfigModalOpen(true); }}
+                className="text-poe-text-muted transition-colors hover:text-poe-gold"
+                aria-label="New snapshot config"
+              >
+                <Plus size={14} />
+              </button>
+            </IconTooltip>
           </div>
 
           <div className="max-h-40 overflow-y-auto">
@@ -434,30 +438,12 @@ export function Stash() {
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Header with tabs */}
         <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-0 lg:px-6">
-          <div className="flex items-center gap-0">
-            <button
-              type="button"
-              onClick={() => setActivePageTab('browse')}
-              className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-                activePageTab === 'browse'
-                  ? 'border-poe-gold text-poe-gold'
-                  : 'border-transparent text-poe-text-dim hover:text-poe-text'
-              }`}
-            >
-              Browse
-            </button>
-            <button
-              type="button"
-              onClick={() => setActivePageTab('snapshots')}
-              className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-                activePageTab === 'snapshots'
-                  ? 'border-poe-gold text-poe-gold'
-                  : 'border-transparent text-poe-text-dim hover:text-poe-text'
-              }`}
-            >
-              Snapshots
-            </button>
-          </div>
+          <Tabs value={activePageTab} onValueChange={(v) => setActivePageTab(v as StashPageTab)}>
+            <TabsList>
+              <TabsTrigger value="browse">Browse</TabsTrigger>
+              <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <div className="flex items-center gap-2">
             {activePageTab === 'browse' && (
@@ -476,30 +462,32 @@ export function Stash() {
 
             {activePageTab === 'snapshots' && selectedConfig && (
               <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => { setEditingConfig(selectedConfig); setConfigModalOpen(true); }}
-                  aria-label="Edit snapshot config"
-                  title="Edit snapshot config"
-                >
-                  <Settings size={14} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    void confirmAction('Delete this config and all its snapshots?', { confirmLabel: 'Delete', destructive: true })
-                      .then((ok) => {
-                        if (ok) deleteConfig.mutate(selectedConfig.id, { onSuccess: () => setSelectedConfigId(null) });
-                      });
-                  }}
-                  className="text-red-400 hover:text-red-300"
-                  aria-label="Delete snapshot config"
-                  title="Delete snapshot config"
-                >
-                  <Trash2 size={14} />
-                </Button>
+                <IconTooltip label="Edit config" side="bottom">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setEditingConfig(selectedConfig); setConfigModalOpen(true); }}
+                    aria-label="Edit config"
+                  >
+                    <Settings size={14} />
+                  </Button>
+                </IconTooltip>
+                <IconTooltip label="Delete config" side="bottom">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      void confirmAction('Delete this config and all its snapshots?', { confirmLabel: 'Delete', destructive: true })
+                        .then((ok) => {
+                          if (ok) deleteConfig.mutate(selectedConfig.id, { onSuccess: () => setSelectedConfigId(null) });
+                        });
+                    }}
+                    className="text-red-400 hover:text-red-300"
+                    aria-label="Delete config"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </IconTooltip>
               </div>
             )}
           </div>
