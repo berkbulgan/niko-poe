@@ -6,6 +6,7 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { Toaster } from '@/components/ui/toaster';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { checkForUpdate } from '@/lib/updater';
 import { useCommunityServerUrl } from '@/lib/hooks/use-community';
 import { Zap, Sword, BarChart3, Globe, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -240,6 +241,7 @@ export function AppLayout() {
         </main>
       </div>
       <Toaster />
+      <ConfirmProvider />
     </div>
   );
 }

@@ -53,7 +53,13 @@ export function SidebarEntityRow({
         </button>
         <span className="text-poe-border">&middot;</span>
         <button
-          onClick={() => { if (confirmAction(`Delete "${name}"? This can't be undone.`)) onDelete(); }}
+          onClick={() => {
+            void confirmAction(`Delete "${name}"?`, {
+              description: "This can't be undone.",
+              confirmLabel: 'Delete',
+              destructive: true,
+            }).then((ok) => { if (ok) onDelete(); });
+          }}
           disabled={isDeleting}
           className="text-xs text-poe-text-dim hover:text-poe-error"
         >

@@ -3,6 +3,7 @@
 
 import { open } from '@tauri-apps/plugin-shell';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { confirm, type ConfirmOptions } from '@/lib/stores/confirm-store';
 
 // --- Storage ---
 // localStorage is acceptable in Phase 1 (non-sensitive: league preference).
@@ -41,13 +42,15 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 
 // --- Dialogs ---
 
-export function confirmAction(message: string): boolean {
-  return window.confirm(message);
+/** Asks in the app's AlertDialog (rendered by ConfirmProvider); resolves true when the user confirms. */
+export function confirmAction(title: string, options: Omit<ConfirmOptions, 'title'> = {}): Promise<boolean> {
+  return confirm({ title, ...options });
 }
 
-/** Returns true when it's OK to replace the editor contents (nothing unsaved, or the user agreed). */
-export function confirmDiscard(hasUnsavedChanges: boolean): boolean {
-  return !hasUnsavedChanges || confirmAction('You have unsaved changes. Discard them?');
+/** Resolves true when it's OK to replace the editor contents (nothing unsaved, or the user agreed). */
+export function confirmDiscard(hasUnsavedChanges: boolean): Promise<boolean> {
+  if (!hasUnsavedChanges) return Promise.resolve(true);
+  return confirmAction('You have unsaved changes. Discard them?', { confirmLabel: 'Discard', destructive: true });
 }
 
 // --- Windows ---

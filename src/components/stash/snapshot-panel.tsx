@@ -292,7 +292,8 @@ export function SnapshotPanel({ config }: SnapshotPanelProps) {
                       snapshotId={snap.id}
                       divineRate={divineRate}
                       onDelete={() => {
-                        if (confirmAction('Delete this snapshot?')) deleteSnapshotMut.mutate(snap.id);
+                        void confirmAction('Delete this snapshot?', { confirmLabel: 'Delete', destructive: true })
+                          .then((ok) => { if (ok) deleteSnapshotMut.mutate(snap.id); });
                       }}
                       isDeleting={deleteSnapshotMut.isPending}
                     />

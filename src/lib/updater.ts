@@ -21,7 +21,11 @@ export async function checkForUpdate(): Promise<void> {
   }
   if (!update) return;
 
-  if (!confirmAction(`N.I.K.O. ${update.version} is available. Install it now? The app will close to update.`)) return;
+  const install = await confirmAction('Update available', {
+    description: `N.I.K.O. ${update.version} is available. The app will close to install it.`,
+    confirmLabel: 'Install and restart',
+  });
+  if (!install) return;
   try {
     await update.downloadAndInstall();
   } catch (err) {

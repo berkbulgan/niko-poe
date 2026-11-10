@@ -142,9 +142,11 @@ export function StrategyResults({ strategyId }: { strategyId: string }) {
                             variant="ghost"
                             aria-label="Delete run"
                             onClick={() => {
-                              if (confirmAction('Delete this run and its map log? Its snapshots are kept.')) {
-                                deleteRun.mutate(r.runId);
-                              }
+                              void confirmAction('Delete this run and its map log?', {
+                                description: 'Its snapshots are kept.',
+                                confirmLabel: 'Delete',
+                                destructive: true,
+                              }).then((ok) => { if (ok) deleteRun.mutate(r.runId); });
                             }}
                           >
                             <Trash2 size={14} />

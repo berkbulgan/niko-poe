@@ -103,16 +103,16 @@ export function Filters() {
     });
   }
 
-  function handleDuplicate(preset: FilterPresetParsed) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleDuplicate(preset: FilterPresetParsed) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     duplicatePreset.mutate(
       { name: `${preset.name} (copy)`, config: preset.config },
       { onSuccess: (dup) => { setActivePresetId(dup.id); loadConfig(dup.config); } },
     );
   }
 
-  function handleLoadPreset(preset: FilterPresetParsed) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleLoadPreset(preset: FilterPresetParsed) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     setActivePresetId(preset.id);
     loadConfig(preset.config);
   }
@@ -124,9 +124,12 @@ export function Filters() {
     if (!linkedPresetId || !presets) return;
     setSearchParams({}, { replace: true });
     const preset = presets.find((p) => p.id === linkedPresetId);
-    if (!preset || preset.id === activePresetId || !confirmDiscard(hasUnsavedChanges)) return;
-    setActivePresetId(preset.id);
-    loadConfig(preset.config);
+    if (!preset || preset.id === activePresetId) return;
+    void confirmDiscard(hasUnsavedChanges).then((ok) => {
+      if (!ok) return;
+      setActivePresetId(preset.id);
+      loadConfig(preset.config);
+    });
   }, [linkedPresetId, presets, activePresetId, hasUnsavedChanges, setActivePresetId, loadConfig, setSearchParams]);
 
   return (

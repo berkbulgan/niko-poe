@@ -489,11 +489,10 @@ export function Stash() {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
-                    if (confirmAction('Delete this config and all its snapshots?')) {
-                      deleteConfig.mutate(selectedConfig.id, {
-                        onSuccess: () => setSelectedConfigId(null),
+                    void confirmAction('Delete this config and all its snapshots?', { confirmLabel: 'Delete', destructive: true })
+                      .then((ok) => {
+                        if (ok) deleteConfig.mutate(selectedConfig.id, { onSuccess: () => setSelectedConfigId(null) });
                       });
-                    }
                   }}
                   className="text-red-400 hover:text-red-300"
                   aria-label="Delete snapshot config"

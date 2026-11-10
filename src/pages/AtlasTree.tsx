@@ -166,8 +166,8 @@ export function AtlasTree() {
     overwriteMutation.mutate({ config }, { onSuccess: () => toast.success('Atlas build saved') });
   }
 
-  function handleDuplicate(tree: AtlasTreeType) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleDuplicate(tree: AtlasTreeType) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     duplicateTree.mutate(
       { name: `${tree.name} (copy)`, config: tree.config },
       {
@@ -178,8 +178,8 @@ export function AtlasTree() {
     );
   }
 
-  function handleLoadTree(tree: AtlasTreeType) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleLoadTree(tree: AtlasTreeType) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     loadTree(tree.id, tree.config.allocatedNodeIds);
   }
 
