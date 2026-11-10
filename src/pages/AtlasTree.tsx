@@ -1,4 +1,4 @@
-// ABOUTME: Atlas skill tree planner page with saved build sidebar, Canvas tree, and stats panel.
+// ABOUTME: Atlas skill tree planner page with saved atlas tree sidebar, Canvas tree, and stats panel.
 // ABOUTME: Manages allocated node state, undo history, save/load/import/share/delete operations.
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -163,7 +163,7 @@ export function AtlasTree() {
   function handleSaveOverwrite() {
     if (!activeTreeId) return;
     const config = getConfig(treeData.tree);
-    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success('Atlas build saved') });
+    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success(`Saved "${activeTree?.name ?? 'atlas tree'}"`) });
   }
 
   async function handleDuplicate(tree: AtlasTreeType) {
@@ -186,11 +186,11 @@ export function AtlasTree() {
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
       <EntitySidebar
-        title="Atlas Builds"
+        title="Atlas Trees"
         onImport={() => setShowImport(true)}
         isLoading={isLoading}
         isEmpty={!trees || trees.length === 0}
-        emptyTitle="No builds saved"
+        emptyTitle="No atlas trees saved"
         emptyDescription="Allocate nodes and hit Save"
       >
         {trees?.map((tree) => (
@@ -208,7 +208,7 @@ export function AtlasTree() {
       {/* Center panel: Tree Canvas */}
       <main className="flex flex-1 flex-col overflow-hidden">
         <EditorToolbar
-          title="Atlas Skill Tree"
+          title="Atlas Tree"
           hasUnsavedChanges={hasUnsavedChanges}
           hasActiveEntity={!!activeTree}
           onSave={handleSaveOverwrite}

@@ -105,7 +105,7 @@ export function Strategies() {
   function handleSaveOverwrite() {
     if (!activeStrategyId) return;
     const config = getConfig();
-    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success('Strategy saved') });
+    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success(`Saved "${activeStrategy?.name ?? 'strategy'}"`) });
   }
 
   async function handleDuplicate(strategy: StrategyParsed) {

@@ -98,7 +98,7 @@ export function Filters() {
     updatePreset.mutate({ config }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
-        toast.success('Preset saved');
+        toast.success(`Saved "${activePreset?.name ?? 'preset'}"`);
       },
     });
   }
@@ -154,10 +154,10 @@ export function Filters() {
         ))}
       </EntitySidebar>
 
-      {/* ── Right panel: Map Mod Picker ── */}
+      {/* ── Right panel: Regex Filters editor ── */}
       <main className="flex flex-1 flex-col overflow-y-auto">
         <EditorToolbar
-          title="Map Mod Picker"
+          title="Regex Filters"
           hasUnsavedChanges={hasUnsavedChanges}
           hasActiveEntity={!!activePreset}
           onSave={handleSaveOverwrite}
