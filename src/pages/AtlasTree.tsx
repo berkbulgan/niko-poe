@@ -292,7 +292,7 @@ export function AtlasTree() {
         onSave={handleSaveAs}
         title="Save Atlas Tree"
         placeholder="e.g. Essence Farming, Delirium Rush..."
-        label="Build Name"
+        label="Atlas Tree Name"
       />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
       <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
