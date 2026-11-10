@@ -23,6 +23,17 @@
     @apply bg-poe-gold/30 text-poe-text;
   }
 
+  /* Native number spinners clash with the dark theme; values are typed, arrow keys still step. */
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+
   /* Scrollbar styling */
   ::-webkit-scrollbar {
     width: 6px;
