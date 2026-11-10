@@ -15,6 +15,7 @@ import { buildOptimizedVendorRegex } from '@/lib/optimize-regex';
 import { PoeIcon, type PoeIconName } from '@/components/ui/poe-icon';
 import { useFiltersStore } from '@/lib/stores/filters-store';
 import type { MapStatFilters, QualityType } from '@/types/filters';
+import { SimpleSelect } from '@/components/ui/select';
 
 const QUALITY_TYPE_OPTIONS: Array<{ value: QualityType; label: string }> = [
   { value: 'pack_size', label: 'Pack Size' },
@@ -393,15 +394,12 @@ export function StatPicker() {
             <label className="mb-1 flex items-center gap-1.5 text-xs text-poe-text-muted">
               <PoeIcon name="chisel" size={16} /> Quality Type
             </label>
-            <select
+            <SimpleSelect
               value={filters.qualityType}
-              onChange={(e) => updateFilter('qualityType', e.target.value as QualityType)}
-              className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
-            >
-              {QUALITY_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              onValueChange={(v) => updateFilter('qualityType', v as QualityType)}
+              options={QUALITY_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              aria-label="Quality type"
+            />
           </div>
           {/* Corrupted: 3-state */}
           <div className="flex flex-col">

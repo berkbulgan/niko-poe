@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { checkForUpdate } from '@/lib/updater';
 import { useCommunityServerUrl } from '@/lib/hooks/use-community';
 import { Zap, Sword, BarChart3, Globe, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { SimpleSelect } from '@/components/ui/select';
 
 interface NavItemProps {
   href: string;
@@ -144,15 +145,13 @@ export function AppLayout() {
             <label className="mb-1 block text-[10px] tracking-wider text-poe-text-muted">
               LEAGUE
             </label>
-            <select
+            <SimpleSelect
               value={currentLeague}
-              onChange={(e) => setLeague(e.target.value)}
-              className="w-full border border-poe-border/40 bg-poe-panel px-2 py-1.5 text-xs text-poe-text focus:border-poe-gold/50 focus:outline-none"
-            >
-              {leagues.map((l) => (
-                <option key={l.id} value={l.id}>{l.text}</option>
-              ))}
-            </select>
+              onValueChange={setLeague}
+              options={leagues.map((l) => ({ value: l.id, label: l.text }))}
+              size="sm"
+              aria-label="League"
+            />
             {pricesLoading && (
               <p className="mt-1 text-[10px] text-poe-gold/70 animate-pulse">
                 Fetching prices...

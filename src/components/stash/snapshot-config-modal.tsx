@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useStrategies } from '@/lib/hooks/use-strategies';
 import type { StashTab } from '@/types/index';
 import type { SnapshotConfig } from '@/types/snapshots';
+import { SimpleSelect } from '@/components/ui/select';
 
 interface SnapshotConfigModalProps {
   open: boolean;
@@ -139,16 +140,12 @@ export function SnapshotConfigModal({
           <label className="mb-1 block text-xs text-poe-text-muted">
             Link to Strategy (optional — enables ROI tracking)
           </label>
-          <select
+          <SimpleSelect
             value={strategyId ?? ''}
-            onChange={(e) => setStrategyId(e.target.value || null)}
-            className="w-full border border-poe-border/40 bg-poe-panel/30 px-3 py-2 text-sm text-poe-text focus:border-poe-gold/50 focus:outline-none"
-          >
-            <option value="">None</option>
-            {(strategies ?? []).map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+            onValueChange={(v) => setStrategyId(v || null)}
+            options={[{ value: '', label: 'None' }, ...(strategies ?? []).map((s) => ({ value: s.id, label: s.name }))]}
+            aria-label="Linked strategy"
+          />
         </div>
 
         {/* Actions */}

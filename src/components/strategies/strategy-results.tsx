@@ -10,6 +10,7 @@ import { useDeleteTrackingRun, useReassignMapRuns, useTrackerState, useTrackingH
 import { confirmAction } from '@/lib/platform';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
 import { strategyResults } from '@/lib/tracking-results';
+import { SimpleSelect } from '@/components/ui/select';
 
 function shortDate(db: string): string {
   const d = new Date(db + 'Z');
@@ -84,15 +85,15 @@ export function StrategyResults({ strategyId }: { strategyId: string }) {
           {selected.size > 0 && expandedRun && (
             <div className="my-2 flex items-center gap-2 text-xs">
               <span>{selected.size} selected — move to</span>
-              <select
-                aria-label="Move selected maps to strategy"
+              <SimpleSelect
                 value=""
-                onChange={(e) => move([...selected], expandedRun.strategyId, e.target.value)}
-                className="border border-poe-border/40 bg-poe-panel px-1 py-0.5"
-              >
-                <option value="" disabled>Strategy…</option>
-                {strategies?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+                onValueChange={(v) => move([...selected], expandedRun.strategyId, v)}
+                options={(strategies ?? []).map((s) => ({ value: s.id, label: s.name }))}
+                placeholder="Strategy…"
+                size="sm"
+                className="w-40"
+                aria-label="Move selected maps to strategy"
+              />
             </div>
           )}
 
@@ -169,14 +170,14 @@ export function StrategyResults({ strategyId }: { strategyId: string }) {
                         <td>{m.areaName} (lvl {m.areaLevel})</td>
                         <td colSpan={2}>{Math.round(m.durationSecs / 60)} min</td>
                         <td colSpan={2}>
-                          <select
-                            aria-label={`Strategy for ${m.areaName}`}
+                          <SimpleSelect
                             value={m.strategyId ?? run.strategyId}
-                            onChange={(e) => move([m.id], run.strategyId, e.target.value)}
-                            className="border border-poe-border/40 bg-poe-panel px-1 py-0.5"
-                          >
-                            {strategies?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                          </select>
+                            onValueChange={(v) => move([m.id], run.strategyId, v)}
+                            options={(strategies ?? []).map((s) => ({ value: s.id, label: s.name }))}
+                            size="sm"
+                            className="w-40"
+                            aria-label={`Strategy for ${m.areaName}`}
+                          />
                         </td>
                       </tr>
                     ))}

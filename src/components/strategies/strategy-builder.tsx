@@ -23,6 +23,7 @@ import { toast } from '@/lib/stores/toast-store';
 import { useStrategiesStore, type SelectedItem } from '@/lib/stores/strategies-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type { AtlasTreeRawData } from '@/types/atlas-tree';
+import { SimpleSelect } from '@/components/ui/select';
 
 const treeData = rawTreeData as unknown as AtlasTreeRawData;
 
@@ -45,16 +46,13 @@ function CategorySelect({
   onChange: (v: PriceCategory) => void;
 }) {
   return (
-    <select
+    <SimpleSelect
       value={value}
-      onChange={(e) => onChange(e.target.value as PriceCategory)}
-      className="border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
+      onValueChange={(v) => onChange(v as PriceCategory)}
+      options={CATEGORY_OPTIONS}
+      className="w-40"
       aria-label="Item category"
-    >
-      {CATEGORY_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
+    />
   );
 }
 
@@ -286,16 +284,12 @@ function LinkedPresetSection({
         Linked Filter Preset
       </h4>
 
-      <select
+      <SimpleSelect
         value={selectedPresetId ?? ''}
-        onChange={(e) => onSelect(e.target.value || null)}
-        className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
-      >
-        <option value="">No preset linked</option>
-        {presets.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-      </select>
+        onValueChange={(v) => onSelect(v || null)}
+        options={[{ value: '', label: 'No preset linked' }, ...presets.map((p) => ({ value: p.id, label: p.name }))]}
+        aria-label="Linked preset"
+      />
 
       {selectedPreset && (
         <div className="flex items-center justify-between border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
@@ -359,16 +353,12 @@ function LinkedAtlasTreeSection({
         Linked Atlas Tree
       </h4>
 
-      <select
+      <SimpleSelect
         value={selectedTreeId ?? ''}
-        onChange={(e) => onSelect(e.target.value || null)}
-        className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
-      >
-        <option value="">No atlas tree linked</option>
-        {trees.map((t) => (
-          <option key={t.id} value={t.id}>{t.name}</option>
-        ))}
-      </select>
+        onValueChange={(v) => onSelect(v || null)}
+        options={[{ value: '', label: 'No atlas tree linked' }, ...trees.map((t) => ({ value: t.id, label: t.name }))]}
+        aria-label="Linked atlas tree"
+      />
 
       {selectedTree && (
         <div className="border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
