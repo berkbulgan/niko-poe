@@ -25,6 +25,7 @@ import * as ipc from '@/lib/ipc';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import { toast } from '@/lib/stores/toast-store';
 import { confirmDiscard } from '@/lib/platform';
+import { useConfirmStore } from '@/lib/stores/confirm-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type {
   AtlasTreeRawData,
@@ -126,6 +127,7 @@ export function AtlasTree() {
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (useConfirmStore.getState().request !== null) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         undo();

@@ -77,7 +77,7 @@ export function SnapshotConfigModal({
   return (
     <Modal isOpen onClose={onClose} title={existing ? 'Edit Config' : 'New Snapshot Config'} className="max-w-md">
         {/* Name */}
-        <div className="mb-4">
+        <div>
           <label className="mb-1 block text-xs text-poe-text-muted">Config Name</label>
           <Input
             value={name}
@@ -87,7 +87,7 @@ export function SnapshotConfigModal({
         </div>
 
         {/* Tab selection */}
-        <div className="mb-4">
+        <div>
           <label className="mb-1 block text-xs text-poe-text-muted">
             Select Stash Tabs ({selectedTabs.size} selected)
           </label>
@@ -119,7 +119,7 @@ export function SnapshotConfigModal({
         </div>
 
         {/* Strategy link */}
-        <div className="mb-6">
+        <div>
           <label className="mb-1 block text-xs text-poe-text-muted">
             Link to Strategy (optional — enables ROI tracking)
           </label>
