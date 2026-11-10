@@ -53,5 +53,8 @@
     "typescript-eslint": "^8.72.1",
     "vite": "^8.0.5",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "@radix-ui/react-dismissable-layer": "1.2.1"
   }
 }
