@@ -8,6 +8,30 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* shadcn/ui tokens mapped onto the PoE palette (dark only). */
+    --background: 240 8% 5%;          /* #0C0C0E poe-bg */
+    --foreground: 43 23% 88%;         /* #E8E4D9 poe-text */
+    --card: 240 28% 14%;              /* #1A1A2E poe-panel */
+    --card-foreground: 43 23% 88%;
+    --popover: 240 28% 14%;
+    --popover-foreground: 43 23% 88%;
+    --primary: 26 65% 42%;            /* #AF6025 poe-gold */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 28% 14%;
+    --secondary-foreground: 43 23% 88%;
+    --muted: 240 26% 20%;             /* #252540 poe-panel-light */
+    --muted-foreground: 32 5% 48%;    /* #7F7A74 poe-text-muted */
+    --accent: 240 26% 20%;
+    --accent-foreground: 43 23% 88%;
+    --destructive: 0 84% 60%;         /* #EF4444 poe-error */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 19% 20%;            /* #2A2A3E poe-border */
+    --input: 240 19% 20%;
+    --ring: 26 65% 42%;
+    --radius: 0.25rem;
+  }
+
   body {
     @apply bg-poe-bg text-poe-text antialiased;
     transition: background-color 0.2s ease, color 0.2s ease;

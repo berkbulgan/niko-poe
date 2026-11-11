@@ -146,13 +146,14 @@ export function Overlay() {
     }
   }
 
+  // Native on purpose: a Radix dropdown would be clipped by the small overlay window.
   const strategySelect = (onChange: (id: string) => void) => (
     <select
       value={selected?.id ?? ''}
       onChange={(e) => onChange(e.target.value)}
       disabled={tracker.busy}
       aria-label="Strategy"
-      className="min-w-0 flex-1 border border-poe-border/40 bg-poe-panel px-1 py-0.5 text-xs text-poe-text"
+      className="min-w-0 flex-1 rounded-md border border-input bg-card px-1.5 py-0.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
     >
       {strategies?.map((s) => (
         <option key={s.id} value={s.id}>{s.name}</option>

@@ -15,12 +15,10 @@ import { toast } from '@/lib/stores/toast-store';
 import type { StrategyParsed } from '@/lib/hooks/use-strategies';
 import type { Budget, Difficulty } from '@/types/community';
 import sources from '@/data/sources.json';
+import { SimpleSelect } from '@/components/ui/select';
 
 const NOTES_MAX = 8000;
 const DEFAULT_PATCH = sources.atlasTag.split('.').slice(0, 2).join('.');
-
-const selectClass =
-  'h-10 w-full rounded-md border border-poe-border bg-poe-panel px-3 text-sm text-poe-text focus:border-poe-gold/50 focus:outline-none';
 
 interface PublishModalProps {
   strategy: StrategyParsed | null;
@@ -139,27 +137,34 @@ export function PublishModal({ strategy, onClose }: PublishModalProps) {
               <Input value={form.authorName} onChange={(e) => update('authorName', e.target.value)} maxLength={40} />
             </Field>
             <Field label="League">
-              <select className={selectClass} value={form.league} onChange={(e) => update('league', e.target.value)}>
-                {!leagues.some((l) => l.id === form.league) && <option value={form.league}>{form.league}</option>}
-                {leagues.map((l) => <option key={l.id} value={l.id}>{l.text}</option>)}
-              </select>
+              <SimpleSelect
+                value={form.league}
+                onValueChange={(v) => update('league', v)}
+                options={[
+                  ...(leagues.some((l) => l.id === form.league) ? [] : [{ value: form.league, label: form.league }]),
+                  ...leagues.map((l) => ({ value: l.id, label: l.text })),
+                ]}
+                aria-label="League"
+              />
             </Field>
             <Field label="Patch">
               <Input value={form.patch} onChange={(e) => update('patch', e.target.value)} maxLength={16} />
             </Field>
             <Field label="Budget">
-              <select className={selectClass} value={form.budget} onChange={(e) => update('budget', e.target.value as Budget)}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
+              <SimpleSelect
+                value={form.budget}
+                onValueChange={(v) => update('budget', v as Budget)}
+                options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]}
+                aria-label="Budget"
+              />
             </Field>
             <Field label="Difficulty">
-              <select className={selectClass} value={form.difficulty} onChange={(e) => update('difficulty', e.target.value as Difficulty)}>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
+              <SimpleSelect
+                value={form.difficulty}
+                onValueChange={(v) => update('difficulty', v as Difficulty)}
+                options={[{ value: 'easy', label: 'Easy' }, { value: 'medium', label: 'Medium' }, { value: 'hard', label: 'Hard' }]}
+                aria-label="Difficulty"
+              />
             </Field>
           </div>
           <Field label="Tags (comma separated, up to 5)">

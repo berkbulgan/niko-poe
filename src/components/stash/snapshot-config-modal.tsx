@@ -2,11 +2,14 @@
 // ABOUTME: Reuses stash tab list with checkboxes for multi-select.
 
 import { useState, useEffect } from 'react';
-import { X, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useStrategies } from '@/lib/hooks/use-strategies';
 import type { StashTab } from '@/types/index';
 import type { SnapshotConfig } from '@/types/snapshots';
+import { SimpleSelect } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Modal } from '@/components/ui/modal';
 
 interface SnapshotConfigModalProps {
   open: boolean;
@@ -43,13 +46,6 @@ export function SnapshotConfigModal({
     }
   }, [open, existing]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
   if (!open) return null;
 
   function toggleTab(tabId: string) {
@@ -79,31 +75,19 @@ export function SnapshotConfigModal({
   const flatTabs = flattenTabs(tabs);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div role="dialog" aria-modal="true" aria-label={existing ? 'Edit Config' : 'New Snapshot Config'} className="w-full max-w-md border border-poe-border/40 bg-poe-bg p-6 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-display text-sm tracking-wide text-poe-text">
-            {existing ? 'Edit Config' : 'New Snapshot Config'}
-          </h3>
-          <button type="button" onClick={onClose} className="text-poe-text-muted hover:text-poe-text" aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-
+    <Modal isOpen onClose={onClose} title={existing ? 'Edit Config' : 'New Snapshot Config'} className="max-w-md">
         {/* Name */}
-        <div className="mb-4">
+        <div>
           <label className="mb-1 block text-xs text-poe-text-muted">Config Name</label>
-          <input
-            type="text"
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Dump Tabs, Currency Only"
-            className="w-full border border-poe-border/40 bg-poe-panel/30 px-3 py-2 text-sm text-poe-text placeholder:text-poe-text-muted/40 focus:border-poe-gold/50 focus:outline-none"
           />
         </div>
 
         {/* Tab selection */}
-        <div className="mb-4">
+        <div>
           <label className="mb-1 block text-xs text-poe-text-muted">
             Select Stash Tabs ({selectedTabs.size} selected)
           </label>
@@ -135,20 +119,16 @@ export function SnapshotConfigModal({
         </div>
 
         {/* Strategy link */}
-        <div className="mb-6">
+        <div>
           <label className="mb-1 block text-xs text-poe-text-muted">
             Link to Strategy (optional — enables ROI tracking)
           </label>
-          <select
+          <SimpleSelect
             value={strategyId ?? ''}
-            onChange={(e) => setStrategyId(e.target.value || null)}
-            className="w-full border border-poe-border/40 bg-poe-panel/30 px-3 py-2 text-sm text-poe-text focus:border-poe-gold/50 focus:outline-none"
-          >
-            <option value="">None</option>
-            {(strategies ?? []).map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+            onValueChange={(v) => setStrategyId(v || null)}
+            options={[{ value: '', label: 'None' }, ...(strategies ?? []).map((s) => ({ value: s.id, label: s.name }))]}
+            aria-label="Linked strategy"
+          />
         </div>
 
         {/* Actions */}
@@ -163,8 +143,7 @@ export function SnapshotConfigModal({
             {saving ? 'Saving...' : existing ? 'Update' : 'Create'}
           </Button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

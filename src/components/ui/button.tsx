@@ -1,30 +1,26 @@
-// ABOUTME: Reusable Button component with PoE-themed variants using class-variance-authority.
-// ABOUTME: Supports primary (gold gradient), secondary, danger, and ghost variants with size options.
-
-
+// ABOUTME: Button (shadcn/ui pattern) with the PoE variants: primary gold gradient, secondary, danger, ghost.
+// ABOUTME: Supports asChild via Radix Slot; sizes sm/md/lg keep the app's existing API.
 
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md font-medium transition-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-poe-gold/50 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
         primary:
-          'bg-gradient-to-b from-poe-gold to-amber-800 text-white shadow-md hover:from-amber-600 hover:to-amber-900',
-        secondary:
-          'border border-poe-border bg-poe-panel text-poe-text hover:bg-poe-panel-light',
-        danger:
-          'bg-poe-error/90 text-white hover:bg-poe-error',
-        ghost:
-          'text-poe-text-dim hover:bg-poe-panel-light hover:text-poe-text',
+          'bg-gradient-to-b from-poe-gold to-amber-800 text-primary-foreground shadow-md hover:from-amber-600 hover:to-amber-900',
+        secondary: 'border border-border bg-secondary text-secondary-foreground hover:bg-accent',
+        danger: 'bg-destructive/90 text-destructive-foreground hover:bg-destructive',
+        ghost: 'text-poe-text-dim hover:bg-accent hover:text-accent-foreground',
       },
       size: {
         sm: 'h-8 px-3 text-sm',
-        md: 'h-10 px-4 text-sm',
-        lg: 'h-12 px-6 text-base',
+        md: 'h-9 px-4 text-sm',
+        lg: 'h-11 px-6 text-base',
       },
     },
     defaultVariants: {
@@ -36,17 +32,14 @@ const buttonVariants = cva(
 
 interface ButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => {
-    return (
-      <button
-        className={cn(buttonVariants({ variant, size }), className)}
-        ref={ref}
-        {...props}
-      />
-    );
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : 'button';
+    return <Comp className={cn(buttonVariants({ variant, size }), className)} ref={ref} {...props} />;
   },
 );
 

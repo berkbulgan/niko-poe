@@ -212,7 +212,7 @@ export function Dashboard() {
             <QuickAction
               href="/filters"
               icon="⚔️"
-              title="Map Mod Filters"
+              title="Regex Filters"
               description="Pick avoid/prefer mods, set map stats, get stash regex"
             />
             <QuickAction

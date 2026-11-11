@@ -23,6 +23,7 @@ import { toast } from '@/lib/stores/toast-store';
 import { useStrategiesStore, type SelectedItem } from '@/lib/stores/strategies-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type { AtlasTreeRawData } from '@/types/atlas-tree';
+import { SimpleSelect } from '@/components/ui/select';
 
 const treeData = rawTreeData as unknown as AtlasTreeRawData;
 
@@ -45,16 +46,13 @@ function CategorySelect({
   onChange: (v: PriceCategory) => void;
 }) {
   return (
-    <select
+    <SimpleSelect
       value={value}
-      onChange={(e) => onChange(e.target.value as PriceCategory)}
-      className="border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
+      onValueChange={(v) => onChange(v as PriceCategory)}
+      options={CATEGORY_OPTIONS}
+      className="w-40"
       aria-label="Item category"
-    >
-      {CATEGORY_OPTIONS.map((opt) => (
-        <option key={opt.value} value={opt.value}>{opt.label}</option>
-      ))}
-    </select>
+    />
   );
 }
 
@@ -139,7 +137,7 @@ function SelectedItemRow({
           <span className="shrink-0 text-[10px] text-poe-text-muted">/{item.mapsPerUse} maps</span>
         )}
       </div>
-      <input
+      <Input
         type="number"
         min="1"
         max="999"
@@ -148,7 +146,7 @@ function SelectedItemRow({
           const val = parseInt(e.target.value, 10);
           if (!Number.isNaN(val) && val > 0) onQuantityChange(val);
         }}
-        className="w-16 border border-poe-border/30 bg-poe-panel/40 px-2 py-1 text-center text-sm tabular-nums text-poe-currency focus:border-poe-gold/40 focus:outline-none"
+        className="h-8 w-16 text-center tabular-nums text-poe-currency"
         aria-label={`Quantity for ${item.name}`}
       />
       <span className="flex w-20 items-center justify-end gap-1 text-xs text-poe-text-muted">
@@ -286,16 +284,12 @@ function LinkedPresetSection({
         Linked Filter Preset
       </h4>
 
-      <select
+      <SimpleSelect
         value={selectedPresetId ?? ''}
-        onChange={(e) => onSelect(e.target.value || null)}
-        className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
-      >
-        <option value="">No preset linked</option>
-        {presets.map((p) => (
-          <option key={p.id} value={p.id}>{p.name}</option>
-        ))}
-      </select>
+        onValueChange={(v) => onSelect(v || null)}
+        options={[{ value: '', label: 'No preset linked' }, ...presets.map((p) => ({ value: p.id, label: p.name }))]}
+        aria-label="Linked preset"
+      />
 
       {selectedPreset && (
         <div className="flex items-center justify-between border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
@@ -359,16 +353,12 @@ function LinkedAtlasTreeSection({
         Linked Atlas Tree
       </h4>
 
-      <select
+      <SimpleSelect
         value={selectedTreeId ?? ''}
-        onChange={(e) => onSelect(e.target.value || null)}
-        className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
-      >
-        <option value="">No atlas tree linked</option>
-        {trees.map((t) => (
-          <option key={t.id} value={t.id}>{t.name}</option>
-        ))}
-      </select>
+        onValueChange={(v) => onSelect(v || null)}
+        options={[{ value: '', label: 'No atlas tree linked' }, ...trees.map((t) => ({ value: t.id, label: t.name }))]}
+        aria-label="Linked atlas tree"
+      />
 
       {selectedTree && (
         <div className="border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
@@ -571,7 +561,7 @@ export function StrategyBuilder() {
             <label className="mb-1 flex items-center gap-1.5 text-xs text-poe-text-muted">
               <PoeIcon name="chaos" size={14} /> Extra Cost/Map
             </label>
-            <input
+            <Input
               type="number"
               min="0"
               step="0.1"
@@ -581,14 +571,14 @@ export function StrategyBuilder() {
                 setAverageMapCost(Number.isNaN(val) ? 0 : val);
               }}
               placeholder="0"
-              className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm tabular-nums text-poe-currency placeholder:text-poe-text-muted focus:border-poe-gold/40 focus:outline-none"
+              className="tabular-nums text-poe-currency"
             />
           </div>
           <div className="flex flex-col">
             <label className="mb-1 flex items-center gap-1.5 text-xs text-poe-text-muted">
               <PoeIcon name="map" size={14} /> Maps to Run
             </label>
-            <input
+            <Input
               type="number"
               min="1"
               max="10000"
@@ -597,7 +587,7 @@ export function StrategyBuilder() {
                 const val = parseInt(e.target.value, 10);
                 if (!Number.isNaN(val) && val > 0) setMapCount(val);
               }}
-              className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm tabular-nums text-poe-currency focus:border-poe-gold/40 focus:outline-none"
+              className="tabular-nums text-poe-currency"
             />
           </div>
         </div>

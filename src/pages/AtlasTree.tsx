@@ -1,4 +1,4 @@
-// ABOUTME: Atlas skill tree planner page with saved build sidebar, Canvas tree, and stats panel.
+// ABOUTME: Atlas skill tree planner page with saved atlas tree sidebar, Canvas tree, and stats panel.
 // ABOUTME: Manages allocated node state, undo history, save/load/import/share/delete operations.
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -25,6 +25,7 @@ import * as ipc from '@/lib/ipc';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import { toast } from '@/lib/stores/toast-store';
 import { confirmDiscard } from '@/lib/platform';
+import { useConfirmStore } from '@/lib/stores/confirm-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type {
   AtlasTreeRawData,
@@ -126,6 +127,7 @@ export function AtlasTree() {
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (useConfirmStore.getState().request !== null) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         undo();
@@ -163,11 +165,11 @@ export function AtlasTree() {
   function handleSaveOverwrite() {
     if (!activeTreeId) return;
     const config = getConfig(treeData.tree);
-    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success('Atlas build saved') });
+    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success(`Saved "${activeTree?.name ?? 'atlas tree'}"`) });
   }
 
-  function handleDuplicate(tree: AtlasTreeType) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleDuplicate(tree: AtlasTreeType) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     duplicateTree.mutate(
       { name: `${tree.name} (copy)`, config: tree.config },
       {
@@ -178,19 +180,19 @@ export function AtlasTree() {
     );
   }
 
-  function handleLoadTree(tree: AtlasTreeType) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleLoadTree(tree: AtlasTreeType) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     loadTree(tree.id, tree.config.allocatedNodeIds);
   }
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
       <EntitySidebar
-        title="Atlas Builds"
+        title="Atlas Trees"
         onImport={() => setShowImport(true)}
         isLoading={isLoading}
         isEmpty={!trees || trees.length === 0}
-        emptyTitle="No builds saved"
+        emptyTitle="No atlas trees saved"
         emptyDescription="Allocate nodes and hit Save"
       >
         {trees?.map((tree) => (
@@ -208,7 +210,7 @@ export function AtlasTree() {
       {/* Center panel: Tree Canvas */}
       <main className="flex flex-1 flex-col overflow-hidden">
         <EditorToolbar
-          title="Atlas Skill Tree"
+          title="Atlas Tree"
           hasUnsavedChanges={hasUnsavedChanges}
           hasActiveEntity={!!activeTree}
           onSave={handleSaveOverwrite}
@@ -292,7 +294,7 @@ export function AtlasTree() {
         onSave={handleSaveAs}
         title="Save Atlas Tree"
         placeholder="e.g. Essence Farming, Delirium Rush..."
-        label="Build Name"
+        label="Atlas Tree Name"
       />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
       <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />

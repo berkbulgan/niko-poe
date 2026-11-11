@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import { useSetTrackerSettings, useTrackerSettings, useTrackerState } from '@/lib/hooks/use-tracking';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
@@ -107,14 +108,14 @@ function TrackingSection() {
     <div className="space-y-4 p-6">
       <h2 className="mb-1 font-display text-sm tracking-wide text-poe-text-dim">Map Tracking</h2>
       <div>
-        <label className="flex items-center gap-2 text-xs text-poe-text">
-          <input
-            type="checkbox"
+        <div className="flex items-center gap-2 text-xs text-poe-text">
+          <Switch
+            id="overlay-enabled"
             checked={settings.overlayEnabled}
-            onChange={(e) => update(settings.logPath, e.target.checked)}
+            onCheckedChange={(checked) => update(settings.logPath, checked)}
           />
-          Show in-game overlay
-        </label>
+          <label htmlFor="overlay-enabled">Show in-game overlay</label>
+        </div>
         <p className="mt-1 text-xs text-poe-text-muted">
           The overlay shows over the game only in Windowed Fullscreen mode, once the game is running.
         </p>
