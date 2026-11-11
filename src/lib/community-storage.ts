@@ -1,11 +1,10 @@
-// ABOUTME: Local records for community features: edit tokens of published strategies, favourites, server override.
+// ABOUTME: Local records for community features: edit tokens of published strategies, favourites.
 // ABOUTME: Everything goes through platform.storage; only the install id is ever sent, with shared results.
 
 import { storage } from '@/lib/platform';
 
 const PUBLISHED_KEY = 'niko_community_published';
 const FAVOURITES_KEY = 'niko_community_favourites';
-const SERVER_URL_KEY = 'niko_community_url';
 const LINKED_KEY = 'niko_community_linked';
 const INSTALL_ID_KEY = 'niko_install_id';
 
@@ -90,13 +89,4 @@ export function setFavourited(communityId: string, on: boolean): void {
   const ids = readJson<string[]>(FAVOURITES_KEY, []).filter((id) => id !== communityId);
   if (on) ids.push(communityId);
   storage.set(FAVOURITES_KEY, JSON.stringify(ids));
-}
-
-export function getServerUrlOverride(): string | null {
-  return storage.get(SERVER_URL_KEY);
-}
-
-export function setServerUrlOverride(url: string | null): void {
-  if (url) storage.set(SERVER_URL_KEY, url);
-  else storage.remove(SERVER_URL_KEY);
 }
