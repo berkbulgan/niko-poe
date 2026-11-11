@@ -248,6 +248,7 @@ export function StatPicker() {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (!(e.ctrlKey && e.shiftKey && e.code === 'KeyC')) return;
+      if (e.repeat) return;
       const t = e.target;
       if ((t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) && t.selectionStart !== t.selectionEnd) return;
       e.preventDefault();

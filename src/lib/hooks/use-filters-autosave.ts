@@ -42,13 +42,15 @@ export function useFiltersAutosave(presetNames: string[]) {
       if (activePresetId) {
         await ipc.updateFilterPreset(activePresetId, { config: JSON.stringify(config) });
         baseline.current = config;
+        setStatus('saved');
       } else {
         const created = await ipc.createFilterPreset({ name: untitledName(names.current), config: JSON.stringify(config) });
         baseline.current = config;
+        // Set 'saved' before the store update so a follow-up change seen by the subscription can still show 'saving'.
         // Not muted: if the draft changed while creating, the subscription schedules the follow-up update.
+        setStatus('saved');
         setActivePresetId(created.id);
       }
-      setStatus('saved');
     } catch (err) {
       console.error('[Filters] autosave failed:', err);
       setStatus('error');
