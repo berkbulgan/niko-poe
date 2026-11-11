@@ -2,7 +2,6 @@
 // ABOUTME: Left: search, filters and results. Right: detail panel for the selected strategy.
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,7 +46,7 @@ export function Community() {
       <div className="mx-auto max-w-md py-16 text-center">
         <h2 className="text-sm font-semibold text-poe-text-dim">Community server not configured</h2>
         <p className="mt-2 text-xs text-poe-text-muted">
-          This build has no community server. Set one under <Link to="/settings" className="text-poe-gold">Settings</Link>.
+          This build has no community server.
         </p>
       </div>
     );

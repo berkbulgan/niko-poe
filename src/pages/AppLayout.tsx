@@ -9,7 +9,6 @@ import { Toaster } from '@/components/ui/toaster';
 import { ConfirmProvider } from '@/components/ui/confirm-dialog';
 import { IconTooltip, TooltipProvider } from '@/components/ui/tooltip';
 import { checkForUpdate } from '@/lib/updater';
-import { useCommunityServerUrl } from '@/lib/hooks/use-community';
 import { Zap, Sword, BarChart3, Globe, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { SimpleSelect } from '@/components/ui/select';
 
@@ -55,9 +54,6 @@ export function AppLayout() {
   useEffect(() => { setSidebarOpen(false); }, [pathname]);
 
   useEffect(() => { void checkForUpdate(); }, []);
-
-  // Push any saved community server override to Rust before anything talks to the server.
-  useCommunityServerUrl();
 
   const navItems = [
     { href: '/dashboard', icon: <Zap size={18} />, label: 'Dashboard' },
