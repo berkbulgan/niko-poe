@@ -195,6 +195,11 @@ pub struct ListQuery {
     pub q: Option<String>,
     pub tag: Option<String>,
     pub league: Option<String>,
+    /// Omitted from the wire when unset, so servers from before this filter see the same query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<Budget>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub difficulty: Option<Difficulty>,
     #[serde(default)]
     pub sort: Sort,
     #[serde(default = "default_page")]
@@ -213,7 +218,16 @@ fn default_limit() -> u32 {
 
 impl Default for ListQuery {
     fn default() -> Self {
-        ListQuery { q: None, tag: None, league: None, sort: Sort::New, page: 1, limit: default_limit() }
+        ListQuery {
+            q: None,
+            tag: None,
+            league: None,
+            budget: None,
+            difficulty: None,
+            sort: Sort::New,
+            page: 1,
+            limit: default_limit(),
+        }
     }
 }
 
@@ -225,6 +239,8 @@ impl ListQuery {
             q: blank_to_none(self.q),
             tag: blank_to_none(self.tag).map(|t| t.to_lowercase()),
             league: blank_to_none(self.league),
+            budget: self.budget,
+            difficulty: self.difficulty,
             sort: self.sort,
             page: self.page.max(1),
             limit: self.limit.clamp(1, MAX_LIST_LIMIT),
@@ -409,6 +425,23 @@ mod tests {
         let q = ListQuery { q: Some(" ".into()), tag: Some("Deli".into()), page: 0, limit: 500, ..Default::default() }
             .normalize();
         assert_eq!((q.q, q.tag.as_deref(), q.page, q.limit), (None, Some("deli"), 1, 50));
+    }
+
+    #[test]
+    fn list_query_budget_and_difficulty_are_optional() {
+        let q: ListQuery = serde_json::from_str(r#"{"budget":"low","difficulty":"hard"}"#).unwrap();
+        assert_eq!((q.budget, q.difficulty), (Some(Budget::Low), Some(Difficulty::Hard)));
+        let q = q.normalize();
+        assert_eq!((q.budget, q.difficulty), (Some(Budget::Low), Some(Difficulty::Hard)));
+
+        let q: ListQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!((q.budget, q.difficulty), (None, None));
+        assert_eq!(ListQuery::default().budget, None);
+
+        let json = serde_json::to_value(ListQuery::default()).unwrap();
+        assert!(json.get("budget").is_none() && json.get("difficulty").is_none(), "None is omitted: {json}");
+        let json = serde_json::to_value(ListQuery { budget: Some(Budget::High), ..Default::default() }).unwrap();
+        assert_eq!(json["budget"], "high");
     }
 
     #[test]

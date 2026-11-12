@@ -200,6 +200,17 @@ mod tests {
     }
 
     #[test]
+    fn list_query_encodes_budget_and_difficulty() {
+        let query = ListQuery {
+            budget: Some(niko_community_api::Budget::Low),
+            difficulty: Some(niko_community_api::Difficulty::Hard),
+            ..Default::default()
+        };
+        let req = reqwest::Client::new().get("http://x/v1/strategies").query(&query.normalize()).build().unwrap();
+        assert_eq!(req.url().query(), Some("budget=low&difficulty=hard&sort=new&page=1&limit=20"));
+    }
+
+    #[test]
     fn submit_outcome_treats_conflict_as_already_shared() {
         assert!(matches!(submit_outcome(201, ""), Ok(true)));
         assert!(matches!(submit_outcome(409, r#"{"error":"conflict","message":"x"}"#), Ok(false)));
