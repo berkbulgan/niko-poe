@@ -27,7 +27,7 @@ import type { StrategyConfig } from '@/types/strategies';
 import type { StrategyStats } from '@/types/community';
 
 function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="rounded bg-poe-panel-light/60 px-1.5 py-0.5 text-[11px] capitalize text-poe-text-dim">{children}</span>;
+  return <span className="rounded bg-poe-panel-light/60 px-1.5 py-0.5 text-[11px] text-poe-text-dim">{children}</span>;
 }
 
 /** Linked preset or tree box; a button that opens a preview when the bundle carries that payload. */
@@ -149,8 +149,8 @@ export function StrategyDetailPanel({ id }: { id: string }) {
             {detail.league}{detail.patch ? ` · ${detail.patch}` : ''} · updated {new Date(detail.updatedAt).toLocaleDateString()}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <Chip>{detail.budget} budget</Chip>
-            <Chip>{detail.difficulty}</Chip>
+            <Chip><span className="capitalize">{detail.budget}</span> budget</Chip>
+            <Chip><span className="capitalize">{detail.difficulty}</span></Chip>
             {detail.tags.map((t) => <Chip key={t}>{t}</Chip>)}
           </div>
         </div>
