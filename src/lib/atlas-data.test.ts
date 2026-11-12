@@ -30,6 +30,13 @@ describe('refreshAtlasTag', () => {
     expect(await refreshAtlasTag()).toEqual({ newTag: null, answered: true });
   });
 
+  it('does not report an answer when a newer listed tag fails to download', async () => {
+    vi.mocked(ipc.atlasVersions).mockResolvedValue([NEWER, BUNDLED_ATLAS]);
+    vi.mocked(ipc.atlasData).mockRejectedValue(new Error('429'));
+    expect(await refreshAtlasTag()).toEqual({ newTag: null, answered: false });
+    expect(useGameDataStore.getState().atlasTag).toBe(BUNDLED_ATLAS.tag);
+  });
+
   it('keeps the saved pick when the server does not answer', async () => {
     vi.mocked(ipc.atlasVersions).mockImplementation(async (refresh) => {
       if (refresh) throw new Error('offline');
