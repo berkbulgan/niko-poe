@@ -2,6 +2,11 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.1] - 2026-11-12
+
+### Changed
+- Atlas tree data updated to 3.30.0 (+598 / -511 nodes)
+
 ## [0.8.0] - 2026-11-12
 
 ### Added
