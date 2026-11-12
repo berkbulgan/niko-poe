@@ -182,6 +182,7 @@ export function Community() {
     ? [...new Map((list.data?.pages.flatMap((p) => p.items) ?? []).map((s) => [s.id, s])).values()]
     : local.items.filter((s) => s.name.toLowerCase().includes(needle));
   const loading = showAll ? list.isLoading : local.isLoading;
+  const error = showAll ? list.error : local.error;
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
@@ -251,8 +252,8 @@ export function Community() {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-8"><Spinner /></div>
-          ) : showAll && list.isError ? (
-            <p className="p-4 text-xs text-poe-error">{list.error.message}</p>
+          ) : error ? (
+            <p className="p-4 text-xs text-poe-error">{error.message}</p>
           ) : items.length === 0 ? (
             <p className="p-4 text-center text-sm text-poe-text-dim">{EMPTY_TEXT[show]}</p>
           ) : (

@@ -63,7 +63,10 @@ export function useCommunityStrategy(id: string | null) {
   });
 }
 
-/** Details for a list of ids (my published, favourites), sharing the detail cache; ids that fail (e.g. deleted) are dropped. */
+/**
+ * Details for a list of ids (my published, favourites), sharing the detail cache. Deleted ids are dropped;
+ * `error` is the first other failure (e.g. server down), so the page can say so instead of showing an empty list.
+ */
 export function useCommunityStrategies(ids: string[]) {
   return useQueries({
     queries: ids.map((id) => ({
@@ -73,6 +76,7 @@ export function useCommunityStrategies(ids: string[]) {
     combine: (results) => ({
       items: results.flatMap((r) => (r.data ? [r.data] : [])),
       isLoading: results.some((r) => r.isLoading),
+      error: results.find((r) => r.error && !isGone(r.error))?.error ?? null,
     }),
   });
 }
