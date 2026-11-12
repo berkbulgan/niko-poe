@@ -3,7 +3,7 @@
 
 import * as ipc from '@/lib/ipc';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
-import { atlasConfigsEqual, isEmptyAtlasConfig } from '@/lib/atlas-tree-utils';
+import { atlasConfigsEqual, isEmptyAtlasConfig, resolveTreeTag } from '@/lib/atlas-tree-utils';
 import { useEntityAutosave, type AutosaveAdapter } from '@/lib/hooks/use-entity-autosave';
 import { useGameDataStore } from '@/lib/stores/game-data-store';
 import type { AtlasTreeConfig } from '@/types/atlas-tree';
@@ -12,10 +12,14 @@ const atlasAdapter: AutosaveAdapter<AtlasTreeConfig> = {
   subscribe: (listener) => useAtlasTreeStore.subscribe(listener),
   getActiveId: () => useAtlasTreeStore.getState().activeTreeId,
   setActiveId: (id) => useAtlasTreeStore.getState().setActiveTreeId(id),
-  // Saves carry the atlas tag the tree is edited on. Trees on another patch are read-only, so they are never saved here.
-  getConfig: () => useAtlasTreeStore.getState().getConfig(useGameDataStore.getState().atlasTag),
-  loadConfig: (config) => useAtlasTreeStore.getState().loadAllocation(config.allocatedNodeIds),
-  clear: () => useAtlasTreeStore.getState().loadAllocation([]),
+  // Saves carry the tag the tree was opened on, even if the current tag changed since (the tree is then read-only).
+  getConfig: () => useAtlasTreeStore.getState().getConfig(),
+  // A legacy tree (no tag saved) is editable only when its guessed tag is the current one.
+  loadConfig: (config) => useAtlasTreeStore.getState().loadAllocation(
+    config.allocatedNodeIds,
+    resolveTreeTag({ config }, []) ?? useGameDataStore.getState().atlasTag,
+  ),
+  clear: () => useAtlasTreeStore.getState().loadAllocation([], null),
   equal: atlasConfigsEqual,
   isEmpty: isEmptyAtlasConfig,
   create: (name, config) => ipc.createAtlasTree({ name, config: JSON.stringify(config) }),

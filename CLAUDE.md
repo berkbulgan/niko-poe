@@ -57,7 +57,7 @@ At runtime the app gets game data from the N.I.K.O. server (`/v1/data/*` on the 
 
 Atlas tags are downloaded one at a time, and HTTP 429 means "try again later". Sprites load through the Tauri asset protocol (scope `$APPDATA/game-data/**`).
 
-The current atlas tag is the newest server tag whose files load; otherwise it is the bundled one. Saved trees record their tag in `config.treeVersion`. Older saves are mapped to a tag by `updatedAt`. A tree on another tag opens read-only until **Update** migrates it.
+The current atlas tag is the newest server tag whose files load; otherwise it is the bundled one. Saved trees record their tag in `config.treeVersion`. Older saves are mapped to a tag by `updatedAt`, never past the bundled tag. A tree on another tag opens read-only until **Update** migrates it.
 
 `src/data/` and `public/atlas/` (41 sprite files, ~10MB) hold the bundled fallback:
 - `node scripts/sync-game-data.mjs` refreshes them by hand.

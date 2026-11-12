@@ -331,7 +331,7 @@ export interface AtlasPatchFiles {
   assetDir: string;
 }
 
-/** The cached atlas tag list, newest first; `refresh` re-fetches it from the server first (the cache on failure). */
+/** The cached atlas tag list, newest first; `refresh` fetches the server's instead and rejects when it does not answer. */
 export function atlasVersions(refresh: boolean): Promise<AtlasVersion[]> {
   return invoke<AtlasVersion[]>('atlas_versions', { refresh });
 }

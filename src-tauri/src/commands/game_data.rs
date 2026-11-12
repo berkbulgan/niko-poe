@@ -19,6 +19,8 @@ use crate::state::AppState;
 
 /// Every game data request gives up after this long; the app then keeps what it has.
 pub const SERVER_TIMEOUT: Duration = Duration::from_secs(10);
+/// Atlas data.json and sprite downloads (up to a few MB each) get longer, so slow connections still finish.
+const ATLAS_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(60);
 const MAP_MODS_FILE: &str = "map-mods.json";
 
 /// `<app data dir>/game-data`, where all runtime game data lives.
@@ -241,39 +243,35 @@ fn save(path: &Path, bytes: &[u8]) -> Result<()> {
     write_atomic(path, bytes).map_err(|e| Error::Validation(format!("could not save {}: {e}", path.display())))
 }
 
-/// GET on the community server with the game data timeout. Errors when no server is configured or it is unreachable.
-async fn fetch(state: &AppState, path: &str) -> Result<reqwest::Response> {
+/// GET on the community server, giving up after `timeout`. Errors when no server is configured or it is unreachable.
+async fn fetch(state: &AppState, path: &str, timeout: Duration) -> Result<reqwest::Response> {
     request(state, Method::GET, path)
         .await?
-        .timeout(SERVER_TIMEOUT)
+        .timeout(timeout)
         .send()
         .await
         .map_err(|e| Error::Network(format!("game data server unreachable: {e}")))
 }
 
 async fn fetch_atlas_versions(state: &AppState) -> Result<Vec<AtlasVersion>> {
-    let res = fetch(state, "/v1/data/atlas").await?;
+    let res = fetch(state, "/v1/data/atlas", SERVER_TIMEOUT).await?;
     if !res.status().is_success() {
         return Err(status_error(res.status().as_u16()));
     }
     res.json().await.map_err(|e| Error::Parse(format!("bad atlas tag list: {e}")))
 }
 
-/// The cached atlas tag list, newest first. `refresh` fetches it from the server first; on failure the cache is returned.
+/// The atlas tag list, newest first: the cached one, or with `refresh` the server's (saved as the new cache).
+/// A refresh the server does not answer is an error, so the caller can tell it from an answer.
 #[tauri::command]
 pub async fn atlas_versions(app: AppHandle, state: State<'_, AppState>, refresh: bool) -> Result<Vec<AtlasVersion>> {
     let path = game_data_dir(&app)?.join("atlas").join("index.json");
     if refresh {
-        match fetch_atlas_versions(&state).await {
-            Ok(versions) => {
-                let index = AtlasIndex { checked_at: Utc::now(), versions };
-                if let Err(e) = write_json(&path, &index) {
-                    eprintln!("could not save the atlas tag list: {e}");
-                }
-                return Ok(index.versions);
-            }
-            Err(e) => eprintln!("atlas tag list refresh failed: {e}"),
+        let index = AtlasIndex { checked_at: Utc::now(), versions: fetch_atlas_versions(&state).await? };
+        if let Err(e) = write_json(&path, &index) {
+            eprintln!("could not save the atlas tag list: {e}");
         }
+        return Ok(index.versions);
     }
     Ok(read_json::<AtlasIndex>(&path).map(|index| index.versions).unwrap_or_default())
 }
@@ -291,7 +289,7 @@ pub async fn atlas_data(app: AppHandle, state: State<'_, AppState>, tag: String)
     let (data_json, data) = match read_atlas_data(&data_path) {
         Some(stored) => stored,
         None => {
-            let res = fetch(&state, &format!("/v1/data/atlas/{tag}")).await?;
+            let res = fetch(&state, &format!("/v1/data/atlas/{tag}"), ATLAS_DOWNLOAD_TIMEOUT).await?;
             match res.status().as_u16() {
                 200 => {}
                 404 => return Ok(None),
@@ -305,7 +303,7 @@ pub async fn atlas_data(app: AppHandle, state: State<'_, AppState>, tag: String)
     };
     // Files already written stay when a download fails (429 included); the next call fetches only the rest.
     for name in missing_assets(&dir, &sprite_files(&data)) {
-        let res = fetch(&state, &format!("/v1/data/atlas/{tag}/assets/{name}")).await?;
+        let res = fetch(&state, &format!("/v1/data/atlas/{tag}/assets/{name}"), ATLAS_DOWNLOAD_TIMEOUT).await?;
         if !res.status().is_success() {
             return Err(status_error(res.status().as_u16()));
         }
