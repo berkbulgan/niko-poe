@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   atlasConfigsEqual,
   boundsOf,
+  clampPan,
   buildConnections,
   cycleIndex,
   formatStatTotal,
@@ -333,5 +334,19 @@ describe('buildConnections arc centres', () => {
     const c = pnode('3', { group: 2, orbit: 1 });
     const conns = buildConnections([a, b, c], new Map([['1', a], ['2', b], ['3', c]]));
     expect(conns.map((x) => [x.toId, x.sameOrbit, x.arcCenter])).toEqual([['2', true, undefined], ['3', false, undefined]]);
+  });
+});
+
+describe('clampPan', () => {
+  const bounds = { minX: 0, minY: 0, maxX: 1000, maxY: 1000 };
+
+  it('keeps a tree larger than the viewport inside its 10% margin', () => {
+    // zoom 1: tree is 1000px in a 500px viewport, so pan x ranges over [500-1000-100, 0+100]
+    expect(clampPan(500, -9999, 1, 500, 500, bounds)).toEqual({ x: 100, y: -600 });
+  });
+
+  it('centres a tree that fits in the viewport with room to spare', () => {
+    // zoom 0.1: tree is 100px in an 800x400 viewport, so it sits in the middle
+    expect(clampPan(0, 0, 0.1, 800, 400, bounds)).toEqual({ x: 350, y: 150 });
   });
 });

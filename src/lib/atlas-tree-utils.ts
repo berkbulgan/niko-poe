@@ -774,3 +774,25 @@ export async function pickAtlasTag(
   }
   return bundled.tag;
 }
+
+/**
+ * Clamps pan so the tree (bounds scaled by zoom, plus a 10% margin) keeps covering the viewport.
+ * On an axis where the tree is smaller than the viewport, it is centred instead.
+ */
+export function clampPan(
+  px: number,
+  py: number,
+  zoom: number,
+  containerW: number,
+  containerH: number,
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+): { x: number; y: number } {
+  // Screen edge = pan + world * zoom, so pan must lie in [container - maxX*zoom - margin, -minX*zoom + margin]
+  const marginX = (bounds.maxX - bounds.minX) * zoom * 0.1;
+  const marginY = (bounds.maxY - bounds.minY) * zoom * 0.1;
+  const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
+  return {
+    x: clamp(px, containerW - bounds.maxX * zoom - marginX, -bounds.minX * zoom + marginX),
+    y: clamp(py, containerH - bounds.maxY * zoom - marginY, -bounds.minY * zoom + marginY),
+  };
+}
