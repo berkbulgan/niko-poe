@@ -2,6 +2,12 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.2] - 2026-11-13
+
+### Fixed
+- Atlas 3.30: the background rings are centred on the start instead of sitting above it
+- "Jump to" no longer zooms all the way in on small mechanics like Delirium
+
 ## [0.9.1] - 2026-11-12
 
 ### Fixed

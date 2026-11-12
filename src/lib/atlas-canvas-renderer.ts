@@ -14,6 +14,7 @@ import {
   resolveSprite,
   type AssetUrl,
 } from './atlas-sprite-loader';
+import { backgroundRect } from './atlas-tree-utils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -197,10 +198,8 @@ function drawAtlasBackground(
   zoomKey: string,
 ): void {
   const { bounds, sprites, assetUrl } = state;
-  const w = bounds.maxX - bounds.minX;
-  const h = bounds.maxY - bounds.minY;
-  const cx = (bounds.minX + bounds.maxX) / 2;
-  const cy = (bounds.minY + bounds.maxY) / 2;
+  const coord = resolveSprite(sprites.atlasBackground, 'AtlasPassiveBackground', zoomKey, assetUrl)?.coord;
+  const { cx, cy, w, h } = backgroundRect(bounds, state.startPosition, coord?.w === coord?.h);
 
   drawSpriteRect(
     ctx,
@@ -208,7 +207,7 @@ function drawAtlasBackground(
     'AtlasPassiveBackground',
     zoomKey,
     cx, cy,
-    w * 1.15, h * 1.15,
+    w, h,
     assetUrl,
   );
 }
