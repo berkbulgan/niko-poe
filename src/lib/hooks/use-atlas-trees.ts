@@ -54,3 +54,11 @@ export function useDuplicateAtlasTree() {
   });
 }
 
+/** Writes a tree's config right away (the atlas patch update); resolves after the tree list has refetched. */
+export function useSaveAtlasTreeConfig() {
+  const queryClient = useQueryClient();
+  return useMutation<void, Error, { id: string; config: AtlasTreeConfig }>({
+    mutationFn: async ({ id, config }) => { await ipc.updateAtlasTree(id, { config: JSON.stringify(config) }); },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ATLAS_TREES_KEY }),
+  });
+}

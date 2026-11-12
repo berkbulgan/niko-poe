@@ -16,7 +16,7 @@ import type {
 } from '@/types/atlas-tree';
 import { getAllocatableNeighbors, getStartingNodeIds, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected, searchMatches, boundsOf } from '@/lib/atlas-tree-utils';
 import { renderAtlasTree, hitTestNode, type RenderState } from '@/lib/atlas-canvas-renderer';
-import { initZoomLevels, preloadSprites, pickZoomLevel } from '@/lib/atlas-sprite-loader';
+import { initZoomLevels, preloadSprites, pickZoomLevel, type AssetUrl } from '@/lib/atlas-sprite-loader';
 
 interface TreeRendererProps {
   nodes: ProcessedAtlasNode[];
@@ -28,6 +28,8 @@ interface TreeRendererProps {
   searchHighlight?: string;
   sprites: AtlasSprites;
   imageZoomLevels: number[];
+  /** Sprite sheet file name → URL for this tree's atlas tag. */
+  assetUrl: AssetUrl;
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
   groups: Record<string, { x: number; y: number; background?: { image: string; offsetX?: number; offsetY?: number } }>;
   /** A new object centers the view on that node (zoom at least FOCUS_ZOOM) and gives it the hover highlight. */
@@ -106,6 +108,7 @@ export function TreeRenderer({
   searchHighlight,
   sprites,
   imageZoomLevels,
+  assetUrl,
   bounds,
   groups,
   focus,
@@ -142,21 +145,21 @@ export function TreeRenderer({
   useEffect(() => {
     initZoomLevels(imageZoomLevels, sprites);
     const zoomKey = pickZoomLevel(MIN_ZOOM);
-    preloadSprites(sprites, zoomKey).then(
+    preloadSprites(sprites, zoomKey, assetUrl).then(
       () => setSpritesReady(true),
       (err: unknown) => {
         console.error('[TreeRenderer] sprite preload failed:', err);
         setSpritesFailed(true);
       },
     );
-  }, [sprites, imageZoomLevels]);
+  }, [sprites, imageZoomLevels, assetUrl]);
 
   // Preload next zoom level when zoom changes
   useEffect(() => {
     if (!spritesReady) return;
     const zoomKey = pickZoomLevel(zoom);
-    preloadSprites(sprites, zoomKey);
-  }, [zoom, sprites, spritesReady]);
+    preloadSprites(sprites, zoomKey, assetUrl);
+  }, [zoom, sprites, spritesReady, assetUrl]);
 
   const allocatedStringIds = useMemo(
     () => new Set(Array.from(allocatedIds).map(String)),
@@ -259,6 +262,7 @@ export function TreeRenderer({
     allocatedIds,
     allocatableIds: allocatableNeighbors,
     sprites,
+    assetUrl,
     bounds,
     groups,
     zoom,
@@ -274,7 +278,7 @@ export function TreeRenderer({
     animTime: 0,
     viewportWidth: 0,
     viewportHeight: 0,
-  }), [nodes, connections, allocatedIds, allocatableNeighbors, sprites, bounds, groups, zoom, panX, panY, hoveredNodeId, focusedId, searchMatchIds, startingNodeIds, pathPreviewIds, prunePreviewIds, hoveredMasteryName, masteryGroupMap]);
+  }), [nodes, connections, allocatedIds, allocatableNeighbors, sprites, assetUrl, bounds, groups, zoom, panX, panY, hoveredNodeId, focusedId, searchMatchIds, startingNodeIds, pathPreviewIds, prunePreviewIds, hoveredMasteryName, masteryGroupMap]);
 
   /** Sets zoom and pan (clamped) in both the refs and the state. */
   const applyView = useCallback((z: number, px: number, py: number) => {

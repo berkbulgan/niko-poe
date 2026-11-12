@@ -12,6 +12,7 @@ import {
   drawSpriteRect,
   pickZoomLevel,
   resolveSprite,
+  type AssetUrl,
 } from './atlas-sprite-loader';
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,8 @@ export interface RenderState {
   allocatedIds: Set<number>;
   allocatableIds: Set<string>;
   sprites: AtlasSprites;
+  /** Sprite sheet file name → URL for this tree's atlas tag. */
+  assetUrl: AssetUrl;
   /** Tree world-space bounds from GGG data. */
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
   /** Group data for rendering backgrounds. */
@@ -191,7 +194,7 @@ function drawAtlasBackground(
   state: RenderState,
   zoomKey: string,
 ): void {
-  const { bounds, sprites } = state;
+  const { bounds, sprites, assetUrl } = state;
   const w = bounds.maxX - bounds.minX;
   const h = bounds.maxY - bounds.minY;
   const cx = (bounds.minX + bounds.maxX) / 2;
@@ -204,6 +207,7 @@ function drawAtlasBackground(
     zoomKey,
     cx, cy,
     w * 1.15, h * 1.15,
+    assetUrl,
   );
 }
 
@@ -216,13 +220,13 @@ function drawGroupBackgrounds(
   state: RenderState,
   zoomKey: string,
 ): void {
-  const { groups, sprites } = state;
+  const { groups, sprites, assetUrl } = state;
 
   for (const group of Object.values(groups)) {
     if (!group.background) continue;
 
     const bgName = group.background.image;
-    const resolved = resolveSprite(sprites.groupBackground, bgName, zoomKey);
+    const resolved = resolveSprite(sprites.groupBackground, bgName, zoomKey, assetUrl);
     if (!resolved) continue;
 
     const offsetX = group.background.offsetX ?? 0;
@@ -242,6 +246,7 @@ function drawGroupBackgrounds(
       group.y + offsetY,
       resolved.coord.w * invZoom,
       resolved.coord.h * invZoom,
+      assetUrl,
     );
   }
 }
@@ -257,7 +262,7 @@ function drawStartNode(
 ): void {
   const zoomLevel = parseFloat(zoomKey) || 0.3835;
   const invZoom = 1 / zoomLevel;
-  const resolved = resolveSprite(state.sprites.startNode, 'AtlasPassiveSkillScreenStart', zoomKey);
+  const resolved = resolveSprite(state.sprites.startNode, 'AtlasPassiveSkillScreenStart', zoomKey, state.assetUrl);
   const w = (resolved?.coord.w ?? 148) * invZoom;
   const h = (resolved?.coord.h ?? 154) * invZoom;
 
@@ -268,6 +273,7 @@ function drawStartNode(
     zoomKey,
     0, 0,
     w, h,
+    state.assetUrl,
   );
 }
 
@@ -559,7 +565,7 @@ function drawNodes(
   state: RenderState,
   zoomKey: string,
 ): void {
-  const { nodes, allocatedIds, allocatableIds, sprites, hoveredNodeId, searchMatchIds, pathPreviewIds, prunePreviewIds, hoveredMasteryName } = state;
+  const { nodes, allocatedIds, allocatableIds, sprites, assetUrl, hoveredNodeId, searchMatchIds, pathPreviewIds, prunePreviewIds, hoveredMasteryName } = state;
   const zoomLevel = parseFloat(zoomKey) || 0.3835;
   const invZoom = 1 / zoomLevel;
 
@@ -579,12 +585,12 @@ function drawNodes(
     const iconCategory = getIconCategory(sprites, node.nodeType, showAsAllocated);
     const iconName = node.nodeType === 'wormhole' ? 'Wormhole' : node.icon;
 
-    drawSprite(ctx, iconCategory, iconName, zoomKey, node.x, node.y, invZoom);
+    drawSprite(ctx, iconCategory, iconName, zoomKey, node.x, node.y, invZoom, assetUrl);
 
     // Frame
     if (node.nodeType !== 'mastery') {
       const frameName = getFrameName(node.nodeType, showAsAllocated, isAllocatable);
-      drawSprite(ctx, sprites.frame, frameName, zoomKey, node.x, node.y, invZoom);
+      drawSprite(ctx, sprites.frame, frameName, zoomKey, node.x, node.y, invZoom, assetUrl);
     }
 
     // Path preview glow (gold)
