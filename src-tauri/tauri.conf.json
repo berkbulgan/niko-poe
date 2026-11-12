@@ -1,6 +1,6 @@
 {
   "productName": "niko",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "identifier": "com.niko.app",
   "build": {
     "frontendDist": "../dist",
