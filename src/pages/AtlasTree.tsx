@@ -213,8 +213,8 @@ export function AtlasTree() {
     setSearchParams({}, { replace: true });
     const tree = trees.find((t) => t.id === linkedTreeId);
     if (!tree || tree.id === activeTreeId) return;
-    void open(tree.id, tree.config);
-  }, [linkedTreeId, trees, activeTreeId, open, setSearchParams]);
+    void open(tree.id, { ...tree.config, treeVersion: resolveTreeTag(tree, versions) ?? tree.config.treeVersion });
+  }, [linkedTreeId, trees, activeTreeId, open, setSearchParams, versions]);
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
@@ -232,7 +232,7 @@ export function AtlasTree() {
             tree={tree}
             active={activeTreeId === tree.id}
             badge={badgeFor(tree)}
-            onSelect={() => { if (tree.id !== activeTreeId) void open(tree.id, tree.config); }}
+            onSelect={() => { if (tree.id !== activeTreeId) void open(tree.id, configFor(tree)); }}
             onDuplicate={() => { void handleDuplicate(tree); }}
             onExport={() => { void handleExport(tree); }}
             onBeforeDelete={() => { if (tree.id === activeTreeId) void startNew({ discard: true }); }}
