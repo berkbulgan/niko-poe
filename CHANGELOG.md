@@ -2,6 +2,20 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.1] - 2026-11-12
+
+### Fixed
+- Atlas 3.30: the start icon and its lines are drawn at the tree's new starting point in the middle, and connections that curve around their own centre are drawn as arcs
+- The atlas tree no longer goes blank after returning to the page, switching trees, collapsing the stats panel or opening a community preview, and sprites appear right after zooming
+- "Jump to" frames the chosen mechanic's nodes instead of a huge empty area
+- Atlas text no longer shows raw markup like "[ContainsAbyss|Abysses]", and summed stats read correctly
+- Keyboard zoom works on read-only trees, searched nodes are no longer hidden behind the results list, and tooltips clear when the view moves
+- The app's fonts load in the installed build (they are now bundled)
+- Deleting a published strategy also removes it from the community list; deleting the open strategy clears the editor
+- Publish: the buttons stay visible, and tags follow the server's rules
+- Copy is disabled for a regex over the 250 character game limit
+- Community: a removed strategy shows a clear message, and budget and difficulty are capitalised correctly
+
 ## [0.9.0] - 2026-11-12
 
 ### Added
