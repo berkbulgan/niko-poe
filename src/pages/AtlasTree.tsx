@@ -261,6 +261,9 @@ export function AtlasTree() {
         allocatedNodes={allocatedNodeData}
         totalPoints={allocatedIds.size}
         maxPoints={MAX_POINTS}
+        mechanics={mechanics}
+        treeName={activeTree?.name ?? 'Atlas tree'}
+        onFocusNode={focusNode}
       />
 
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
