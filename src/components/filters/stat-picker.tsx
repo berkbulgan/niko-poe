@@ -168,9 +168,15 @@ export function StatPicker() {
   const hasAnyFilter = hasRegexFilter(regexConfig);
 
   const canCopy = hasAnyFilter && vendorRegex.length > 0;
+  // The stash search box rejects anything longer, so copying it would only paste a broken search.
+  const tooLong = vendorRegex.length > 250;
 
   async function copyRegex() {
     if (!canCopy) return;
+    if (tooLong) {
+      toast.error('Regex is over 250 characters');
+      return;
+    }
     if (!(await copyToClipboard(vendorRegex))) {
       toast.error('Could not copy to clipboard');
       return;
@@ -331,9 +337,12 @@ export function StatPicker() {
             )}
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button variant="primary" size="sm" onClick={() => { void copyRegex(); }} disabled={!canCopy}>
-              {copied ? 'Copied ✓' : 'Copy'}
-            </Button>
+            {/* The span carries the tooltip: a disabled button gets no pointer events. */}
+            <span title={tooLong ? 'Regex is over the 250 character game limit — remove some filters' : undefined}>
+              <Button variant="primary" size="sm" onClick={() => { void copyRegex(); }} disabled={!canCopy || tooLong}>
+                {copied ? 'Copied ✓' : 'Copy'}
+              </Button>
+            </span>
             <Button variant="secondary" size="sm" onClick={handleOpenTrade} disabled={searching || !hasAnyFilter}>
               {searching ? 'Searching...' : 'Open Trade ↗'}
             </Button>
