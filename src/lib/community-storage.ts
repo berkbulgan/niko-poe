@@ -53,6 +53,23 @@ export function getTokenForCommunityId(communityId: string): string | null {
   return Object.values(all).find((r) => r.communityId === communityId)?.token ?? null;
 }
 
+/** Community ids of every strategy this install published. */
+export function getPublishedIds(): string[] {
+  return Object.values(readJson<Record<string, PublishedRecord>>(PUBLISHED_KEY, {})).map((r) => r.communityId);
+}
+
+export type PublishState = 'none' | 'published' | 'stale';
+
+/**
+ * Whether a local strategy is published, and whether its saved config still matches the published one.
+ * Records from before 0.7.0 have no hash and count as published; so does a saved hash that is not known yet.
+ */
+export function publishState(record: PublishedRecord | null, savedHash: string | null): PublishState {
+  if (!record) return 'none';
+  if (!record.hash || savedHash === null || record.hash === savedHash) return 'published';
+  return 'stale';
+}
+
 export function getLinked(strategyId: string): LinkedRecord | null {
   return readJson<Record<string, LinkedRecord>>(LINKED_KEY, {})[strategyId] ?? null;
 }
@@ -72,6 +89,12 @@ export function linkedCommunityId(strategyId: string, currentHash: string): stri
   return linked?.hash === currentHash ? linked.communityId : null;
 }
 
+/** The first local strategy imported from this community id, or null (also when that strategy was deleted). */
+export function importedStrategyId(communityId: string, strategies: Array<{ id: string }>): string | null {
+  const linked = readJson<Record<string, LinkedRecord>>(LINKED_KEY, {});
+  return strategies.find((s) => linked[s.id]?.communityId === communityId)?.id ?? null;
+}
+
 /** Random per-install id, created on first use; the server only keeps a salted hash of it. */
 export function getInstallId(): string {
   const existing = storage.get(INSTALL_ID_KEY);
@@ -89,4 +112,8 @@ export function setFavourited(communityId: string, on: boolean): void {
   const ids = readJson<string[]>(FAVOURITES_KEY, []).filter((id) => id !== communityId);
   if (on) ids.push(communityId);
   storage.set(FAVOURITES_KEY, JSON.stringify(ids));
+}
+
+export function getFavouriteIds(): string[] {
+  return readJson<string[]>(FAVOURITES_KEY, []);
 }
