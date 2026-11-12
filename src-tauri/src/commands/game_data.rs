@@ -261,21 +261,17 @@ async fn fetch_atlas_versions(state: &AppState) -> Result<Vec<AtlasVersion>> {
     res.json().await.map_err(|e| Error::Parse(format!("bad atlas tag list: {e}")))
 }
 
-/// The cached atlas tag list, newest first. `refresh` fetches it from the server first; on failure the cache is returned.
+/// The atlas tag list, newest first: the cached one, or with `refresh` the server's (saved as the new cache).
+/// A refresh the server does not answer is an error, so the caller can tell it from an answer.
 #[tauri::command]
 pub async fn atlas_versions(app: AppHandle, state: State<'_, AppState>, refresh: bool) -> Result<Vec<AtlasVersion>> {
     let path = game_data_dir(&app)?.join("atlas").join("index.json");
     if refresh {
-        match fetch_atlas_versions(&state).await {
-            Ok(versions) => {
-                let index = AtlasIndex { checked_at: Utc::now(), versions };
-                if let Err(e) = write_json(&path, &index) {
-                    eprintln!("could not save the atlas tag list: {e}");
-                }
-                return Ok(index.versions);
-            }
-            Err(e) => eprintln!("atlas tag list refresh failed: {e}"),
+        let index = AtlasIndex { checked_at: Utc::now(), versions: fetch_atlas_versions(&state).await? };
+        if let Err(e) = write_json(&path, &index) {
+            eprintln!("could not save the atlas tag list: {e}");
         }
+        return Ok(index.versions);
     }
     Ok(read_json::<AtlasIndex>(&path).map(|index| index.versions).unwrap_or_default())
 }

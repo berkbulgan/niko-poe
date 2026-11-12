@@ -75,22 +75,25 @@ export function useAtlasVersions(): AtlasVersion[] {
 const canLoad = (tag: string) => ipc.atlasData(tag).then((files) => files !== null, () => false);
 
 /**
- * Picks the current tag from the saved tag list first, then from the server's (the saved list when offline).
+ * Picks the current tag from the saved tag list first, then from the server's (offline: the saved pick stays).
  * The saved pass reads only the disk, so a restart is back on its last tag before the network wait; until then
  * trees on that tag would look newer than the current tag and offer an Update that drops nodes.
- * Returns the current tag when it changed, else null. Never rejects.
+ * newTag: the current tag when it changed, else null. answered: the server sent its tag list. Never rejects.
  */
-export async function refreshAtlasTag(): Promise<string | null> {
+export async function refreshAtlasTag(): Promise<{ newTag: string | null; answered: boolean }> {
   const before = useGameDataStore.getState().atlasTag;
+  let answered = false;
   for (const refresh of [false, true]) {
-    const versions = await ipc.atlasVersions(refresh).catch(() => [] as AtlasVersion[]);
+    const versions = await ipc.atlasVersions(refresh).catch(() => null);
+    if (!versions) continue;
+    answered = refresh;
     const tag = await pickAtlasTag(versions, BUNDLED_ATLAS, canLoad);
     // An open tree keeps saving under the tag it was opened on (atlas-tree-store editingTag), so a tag landing mid-session
     // never restamps old-patch node ids; the tree just turns read-only. Only an empty new draft moves to the new tag.
     useGameDataStore.setState({ atlasVersions: versions, atlasTag: tag });
   }
   const after = useGameDataStore.getState().atlasTag;
-  return after === before ? null : after;
+  return { newTag: after === before ? null : after, answered };
 }
 
 /** Main window only: picks the current atlas tag now and every 24 h. */

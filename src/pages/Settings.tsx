@@ -138,12 +138,13 @@ function GameDataRow() {
   const checkNow = async () => {
     setChecking(true);
     // Neither rejects. The atlas check can take a while when a new tag downloads.
-    const [status, newAtlasTag] = await Promise.all([refreshMapMods(), refreshAtlasTag()]);
+    const [status, atlas] = await Promise.all([refreshMapMods(), refreshAtlasTag()]);
     setChecking(false);
     if (status === 'updated') toast.success(`Map mod data updated to ${useGameDataStore.getState().mapModPatch}`);
-    if (newAtlasTag) toast.success(`New atlas tree ${newAtlasTag} available`);
-    if (status === 'unchanged' && !newAtlasTag) toast.success('Game data is up to date');
+    if (atlas.newTag) toast.success(`New atlas tree ${atlas.newTag} available`);
+    if (status === 'unchanged' && atlas.answered && !atlas.newTag) toast.success('Game data is up to date');
     if (status === 'failed') toast.error('Could not check for game data updates');
+    if (!atlas.answered) toast.error('Could not check for atlas tree data');
   };
 
   return (
