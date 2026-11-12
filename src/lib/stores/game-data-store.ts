@@ -6,6 +6,7 @@ import * as ipc from '@/lib/ipc';
 import { applyMapModData } from '@/data';
 import sources from '@/data/sources.json';
 import { useFiltersStore } from '@/lib/stores/filters-store';
+import type { AtlasVersion } from '@/types/game-data';
 
 export type MapModSource = 'bundled' | 'cached' | 'server';
 export type RefreshStatus = ipc.MapModRefresh['status'];
@@ -20,6 +21,8 @@ interface GameDataState {
   offline: boolean;
   /** The current atlas tag. */
   atlasTag: string;
+  /** The server's atlas tag list as last read (cached on disk), newest first; [] until the first read. */
+  atlasVersions: AtlasVersion[];
   /** Bumped on every runtime apply; components keyed on it remount against the new data. */
   version: number;
 }
@@ -30,6 +33,7 @@ export const useGameDataStore = create<GameDataState>(() => ({
   checkedAt: null,
   offline: false,
   atlasTag: sources.atlasTag,
+  atlasVersions: [],
   version: 0,
 }));
 

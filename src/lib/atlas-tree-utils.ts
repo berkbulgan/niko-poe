@@ -1,5 +1,5 @@
 // ABOUTME: Pure utility functions for processing the GGG atlas passive tree data.
-// ABOUTME: Handles positioning, stat aggregation, pathfinding, connectivity, search and mechanic grouping.
+// ABOUTME: Handles positioning, stat aggregation, pathfinding, connectivity, search, mechanic grouping and atlas patch tags.
 
 import type {
   AtlasGroupData,
@@ -12,6 +12,8 @@ import type {
   AggregatedStat,
   AtlasTreeConfig,
 } from '@/types/atlas-tree';
+import type { AtlasVersion } from '@/types/game-data';
+import sources from '@/data/sources.json';
 
 // ---------------------------------------------------------------------------
 // 3a. Orbit position calculator
@@ -421,11 +423,18 @@ export function pruneDisconnected(
   remaining.delete(removedNodeId);
 
   if (remaining.size === 0) return remaining;
+  return reachableAllocated(remaining, nodes);
+}
 
+/** The allocated ids reachable from the root through allocated nodes and hubs (hubs always count as allocated). */
+function reachableAllocated(
+  allocated: Set<string>,
+  nodes: Record<string, AtlasNodeData>,
+): Set<string> {
   const hubs = getHubNodeIds(nodes);
   const adj = buildAdjacencyList(nodes);
 
-  // BFS from hub nodes through (remaining allocated + hub nodes)
+  // BFS from hub nodes through (allocated + hub nodes)
   const visited = new Set<string>();
   const queue: string[] = [];
 
@@ -448,16 +457,16 @@ export function pruneDisconnected(
 
     for (const neighbor of neighbors) {
       if (visited.has(neighbor)) continue;
-      if (remaining.has(neighbor) || hubs.has(neighbor)) {
+      if (allocated.has(neighbor) || hubs.has(neighbor)) {
         visited.add(neighbor);
         queue.push(neighbor);
       }
     }
   }
 
-  // Return only remaining nodes that were reached from root/hubs
+  // Return only allocated nodes that were reached from root/hubs
   const reachable = new Set<string>();
-  for (const id of remaining) {
+  for (const id of allocated) {
     if (visited.has(id)) reachable.add(id);
   }
   return reachable;
@@ -668,4 +677,82 @@ export function statsText(
     ].join('\n'));
   }
   return blocks.join('\n\n');
+}
+
+// ---------------------------------------------------------------------------
+// 3l. Atlas patches (GGG atlastree-export tags)
+// ---------------------------------------------------------------------------
+
+const ATLAS_TAG = /^\d+\.\d+\.\d+$/;
+
+/** Milliseconds for an RFC 3339 date or SQLite's `YYYY-MM-DD HH:MM:SS` (UTC, no zone). */
+function utcMs(date: string): number {
+  return Date.parse(date.includes('T') ? date : `${date.replace(' ', 'T')}Z`);
+}
+
+/** True when X.Y.Z tag `a` is newer than `b`. */
+function tagNewer(a: string, b: string): boolean {
+  return a.localeCompare(b, undefined, { numeric: true }) > 0;
+}
+
+/**
+ * The atlas tag a saved tree was made on. New saves store it in treeVersion. Older saves hold "Atlas",
+ * so they get the newest known tag released at or before the tree's last update, capped at the bundled
+ * tag: legacy saves were only ever made on the bundled atlas data or older.
+ * Null: an unknown older patch, or no date to go by.
+ */
+export function resolveTreeTag(
+  tree: { config: AtlasTreeConfig; updatedAt?: string },
+  versions: AtlasVersion[],
+): string | null {
+  if (ATLAS_TAG.test(tree.config.treeVersion)) return tree.config.treeVersion;
+  if (!tree.updatedAt) return null;
+  const updated = utcMs(tree.updatedAt);
+  let best: AtlasVersion | null = null;
+  for (const v of versions) {
+    if (tagNewer(v.tag, sources.atlasTag)) continue;
+    const released = utcMs(v.releasedAt);
+    if (released <= updated && (!best || released > utcMs(best.releasedAt))) best = v;
+  }
+  return best?.tag ?? null;
+}
+
+/**
+ * Moves a saved allocation onto another patch's nodes. Ids missing there, hubs and masteries go first;
+ * then every node no longer connected to the root (same rule as pruneDisconnected). Order is kept.
+ */
+export function migrateTree(
+  allocatedIds: number[],
+  nextNodes: Record<string, AtlasNodeData>,
+): { kept: number[]; removed: number[] } {
+  const hubs = getHubNodeIds(nextNodes);
+  const candidates = new Set<string>();
+  for (const id of allocatedIds) {
+    const key = String(id);
+    const node = nextNodes[key];
+    if (node && !hubs.has(key) && !node.isMastery) candidates.add(key);
+  }
+  const reachable = reachableAllocated(candidates, nextNodes);
+  return {
+    kept: allocatedIds.filter((id) => reachable.has(String(id))),
+    removed: allocatedIds.filter((id) => !reachable.has(String(id))),
+  };
+}
+
+/**
+ * The current atlas tag: the newest listed tag, no older than the bundled one, whose files load.
+ * Falls back to the bundled tag. Tags are tried one at a time, newest first; the bundled tag never needs loading.
+ */
+export async function pickAtlasTag(
+  versions: AtlasVersion[],
+  bundled: AtlasVersion,
+  canLoad: (tag: string) => Promise<boolean>,
+): Promise<string> {
+  const candidates = versions
+    .filter((v) => utcMs(v.releasedAt) >= utcMs(bundled.releasedAt))
+    .sort((a, b) => utcMs(b.releasedAt) - utcMs(a.releasedAt));
+  for (const v of candidates) {
+    if (v.tag === bundled.tag || (await canLoad(v.tag))) return v.tag;
+  }
+  return bundled.tag;
 }

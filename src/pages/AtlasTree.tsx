@@ -1,5 +1,5 @@
 // ABOUTME: Atlas skill tree planner page with saved atlas tree sidebar, Canvas tree, and stats panel.
-// ABOUTME: Autosaves the open tree (or an "Untitled tree" on the first allocation); undo, rename, import/export, ?tree= links.
+// ABOUTME: Autosaves the open tree; a tree saved on another atlas patch opens read-only until Update migrates it.
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -13,6 +13,7 @@ import {
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
   useRenameAtlasTree,
+  useSaveAtlasTreeConfig,
 } from '@/lib/hooks/use-atlas-trees';
 import { useAtlasAutosave } from '@/lib/hooks/use-atlas-autosave';
 import { useStrategiesUsing } from '@/lib/hooks/use-strategies';
@@ -22,22 +23,25 @@ import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
-import { nodeMechanics, processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
+import { migrateTree, nodeMechanics, pruneDisconnected, resolveTreeTag } from '@/lib/atlas-tree-utils';
+import { useAtlasData, useAtlasVersions, useTreeAtlas } from '@/lib/atlas-data';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import { useConfirmStore } from '@/lib/stores/confirm-store';
-import rawTreeData from '@/data/atlas-tree-data.json';
+import { useGameDataStore } from '@/lib/stores/game-data-store';
+import { toast } from '@/lib/stores/toast-store';
 import type {
-  AtlasTreeRawData,
   AtlasTree as AtlasTreeType,
   AtlasNodeData,
+  AtlasTreeConfig,
 } from '@/types/atlas-tree';
 
-const treeData = rawTreeData as unknown as AtlasTreeRawData;
-const MAX_POINTS = treeData.points?.totalPoints ?? 138;
+/** Used when a data.json has no points block. */
+const DEFAULT_MAX_POINTS = 138;
 
 function AtlasTreeRow({
   tree,
   active,
+  badge,
   onSelect,
   onDuplicate,
   onExport,
@@ -45,6 +49,8 @@ function AtlasTreeRow({
 }: {
   tree: AtlasTreeType;
   active: boolean;
+  /** The tree's atlas tag (or "old") when it is not the current tag. */
+  badge: string | null;
   onSelect: () => void;
   onDuplicate: () => void;
   onExport: () => void;
@@ -65,6 +71,9 @@ function AtlasTreeRow({
       subtitle={
         <span className="block truncate text-xs text-poe-text-muted">
           {tree.config.allocatedNodeIds.length} pts
+          {badge && (
+            <span className="ml-1.5 rounded border border-poe-border/30 px-1 text-[10px] text-poe-text-muted">{badge}</span>
+          )}
         </span>
       }
       extra={usedIn.length > 0 && <UsedInLinks strategies={usedIn} />}
@@ -87,12 +96,24 @@ export function AtlasTree() {
   const { data: trees, isLoading } = useAtlasTrees();
   const duplicateTree = useDuplicateAtlasTree();
   const renameTree = useRenameAtlasTree();
+  const saveConfig = useSaveAtlasTreeConfig();
   const { status, flush, open, startNew } = useAtlasAutosave(trees?.map((t) => t.name) ?? []);
 
   const activeTree = trees?.find((t) => t.id === activeTreeId);
 
-  const processedNodes = useMemo(() => processTreeData(treeData), []);
-  const mechanics = useMemo(() => nodeMechanics(treeData.nodes), []);
+  // A tree saved on another atlas patch (null: an unknown older one) is read-only until it is updated.
+  const currentTag = useGameDataStore((s) => s.atlasTag);
+  const versions = useAtlasVersions();
+  const activeTag = activeTree ? resolveTreeTag(activeTree, versions) : currentTag;
+  const readOnly = activeTag !== currentTag;
+  const atlas = useTreeAtlas(activeTag);
+  const { data: currentAtlas } = useAtlasData(currentTag);
+
+  const treeData = atlas?.data;
+  const maxPoints = treeData?.points?.totalPoints ?? DEFAULT_MAX_POINTS;
+  const processedNodes = useMemo(() => atlas?.nodes ?? [], [atlas]);
+  const rawNodes = useMemo<Record<string, AtlasNodeData>>(() => treeData?.nodes ?? {}, [treeData]);
+  const mechanics = useMemo(() => nodeMechanics(rawNodes), [rawNodes]);
   const jumpTargets = useMemo(() => {
     const byMechanic = new Map<string, string[]>();
     for (const [nodeId, mechanic] of mechanics) {
@@ -104,8 +125,6 @@ export function AtlasTree() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [mechanics]);
 
-  const rawNodes = treeData.nodes;
-
   const allocatedNodeData = useMemo(() => {
     const result: AtlasNodeData[] = [];
     for (const id of allocatedIds) {
@@ -116,23 +135,24 @@ export function AtlasTree() {
   }, [allocatedIds, rawNodes]);
 
   // Bounds from GGG data
-  const bounds = useMemo(() => ({
+  const bounds = useMemo(() => (treeData ? {
     minX: treeData.min_x,
     minY: treeData.min_y,
     maxX: treeData.max_x,
     maxY: treeData.max_y,
-  }), []);
+  } : null), [treeData]);
 
   const handleToggleNode = useCallback((nodeId: number) => {
     toggleNode(nodeId, rawNodes, pruneDisconnected);
   }, [rawNodes, toggleNode]);
 
-  // Ctrl+Z undoes the last allocation (except while typing in a field).
+  // Ctrl+Z undoes the last allocation (except while typing in a field, or on a read-only tree).
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
       if (useConfirmStore.getState().request !== null) return;
+      if (readOnly) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         undo();
@@ -140,26 +160,48 @@ export function AtlasTree() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [undo]);
+  }, [undo, readOnly]);
 
   const handleAllocatePath = useCallback((nodeIds: number[]) => {
     allocatePath(nodeIds);
   }, [allocatePath]);
 
+  /** Sidebar badge for a tree on another patch: its tag, or "old" when the patch is unknown. */
+  function badgeFor(tree: AtlasTreeType): string | null {
+    const tag = resolveTreeTag(tree, versions);
+    return tag === currentTag ? null : (tag ?? 'old');
+  }
+
+  // The open tree's sidebar copy may lag the draft until the list refetches; other trees keep their own patch tag.
+  function configFor(tree: AtlasTreeType): AtlasTreeConfig {
+    if (tree.id === activeTreeId && !readOnly) return getConfig(currentTag);
+    return { ...tree.config, treeVersion: resolveTreeTag(tree, versions) ?? tree.config.treeVersion };
+  }
+
   async function handleDuplicate(tree: AtlasTreeType) {
     await flush();
-    // The open tree's sidebar copy may lag the draft until the list refetches.
-    const config = tree.id === activeTreeId ? getConfig(treeData.tree) : tree.config;
     duplicateTree.mutate(
-      { name: `${tree.name} (copy)`, config },
+      { name: `${tree.name} (copy)`, config: configFor(tree) },
       { onSuccess: (dup) => { void open(dup.id, dup.config); } },
     );
   }
 
   async function handleExport(tree: AtlasTreeType) {
     await flush();
-    const config = tree.id === activeTreeId ? getConfig(treeData.tree) : tree.config;
-    setExportInput({ type: 'A', name: tree.name, config });
+    setExportInput({ type: 'A', name: tree.name, config: configFor(tree) });
+  }
+
+  function handleUpdate() {
+    if (!activeTree || !currentAtlas) return;
+    const { kept, removed } = migrateTree(activeTree.config.allocatedNodeIds, currentAtlas.data.nodes);
+    const config: AtlasTreeConfig = { allocatedNodeIds: kept, treeVersion: currentTag };
+    // Saved directly: autosave compares node ids only, so an update that keeps every node would never be written.
+    saveConfig.mutate({ id: activeTree.id, config }, {
+      onSuccess: () => {
+        void open(activeTree.id, config);
+        toast.success(`Updated to ${currentTag}: kept ${kept.length} nodes, removed ${removed.length}`);
+      },
+    });
   }
 
   // Strategies link here with ?tree=<id> to open that tree.
@@ -188,6 +230,7 @@ export function AtlasTree() {
             key={tree.id}
             tree={tree}
             active={activeTreeId === tree.id}
+            badge={badgeFor(tree)}
             onSelect={() => { if (tree.id !== activeTreeId) void open(tree.id, tree.config); }}
             onDuplicate={() => { void handleDuplicate(tree); }}
             onExport={() => { void handleExport(tree); }}
@@ -206,8 +249,8 @@ export function AtlasTree() {
             status={status}
             ariaLabel="Atlas tree name"
           >
-            <span className={`text-xs ${allocatedIds.size > MAX_POINTS ? 'font-semibold text-poe-error' : 'text-poe-text-muted'}`}>
-              {allocatedIds.size} / {MAX_POINTS} pts
+            <span className={`text-xs ${allocatedIds.size > maxPoints ? 'font-semibold text-poe-error' : 'text-poe-text-muted'}`}>
+              {allocatedIds.size} / {maxPoints} pts
             </span>
           </EntityTitle>
           <div className="flex items-center gap-2">
@@ -215,7 +258,7 @@ export function AtlasTree() {
               variant="ghost"
               size="sm"
               onClick={() => undo()}
-              disabled={history.length === 0}
+              disabled={readOnly || history.length === 0}
               title="Undo (Ctrl+Z)"
             >
               Undo
@@ -224,28 +267,49 @@ export function AtlasTree() {
           </div>
         </div>
 
+        {/* Old patch: read-only until updated */}
+        {readOnly && atlas && (
+          <div className="flex items-center justify-between gap-3 border-b border-poe-gold/20 bg-poe-gold/5 px-4 py-2 lg:px-6">
+            <p className="text-xs text-poe-gold">
+              {atlas.tag === activeTag
+                ? `Made for ${activeTag}. Update it to ${currentTag} to edit.`
+                : 'Made for an older patch.'}
+            </p>
+            <Button size="sm" onClick={handleUpdate} disabled={!currentAtlas || saveConfig.isPending}>
+              Update
+            </Button>
+          </div>
+        )}
+
         {/* Tree renderer */}
         <div className="relative flex-1">
-          <TreeRenderer
-            nodes={processedNodes}
-            rawNodes={rawNodes}
-            allocatedIds={allocatedIds}
-            onToggleNode={handleToggleNode}
-            onAllocatePath={handleAllocatePath}
-            searchHighlight={searchQuery}
-            sprites={treeData.sprites}
-            imageZoomLevels={treeData.imageZoomLevels}
-            bounds={bounds}
-            groups={treeData.groups}
-            focus={focus}
-            jumpTargets={jumpTargets}
-          />
+          {atlas && bounds ? (
+            <TreeRenderer
+              key={atlas.tag}
+              nodes={processedNodes}
+              rawNodes={rawNodes}
+              allocatedIds={allocatedIds}
+              onToggleNode={handleToggleNode}
+              onAllocatePath={handleAllocatePath}
+              searchHighlight={searchQuery}
+              sprites={atlas.data.sprites}
+              imageZoomLevels={atlas.data.imageZoomLevels}
+              assetUrl={atlas.assetUrl}
+              bounds={bounds}
+              groups={atlas.data.groups}
+              focus={focus}
+              jumpTargets={jumpTargets}
+              readOnly={readOnly}
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-xs text-poe-text-muted">Loading atlas tree…</div>
+          )}
 
           {/* Over-limit toast */}
-          {allocatedIds.size > MAX_POINTS && (
+          {allocatedIds.size > maxPoints && (
             <div className="absolute right-4 top-4 rounded border border-poe-error/40 bg-poe-panel/95 px-4 py-2 shadow-lg backdrop-blur-sm">
               <p className="text-sm font-semibold text-poe-error">
-                {allocatedIds.size - MAX_POINTS} point{allocatedIds.size - MAX_POINTS > 1 ? 's' : ''} over limit
+                {allocatedIds.size - maxPoints} point{allocatedIds.size - maxPoints > 1 ? 's' : ''} over limit
               </p>
             </div>
           )}
@@ -267,7 +331,7 @@ export function AtlasTree() {
       <StatsPanel
         allocatedNodes={allocatedNodeData}
         totalPoints={allocatedIds.size}
-        maxPoints={MAX_POINTS}
+        maxPoints={maxPoints}
         mechanics={mechanics}
         treeName={activeTree?.name ?? 'Atlas tree'}
         onFocusNode={focusNode}

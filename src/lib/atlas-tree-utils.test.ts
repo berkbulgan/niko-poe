@@ -1,4 +1,4 @@
-// ABOUTME: Tests for the pure atlas tree helpers: config equality, search, cycling, bounds and mechanic grouping.
+// ABOUTME: Tests for the pure atlas tree helpers: config equality, search, cycling, bounds, mechanic grouping, patch tags and migration.
 // ABOUTME: Uses small hand-built node graphs, plus one sanity check against the bundled GGG tree data.
 
 import { describe, expect, it } from 'vitest';
@@ -9,12 +9,16 @@ import {
   formatStatTotal,
   groupByMechanic,
   isEmptyAtlasConfig,
+  migrateTree,
   nodeMechanics,
+  pickAtlasTag,
+  resolveTreeTag,
   searchMatches,
   statsText,
 } from './atlas-tree-utils';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type { AtlasNodeData, AtlasTreeRawData, ProcessedAtlasNode } from '@/types/atlas-tree';
+import type { AtlasVersion } from '@/types/game-data';
 
 function node(skill: number, extra: Partial<AtlasNodeData> = {}): AtlasNodeData {
   return { skill, name: `Node ${skill}`, icon: '', stats: [], group: 0, orbit: 0, orbitIndex: 0, out: [], in: [], ...extra };
@@ -204,5 +208,70 @@ describe('statsText', () => {
   });
   it('leaves out the keystones block when there are none', () => {
     expect(statsText('Atlas tree', 0, 132, [], [])).toBe('Atlas tree — 0/132 points');
+  });
+});
+
+const V3301: AtlasVersion = { tag: '3.30.0', releasedAt: '2026-11-12T04:34:53Z' };
+const V3291: AtlasVersion = { tag: '3.29.1', releasedAt: '2026-07-31T00:27:57Z' };
+
+describe('resolveTreeTag', () => {
+  const legacy = (updatedAt?: string) => ({ config: { allocatedNodeIds: [], treeVersion: 'Atlas' }, updatedAt });
+  const V3280: AtlasVersion = { tag: '3.28.0', releasedAt: '2026-03-01T00:00:00Z' };
+
+  it('passes an X.Y.Z tree version through', () => {
+    expect(resolveTreeTag({ config: { allocatedNodeIds: [], treeVersion: '3.28.0' }, updatedAt: '2026-12-01 00:00:00' }, [V3301])).toBe('3.28.0');
+  });
+  it('maps a legacy tree to the newest tag released at or before its last update (SQLite dates are UTC)', () => {
+    expect(resolveTreeTag(legacy('2026-11-12 04:00:00'), [V3301, V3291, V3280])).toBe('3.29.1');
+    expect(resolveTreeTag(legacy('2026-07-31T00:27:57Z'), [V3301, V3291, V3280])).toBe('3.29.1');
+    expect(resolveTreeTag(legacy('2026-07-30 23:00:00'), [V3301, V3291, V3280])).toBe('3.28.0');
+  });
+  it('never maps a legacy tree past the bundled tag, even when updated after a newer release', () => {
+    expect(resolveTreeTag(legacy('2026-11-12 05:00:00'), [V3291, V3301])).toBe('3.29.1');
+  });
+  it('returns null for an unknown older patch or a tree without a date', () => {
+    expect(resolveTreeTag(legacy('2026-07-30 23:00:00'), [V3301, V3291])).toBeNull();
+    expect(resolveTreeTag(legacy(), [V3301, V3291])).toBeNull();
+  });
+});
+
+describe('migrateTree', () => {
+  // root → hub 1 (nameless) → 10 → 11 → 12, mastery 30 hangs off 11, 20 off the hub.
+  const edges: Array<[string, string]> = [['root', '1'], ['1', '10'], ['10', '11'], ['11', '12'], ['11', '30'], ['1', '20']];
+  function treeWithout(missing: string[]): Record<string, AtlasNodeData> {
+    const list = [node(0), node(1, { name: '' }), node(10), node(11), node(12), node(20), node(30, { isMastery: true })]
+      .filter((n) => !missing.includes(String(n.skill)));
+    return graph(list, edges.filter(([a, b]) => !missing.includes(a) && !missing.includes(b)));
+  }
+  const allocated = [10, 11, 12, 30, 99, 1];
+
+  it('keeps nodes that still exist and drops missing ids, hubs and masteries', () => {
+    expect(migrateTree(allocated, treeWithout([]))).toEqual({ kept: [10, 11, 12], removed: [30, 99, 1] });
+  });
+  it('drops nodes cut off from root by a removal', () => {
+    expect(migrateTree(allocated, treeWithout(['11']))).toEqual({ kept: [10], removed: [11, 12, 30, 99, 1] });
+  });
+});
+
+describe('pickAtlasTag', () => {
+  const V3310: AtlasVersion = { tag: '3.31.0', releasedAt: '2027-03-01T00:00:00Z' };
+  const V3280: AtlasVersion = { tag: '3.28.0', releasedAt: '2026-03-01T00:00:00Z' };
+
+  it('takes the newest tag whose files load, trying one tag at a time', async () => {
+    const tried: string[] = [];
+    const tag = await pickAtlasTag([V3301, V3310, V3291], V3291, async (t) => { tried.push(t); return t === '3.30.0'; });
+    expect(tag).toBe('3.30.0');
+    expect(tried).toEqual(['3.31.0', '3.30.0']);
+  });
+  it('stops at the bundled tag without loading it', async () => {
+    const tried: string[] = [];
+    expect(await pickAtlasTag([V3301, V3291], V3291, async (t) => { tried.push(t); return false; })).toBe('3.29.1');
+    expect(tried).toEqual(['3.30.0']);
+  });
+  it('ignores tags older than the bundled one and falls back to it', async () => {
+    const tried: string[] = [];
+    expect(await pickAtlasTag([V3280], V3291, async (t) => { tried.push(t); return true; })).toBe('3.29.1');
+    expect(await pickAtlasTag([], V3291, async () => true)).toBe('3.29.1');
+    expect(tried).toEqual([]);
   });
 });

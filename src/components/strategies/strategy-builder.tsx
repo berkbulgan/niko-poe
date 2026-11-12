@@ -21,12 +21,10 @@ import { MAPS_PER_USE } from '@/lib/strategy-cost';
 import { getPrices, proxySearch } from '@/lib/ipc';
 import { toast } from '@/lib/stores/toast-store';
 import { useStrategiesStore, type SelectedItem } from '@/lib/stores/strategies-store';
-import rawTreeData from '@/data/atlas-tree-data.json';
-import type { AtlasTreeRawData } from '@/types/atlas-tree';
+import { resolveTreeTag } from '@/lib/atlas-tree-utils';
+import { useAtlasVersions, useTreeAtlas } from '@/lib/atlas-data';
 import { SimpleSelect } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
-
-const treeData = rawTreeData as unknown as AtlasTreeRawData;
 
 // ── Constants ──
 
@@ -339,23 +337,26 @@ function LinkedAtlasTreeSection({
   onSelect: (id: string | null) => void;
 }) {
   const selectedTree = trees.find((t) => t.id === selectedTreeId);
+  const versions = useAtlasVersions();
+  // The tree's own patch when it is known and loads, else the current atlas data.
+  const atlas = useTreeAtlas(selectedTree ? resolveTreeTag(selectedTree, versions) : null);
   const nodeCount = selectedTree?.config?.allocatedNodeIds?.length ?? 0;
-  const maxPoints = treeData.points?.totalPoints ?? 138;
+  const maxPoints = atlas?.data.points?.totalPoints ?? 138;
   const navigate = useNavigate();
 
   // Resolve keystone and notable data from allocated IDs
   const { keystones, notables } = useMemo(() => {
-    if (!selectedTree) return { keystones: [], notables: [] };
+    if (!selectedTree || !atlas) return { keystones: [], notables: [] };
     const ks: Array<{ name: string; stats: string[] }> = [];
     const ns: Array<{ name: string; stats: string[] }> = [];
     for (const id of selectedTree.config.allocatedNodeIds) {
-      const node = treeData.nodes[String(id)];
+      const node = atlas.data.nodes[String(id)];
       if (!node?.name) continue;
       if (node.isKeystone) ks.push({ name: node.name, stats: node.stats });
       else if (node.isNotable) ns.push({ name: node.name, stats: node.stats });
     }
     return { keystones: ks, notables: ns };
-  }, [selectedTree]);
+  }, [selectedTree, atlas]);
 
 
   return (

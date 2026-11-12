@@ -10,6 +10,7 @@ import { Overlay } from './pages/Overlay';
 import { QueryProvider } from '@/lib/query-provider';
 import { isOverlayWindow } from '@/lib/platform';
 import { loadCachedMapMods, startGameDataRefresh } from '@/lib/stores/game-data-store';
+import { startAtlasRefresh } from '@/lib/atlas-data';
 import './globals.css';
 
 function App() {
@@ -41,4 +42,7 @@ ReactDOM.createRoot(root).render(
   </React.StrictMode>
 );
 
-if (!overlay) startGameDataRefresh();
+if (!overlay) {
+  startGameDataRefresh();
+  startAtlasRefresh();
+}

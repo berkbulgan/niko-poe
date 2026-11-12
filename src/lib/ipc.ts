@@ -42,7 +42,7 @@ import type {
   StrategyDetail,
   TagCount,
 } from '@/types/community';
-import type { MapModData } from '@/types/game-data';
+import type { AtlasVersion, MapModData } from '@/types/game-data';
 
 /**
  * Rust commands reject with the serialized `Error` enum (e.g. `{ Auth: "..." }`), not an Error.
@@ -320,6 +320,25 @@ export function mapModDataCached(): Promise<CachedMapMods | null> {
 /** Asks the server for newer map mod data and saves it. Server problems resolve to status 'failed'. */
 export function refreshMapModData(): Promise<MapModRefresh> {
   return invoke<MapModRefresh>('refresh_map_mod_data');
+}
+
+// --- Game data: atlas tree ---
+
+/** One atlas tag's files on disk (Rust `AtlasPatchFiles`): GGG's data.json text and the folder holding its sprites. */
+export interface AtlasPatchFiles {
+  tag: string;
+  dataJson: string;
+  assetDir: string;
+}
+
+/** The cached atlas tag list, newest first; `refresh` re-fetches it from the server first (the cache on failure). */
+export function atlasVersions(refresh: boolean): Promise<AtlasVersion[]> {
+  return invoke<AtlasVersion[]>('atlas_versions', { refresh });
+}
+
+/** Makes sure the tag's data.json and sprites are on disk, downloading what is missing; null when the server lacks it. */
+export function atlasData(tag: string): Promise<AtlasPatchFiles | null> {
+  return invoke<AtlasPatchFiles | null>('atlas_data', { tag });
 }
 
 // --- GGG Auth ---

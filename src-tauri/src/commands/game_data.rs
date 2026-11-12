@@ -5,11 +5,13 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use niko_community_api::MapModData;
+use niko_community_api::{AtlasVersion, MapModData};
 use reqwest::{header, Method};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tauri::{AppHandle, Manager, State};
+use tokio::sync::Mutex;
 
 use crate::commands::community::request;
 use crate::error::{Error, Result};
@@ -156,6 +158,164 @@ pub async fn refresh_map_mod_data(app: AppHandle, state: State<'_, AppState>) ->
     Ok(result)
 }
 
+// --- Atlas tree data: game-data/atlas/index.json, game-data/atlas/<tag>/{data.json, assets/} ---
+
+/// `game-data/atlas/index.json`: the server's atlas tag list as last fetched.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AtlasIndex {
+    checked_at: DateTime<Utc>,
+    versions: Vec<AtlasVersion>,
+}
+
+/// One atlas tag's files on disk. `data_json` is GGG's data.json as served; sprites are in `asset_dir`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasPatchFiles {
+    pub tag: String,
+    pub data_json: String,
+    pub asset_dir: String,
+}
+
+/// One tag downloads at a time: a cold tag is ~42 requests against the server's 120/minute read limit.
+// ponytail: also makes on-disk reads of another tag wait behind a running download; per-tag locks if that is noticeable.
+static ATLAS_DOWNLOAD: Mutex<()> = Mutex::const_new(());
+
+/// GGG release tags are `X.Y.Z`; nothing else is used as a directory name.
+fn is_atlas_tag(tag: &str) -> bool {
+    let parts: Vec<&str> = tag.split('.').collect();
+    parts.len() == 3 && parts.iter().all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// `<game-data>/atlas/<tag>`
+fn atlas_dir(root: &Path, tag: &str) -> PathBuf {
+    root.join("atlas").join(tag)
+}
+
+/// Plain file names only: these come from downloaded JSON and become paths.
+fn is_safe_filename(name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('.') && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_.".contains(&b))
+}
+
+/// Sprite sheet files named in a GGG data.json: the last path segment of every `sprites.*.*.filename` URL, without its query.
+fn sprite_files(data: &Value) -> Vec<String> {
+    let mut names: Vec<String> = data["sprites"]
+        .as_object()
+        .into_iter()
+        .flat_map(|categories| categories.values())
+        .filter_map(|zooms| zooms.as_object())
+        .flat_map(|zooms| zooms.values())
+        .filter_map(|entry| entry["filename"].as_str())
+        .filter_map(|url| url.split('?').next()?.rsplit('/').next())
+        .filter(|name| is_safe_filename(name))
+        .map(str::to_string)
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
+/// The names not yet in `<dir>/assets`.
+fn missing_assets(dir: &Path, names: &[String]) -> Vec<String> {
+    names.iter().filter(|name| !dir.join("assets").join(name).is_file()).cloned().collect()
+}
+
+/// A stored data.json and its parsed value; `None` when it is missing or does not parse.
+fn read_atlas_data(path: &Path) -> Option<(String, Value)> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let value = serde_json::from_str(&text).ok()?;
+    Some((text, value))
+}
+
+/// 404 bodies reuse a generic server error, so only the status is reported.
+fn status_error(status: u16) -> Error {
+    if status == 429 {
+        Error::Network("game data server is busy, try again later".into())
+    } else {
+        Error::Network(format!("game data server returned HTTP {status}"))
+    }
+}
+
+/// `write_atomic` with the crate error type (there is no `From<std::io::Error>`).
+fn save(path: &Path, bytes: &[u8]) -> Result<()> {
+    write_atomic(path, bytes).map_err(|e| Error::Validation(format!("could not save {}: {e}", path.display())))
+}
+
+/// GET on the community server with the game data timeout. Errors when no server is configured or it is unreachable.
+async fn fetch(state: &AppState, path: &str) -> Result<reqwest::Response> {
+    request(state, Method::GET, path)
+        .await?
+        .timeout(SERVER_TIMEOUT)
+        .send()
+        .await
+        .map_err(|e| Error::Network(format!("game data server unreachable: {e}")))
+}
+
+async fn fetch_atlas_versions(state: &AppState) -> Result<Vec<AtlasVersion>> {
+    let res = fetch(state, "/v1/data/atlas").await?;
+    if !res.status().is_success() {
+        return Err(status_error(res.status().as_u16()));
+    }
+    res.json().await.map_err(|e| Error::Parse(format!("bad atlas tag list: {e}")))
+}
+
+/// The cached atlas tag list, newest first. `refresh` fetches it from the server first; on failure the cache is returned.
+#[tauri::command]
+pub async fn atlas_versions(app: AppHandle, state: State<'_, AppState>, refresh: bool) -> Result<Vec<AtlasVersion>> {
+    let path = game_data_dir(&app)?.join("atlas").join("index.json");
+    if refresh {
+        match fetch_atlas_versions(&state).await {
+            Ok(versions) => {
+                let index = AtlasIndex { checked_at: Utc::now(), versions };
+                if let Err(e) = write_json(&path, &index) {
+                    eprintln!("could not save the atlas tag list: {e}");
+                }
+                return Ok(index.versions);
+            }
+            Err(e) => eprintln!("atlas tag list refresh failed: {e}"),
+        }
+    }
+    Ok(read_json::<AtlasIndex>(&path).map(|index| index.versions).unwrap_or_default())
+}
+
+/// Makes sure a tag's data.json and sprites are on disk, downloading only what is missing.
+/// `None` when the tag is neither on disk nor on the server.
+#[tauri::command]
+pub async fn atlas_data(app: AppHandle, state: State<'_, AppState>, tag: String) -> Result<Option<AtlasPatchFiles>> {
+    if !is_atlas_tag(&tag) {
+        return Err(Error::Validation(format!("invalid atlas tag: {tag}")));
+    }
+    let _one_tag_at_a_time = ATLAS_DOWNLOAD.lock().await;
+    let dir = atlas_dir(&game_data_dir(&app)?, &tag);
+    let data_path = dir.join("data.json");
+    let (data_json, data) = match read_atlas_data(&data_path) {
+        Some(stored) => stored,
+        None => {
+            let res = fetch(&state, &format!("/v1/data/atlas/{tag}")).await?;
+            match res.status().as_u16() {
+                200 => {}
+                404 => return Ok(None),
+                status => return Err(status_error(status)),
+            }
+            let text = res.text().await.map_err(|e| Error::Network(format!("failed to read atlas data: {e}")))?;
+            let value: Value = serde_json::from_str(&text)?;
+            save(&data_path, text.as_bytes())?;
+            (text, value)
+        }
+    };
+    // Files already written stay when a download fails (429 included); the next call fetches only the rest.
+    for name in missing_assets(&dir, &sprite_files(&data)) {
+        let res = fetch(&state, &format!("/v1/data/atlas/{tag}/assets/{name}")).await?;
+        if !res.status().is_success() {
+            return Err(status_error(res.status().as_u16()));
+        }
+        let bytes = res.bytes().await.map_err(|e| Error::Network(format!("failed to read atlas asset {name}: {e}")))?;
+        save(&dir.join("assets").join(&name), &bytes)?;
+    }
+    let asset_dir = dir.join("assets").to_string_lossy().into_owned();
+    Ok(Some(AtlasPatchFiles { tag, data_json, asset_dir }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,5 +418,77 @@ mod tests {
         for (status, body) in [(503, "{}"), (429, ""), (404, not_found), (200, "{ nope"), (304, "")] {
             assert_eq!(map_mod_outcome(status, body, None, now), (None, MapModRefresh::failed()), "HTTP {status}");
         }
+    }
+}
+
+#[cfg(test)]
+mod atlas_tests {
+    use super::*;
+
+    fn temp_dir() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("niko-atlas-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn atlas_tags_are_plain_versions() {
+        assert!(is_atlas_tag("3.30.0"));
+        assert!(is_atlas_tag("10.0.12"));
+        assert!(!is_atlas_tag("3.30"));
+        assert!(!is_atlas_tag("3.30.0-rc1"));
+        assert!(!is_atlas_tag("../3.30.0"));
+        assert!(!is_atlas_tag("3..0"));
+    }
+
+    #[test]
+    fn atlas_files_live_under_their_tag() {
+        let root = Path::new("game-data");
+        assert_eq!(atlas_dir(root, "3.30.0"), root.join("atlas").join("3.30.0"));
+    }
+
+    #[test]
+    fn sprite_files_are_unique_safe_basenames() {
+        let data = serde_json::json!({ "sprites": {
+            "frame": {
+                "0.1246": { "filename": "https://web.poecdn.com/image/passive-skill/atlas-frame-0.png?a1" },
+                "0.2109": { "filename": "https://web.poecdn.com/image/passive-skill/atlas-frame-1.png?b2" }
+            },
+            "mastery": { "0.1246": { "filename": "https://web.poecdn.com/image/passive-skill/atlas-frame-0.png?a1" } },
+            "line": { "0.1246": { "filename": "https://web.poecdn.com/image/passive-skill/.hidden.png" } },
+            "startNode": { "0.1246": { "filename": "https://web.poecdn.com/image/passive-skill/a%2F..%2Fb.png" } }
+        }});
+        assert_eq!(sprite_files(&data), vec!["atlas-frame-0.png", "atlas-frame-1.png"]);
+        assert!(sprite_files(&serde_json::json!({})).is_empty());
+    }
+
+    #[test]
+    fn only_missing_assets_are_downloaded() {
+        let dir = temp_dir();
+        std::fs::create_dir_all(dir.join("assets")).unwrap();
+        std::fs::write(dir.join("assets").join("a.png"), b"x").unwrap();
+        let names = vec!["a.png".to_string(), "b.png".to_string()];
+        assert_eq!(missing_assets(&dir, &names), vec!["b.png".to_string()]);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn corrupt_atlas_data_counts_as_missing() {
+        let dir = temp_dir();
+        let path = dir.join("data.json");
+        assert!(read_atlas_data(&path).is_none());
+        std::fs::write(&path, "{\"tree\":").unwrap();
+        assert!(read_atlas_data(&path).is_none());
+        std::fs::write(&path, "{\"tree\":\"Atlas\"}").unwrap();
+        let (text, value) = read_atlas_data(&path).unwrap();
+        assert_eq!(text, "{\"tree\":\"Atlas\"}");
+        assert_eq!(value["tree"], "Atlas");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn rate_limited_downloads_say_try_again_later() {
+        assert!(matches!(status_error(429), Error::Network(m) if m.contains("try again later")));
+        assert!(matches!(status_error(500), Error::Network(m) if m.contains("500")));
     }
 }

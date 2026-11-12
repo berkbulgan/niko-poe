@@ -3,6 +3,9 @@
 
 import type { AtlasSprites, SpriteCategory, SpriteCoord, SpriteZoomEntry } from '@/types/atlas-tree';
 
+/** Sprite sheet file name → URL for one atlas tag (bundled /atlas/ or a downloaded tag's folder). */
+export type AssetUrl = (filename: string) => string;
+
 // ---------------------------------------------------------------------------
 // Image cache — keyed by URL, shared across all sprite categories
 // ---------------------------------------------------------------------------
@@ -74,19 +77,20 @@ export function pickZoomLevel(currentZoom: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Sprite resolution — convert CDN URLs to local /atlas/ paths
+// Sprite resolution — convert CDN URLs to the tag's local file URLs
 // ---------------------------------------------------------------------------
 
 /**
  * GGG sprite filenames are CDN URLs like:
  *   https://web.poecdn.com/image/passive-skill/atlas-skills-0.jpg?hash
- * We serve them locally from /atlas/atlas-skills-0.jpg.
+ * `assetUrl` maps the file name to the tag's local copy. That full URL keys the image cache,
+ * so two patches never share an image.
  */
-function toLocalUrl(cdnUrl: string): string {
+function toLocalUrl(cdnUrl: string, assetUrl: AssetUrl): string {
   try {
     const url = new URL(cdnUrl);
     const filename = url.pathname.split('/').pop() ?? '';
-    return `/atlas/${filename}`;
+    return assetUrl(filename);
   } catch {
     return cdnUrl;
   }
@@ -109,6 +113,7 @@ export function resolveSprite(
   category: SpriteCategory,
   spriteName: string,
   zoomKey: string,
+  assetUrl: AssetUrl,
 ): { entry: SpriteZoomEntry; coord: SpriteCoord; localUrl: string } | undefined {
   const entry = category[zoomKey];
   if (!entry) return undefined;
@@ -116,7 +121,7 @@ export function resolveSprite(
   const coord = entry.coords[spriteName];
   if (!coord) return undefined;
 
-  return { entry, coord, localUrl: toLocalUrl(entry.filename) };
+  return { entry, coord, localUrl: toLocalUrl(entry.filename, assetUrl) };
 }
 
 /**
@@ -132,8 +137,9 @@ export function drawSprite(
   cx: number,
   cy: number,
   scale: number,
+  assetUrl: AssetUrl,
 ): boolean {
-  const resolved = resolveSprite(category, spriteName, zoomKey);
+  const resolved = resolveSprite(category, spriteName, zoomKey, assetUrl);
   if (!resolved) return false;
 
   const img = imageCache.get(resolved.localUrl);
@@ -163,8 +169,9 @@ export function drawSpriteRect(
   cy: number,
   destW: number,
   destH: number,
+  assetUrl: AssetUrl,
 ): boolean {
-  const resolved = resolveSprite(category, spriteName, zoomKey);
+  const resolved = resolveSprite(category, spriteName, zoomKey, assetUrl);
   if (!resolved) return false;
 
   const img = imageCache.get(resolved.localUrl);
@@ -187,20 +194,20 @@ export function drawSpriteRect(
  * Preloads all sprite sheets for a given zoom level.
  * Returns a promise that resolves when all images are loaded.
  */
-export function preloadSprites(sprites: AtlasSprites, zoomKey: string): Promise<void> {
+export function preloadSprites(sprites: AtlasSprites, zoomKey: string, assetUrl: AssetUrl): Promise<void> {
   const urls = new Set<string>();
 
   for (const category of Object.values(sprites)) {
     const entry = (category as SpriteCategory)[zoomKey];
     if (entry) {
-      urls.add(toLocalUrl(entry.filename));
+      urls.add(toLocalUrl(entry.filename, assetUrl));
     }
   }
 
   // Also preload the highest zoom for mastery overlay (always at "1")
   const masteryOverlay = sprites.masteryOverlay['1'];
   if (masteryOverlay) {
-    urls.add(toLocalUrl(masteryOverlay.filename));
+    urls.add(toLocalUrl(masteryOverlay.filename, assetUrl));
   }
 
   return Promise.all(Array.from(urls).map(loadImage)).then(() => undefined);
@@ -209,10 +216,10 @@ export function preloadSprites(sprites: AtlasSprites, zoomKey: string): Promise<
 /**
  * Preloads sprites for multiple zoom levels.
  */
-export function preloadAllZoomLevels(sprites: AtlasSprites): Promise<void> {
+export function preloadAllZoomLevels(sprites: AtlasSprites, assetUrl: AssetUrl): Promise<void> {
   const promises: Promise<void>[] = [];
   for (const zoomKey of zoomKeyMap.values()) {
-    promises.push(preloadSprites(sprites, zoomKey));
+    promises.push(preloadSprites(sprites, zoomKey, assetUrl));
   }
   return Promise.all(promises).then(() => undefined);
 }
@@ -220,8 +227,8 @@ export function preloadAllZoomLevels(sprites: AtlasSprites): Promise<void> {
 /**
  * Check if a specific sprite sheet image is loaded.
  */
-export function isSpriteLoaded(category: SpriteCategory, zoomKey: string): boolean {
+export function isSpriteLoaded(category: SpriteCategory, zoomKey: string, assetUrl: AssetUrl): boolean {
   const entry = category[zoomKey];
   if (!entry) return false;
-  return imageCache.has(toLocalUrl(entry.filename));
+  return imageCache.has(toLocalUrl(entry.filename, assetUrl));
 }
