@@ -585,6 +585,40 @@ export function boundsOf(points: Array<{ x: number; y: number }>): { minX: numbe
   return { minX, minY, maxX, maxY };
 }
 
+/**
+ * The box "Jump to" frames: all points when their box fits in maxW x maxH (world units). A mechanic's
+ * groups are usually spread too far apart for that, so then it is the group nearest `from` (the view
+ * centre), widened with the next nearest groups while the box still fits.
+ */
+export function jumpBox(
+  points: Array<{ x: number; y: number; group: number }>,
+  from: { x: number; y: number },
+  maxW: number,
+  maxH: number,
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  type Box = NonNullable<ReturnType<typeof boundsOf>>;
+  const fits = (b: Box) => b.maxX - b.minX <= maxW && b.maxY - b.minY <= maxH;
+  const all = boundsOf(points);
+  if (!all || fits(all)) return all;
+
+  const byGroup = new Map<number, Array<{ x: number; y: number }>>();
+  for (const p of points) byGroup.set(p.group, [...(byGroup.get(p.group) ?? []), p]);
+  const boxes = Array.from(byGroup.values(), (g) => boundsOf(g) as Box);
+  const dist = (b: Box, p: { x: number; y: number }) => Math.hypot((b.minX + b.maxX) / 2 - p.x, (b.minY + b.maxY) / 2 - p.y);
+
+  const anchor = boxes.reduce((a, b) => (dist(b, from) < dist(a, from) ? b : a));
+  const anchorCentre = { x: (anchor.minX + anchor.maxX) / 2, y: (anchor.minY + anchor.maxY) / 2 };
+  let box = anchor;
+  for (const b of boxes.sort((a, c) => dist(a, anchorCentre) - dist(c, anchorCentre))) {
+    const union = {
+      minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY),
+      maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY),
+    };
+    if (fits(union)) box = union;
+  }
+  return box;
+}
+
 // ---------------------------------------------------------------------------
 // 3k. Mechanic grouping
 // ---------------------------------------------------------------------------

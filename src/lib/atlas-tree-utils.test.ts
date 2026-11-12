@@ -12,6 +12,7 @@ import {
   getStartPosition,
   groupByMechanic,
   isEmptyAtlasConfig,
+  jumpBox,
   mechanicCoreNodeIds,
   migrateTree,
   nodeMechanics,
@@ -110,6 +111,29 @@ describe('boundsOf', () => {
   });
   it('spans all points', () => {
     expect(boundsOf([{ x: 1, y: 5 }, { x: -2, y: 3 }, { x: 0, y: 9 }])).toEqual({ minX: -2, minY: 3, maxX: 1, maxY: 9 });
+  });
+});
+
+describe('jumpBox', () => {
+  // Group 1 near the origin, group 2 just right of it, group 3 far away.
+  const points = [
+    { x: 0, y: 0, group: 1 }, { x: 10, y: 10, group: 1 },
+    { x: 20, y: 0, group: 2 }, { x: 30, y: 10, group: 2 },
+    { x: 1000, y: 1000, group: 3 }, { x: 1010, y: 1010, group: 3 },
+  ];
+
+  it('returns null for no points', () => {
+    expect(jumpBox([], { x: 0, y: 0 }, 100, 100)).toBeNull();
+  });
+  it('frames every point when they all fit', () => {
+    expect(jumpBox(points, { x: 0, y: 0 }, 2000, 2000)).toEqual({ minX: 0, minY: 0, maxX: 1010, maxY: 1010 });
+  });
+  it('otherwise frames the group nearest the view, widened with nearby groups that still fit', () => {
+    expect(jumpBox(points, { x: 0, y: 0 }, 100, 100)).toEqual({ minX: 0, minY: 0, maxX: 30, maxY: 10 });
+    expect(jumpBox(points, { x: 900, y: 900 }, 100, 100)).toEqual({ minX: 1000, minY: 1000, maxX: 1010, maxY: 1010 });
+  });
+  it('keeps the nearest group alone when no other group fits with it', () => {
+    expect(jumpBox(points, { x: 0, y: 0 }, 15, 15)).toEqual({ minX: 0, minY: 0, maxX: 10, maxY: 10 });
   });
 });
 

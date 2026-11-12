@@ -14,7 +14,7 @@ import type {
   AtlasSprites,
   AtlasConnection,
 } from '@/types/atlas-tree';
-import { getAllocatableNeighbors, getStartingNodeIds, getStartPosition, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected, searchMatches, boundsOf, clampPan } from '@/lib/atlas-tree-utils';
+import { getAllocatableNeighbors, getStartingNodeIds, getStartPosition, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected, searchMatches, boundsOf, clampPan, jumpBox } from '@/lib/atlas-tree-utils';
 import { renderAtlasTree, hitTestNode, type RenderState } from '@/lib/atlas-canvas-renderer';
 import { initZoomLevels, preloadSprites, pickZoomLevel, type AssetUrl } from '@/lib/atlas-sprite-loader';
 
@@ -34,7 +34,7 @@ interface TreeRendererProps {
   groups: Record<string, { x: number; y: number; background?: { image: string; offsetX?: number; offsetY?: number } }>;
   /** A new object centers the view on that node (zoom at least FOCUS_ZOOM) and gives it the hover highlight. */
   focus?: { nodeId: string } | null;
-  /** Options of the "Jump to…" select; choosing one fits the view to those nodes. */
+  /** Options of the "Jump to…" select; choosing one fits the view to those nodes, or to the nearest of their groups when they do not all fit. */
   jumpTargets?: Array<{ label: string; nodeIds: string[] }>;
   /** View only: no click allocation, no hover previews or point cost (zooming still works). */
   readOnly?: boolean;
@@ -619,7 +619,17 @@ export function TreeRenderer({
               value=""
               onValueChange={(label) => {
                 const target = jumpTargets.find((t) => t.label === label);
-                const box = target && boundsOf(target.nodeIds.flatMap((id) => nodeMap.get(id) ?? []));
+                const container = containerRef.current;
+                if (!target || !container) return;
+                const rect = container.getBoundingClientRect();
+                const z = zoomRef.current;
+                // From the view centre; the limit is what minZoom shows (fitBox drops its margin there)
+                const box = jumpBox(
+                  target.nodeIds.flatMap((id) => nodeMap.get(id) ?? []),
+                  { x: (rect.width / 2 - panRef.current.x) / z, y: (rect.height / 2 - panRef.current.y) / z },
+                  rect.width / minZoom,
+                  rect.height / minZoom,
+                );
                 if (box) fitBox(box);
               }}
               options={jumpTargets.map((t) => ({ value: t.label, label: t.label }))}
