@@ -44,7 +44,7 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 
 ### Atlas Tree Data (`src/data/atlas-tree-data.json`)
 
-GGG's official `data.json` export from [atlastree-export](https://github.com/grindinggear/atlastree-export) at its latest release tag, kept current by `scripts/sync-game-data.mjs` (map mod data in `src/data/` comes from [poe.re](https://github.com/veiset/poe.re) the same way; `src/data/sources.json` records the bundled versions and `mod-id-aliases.json` maps re-id'd mods for saved presets). Contains node definitions, group positions, sprite sheet coordinates, orbit constants, wormhole data, and tree bounds. Sprite assets served from `public/atlas/` (41 files, ~10MB).
+GGG's official `data.json` export from [atlastree-export](https://github.com/grindinggear/atlastree-export) at its latest release tag, kept current by `scripts/sync-game-data.mjs` (map mod data in `src/data/` comes from [data.poe.re](https://data.poe.re), poe.re's published data, for the current PoE 1 patch in `current.json`, checked against its `SHA256SUMS`; every request to data.poe.re must send a `<name>/<version> (<url>)` User-Agent; `src/data/sources.json` records the bundled versions and `mod-id-aliases.json` maps re-id'd mods for saved presets). Contains node definitions, group positions, sprite sheet coordinates, orbit constants, wormhole data, and tree bounds. Sprite assets served from `public/atlas/` (41 files, ~10MB).
 
 ### Atlas Tree Architecture
 

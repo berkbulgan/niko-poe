@@ -133,3 +133,12 @@ export function insertChangelogEntry(text, version, date, lines) {
   const at = text.indexOf('## [');
   return at === -1 ? text + entry : text.slice(0, at) + entry + text.slice(at);
 }
+
+/** Hash listed for `filePath` in a sha256sum-style SHA256SUMS file (`<hash>  <path>`, `*` marks binary mode), or null. */
+export function sha256For(sums, filePath) {
+  for (const line of sums.split(/\r?\n/)) {
+    const match = /^([0-9a-f]+)\s+\*?(.+)$/i.exec(line.trim());
+    if (match && match[2] === filePath) return match[1];
+  }
+  return null;
+}
