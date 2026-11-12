@@ -279,13 +279,13 @@ export function TreeRenderer({
     applyView(z, rect.width / 2 - wx * z, rect.height * fy - wy * z);
   }, [applyView]);
 
-  /** Fits a world-space box with a 10% margin on each side. */
-  const fitBox = useCallback((box: Box) => {
+  /** Fits a world-space box with a 10% margin on each side, zooming in no further than maxZoom. */
+  const fitBox = useCallback((box: Box, maxZoom = MAX_ZOOM) => {
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const fit = Math.min(rect.width / (box.maxX - box.minX), rect.height / (box.maxY - box.minY)) / 1.2;
-    const z = Math.max(minZoom, Math.min(MAX_ZOOM, fit));
+    const z = Math.max(minZoom, Math.min(maxZoom, fit));
     centerOn(z, (box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2);
   }, [centerOn, minZoom]);
 
@@ -633,7 +633,8 @@ export function TreeRenderer({
                   rect.width / minZoom,
                   rect.height / minZoom,
                 );
-                if (box) fitBox(box);
+                // A small mechanic core (one group in 3.30) would otherwise fill the view at full zoom.
+                if (box) fitBox(box, FOCUS_ZOOM);
               }}
               options={jumpTargets.map((t) => ({ value: t.label, label: t.label }))}
               placeholder="Jump to…"
