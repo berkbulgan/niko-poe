@@ -13,6 +13,8 @@ interface SidebarEntityRowProps {
   onDuplicate: () => void;
   onDelete: () => void;
   isDeleting: boolean;
+  /** Delete confirmation text; defaults to "This can't be undone." */
+  deleteDescription?: string;
   /** Optional content rendered below the name (e.g. point count) */
   subtitle?: React.ReactNode;
   /** Optional content rendered below the select button; may hold links, which cannot sit inside the button. */
@@ -27,6 +29,7 @@ export function SidebarEntityRow({
   onDuplicate,
   onDelete,
   isDeleting,
+  deleteDescription = "This can't be undone.",
   subtitle,
   extra,
 }: SidebarEntityRowProps) {
@@ -59,7 +62,7 @@ export function SidebarEntityRow({
         <button
           onClick={() => {
             void confirmAction(`Delete "${name}"?`, {
-              description: "This can't be undone.",
+              description: deleteDescription,
               confirmLabel: 'Delete',
               destructive: true,
             }).then((ok) => { if (ok) onDelete(); });

@@ -114,19 +114,22 @@ export function useSavePublished() {
   });
 }
 
+/** Removes this install's community copy of a local strategy, if any; a copy already gone counts as removed. */
+export async function unpublishStrategy(strategyId: string): Promise<void> {
+  const existing = getPublished(strategyId);
+  if (!existing) return;
+  try {
+    await ipc.communityDelete(existing.communityId, existing.token);
+  } catch (err) {
+    if (!isGone(err)) throw err;
+  }
+  setPublished(strategyId, null);
+}
+
 export function useUnpublish() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, string>({
-    mutationFn: async (strategyId) => {
-      const existing = getPublished(strategyId);
-      if (!existing) return;
-      try {
-        await ipc.communityDelete(existing.communityId, existing.token);
-      } catch (err) {
-        if (!isGone(err)) throw err;
-      }
-      setPublished(strategyId, null);
-    },
+    mutationFn: unpublishStrategy,
     onSettled: () => { void queryClient.invalidateQueries({ queryKey: COMMUNITY_KEY }); },
   });
 }

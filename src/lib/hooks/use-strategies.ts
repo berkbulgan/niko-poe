@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Strategy } from '@/types/index';
 import type { StrategyItem, StrategyConfig } from '@/types/strategies';
 import * as ipc from '@/lib/ipc';
+import { unpublishStrategy } from '@/lib/hooks/use-community';
 
 export type { StrategyItem, StrategyConfig };
 
@@ -46,11 +47,24 @@ export function useCreateStrategy() {
   });
 }
 
+/** Unpublishes first so the community copy is not orphaned; if that fails the strategy is kept. */
+export async function deleteStrategy(id: string): Promise<void> {
+  try {
+    await unpublishStrategy(id);
+  } catch (err) {
+    throw new Error(`Could not remove it from the community list, so it was not deleted: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  await ipc.deleteStrategy(id);
+}
+
 export function useDeleteStrategy(id: string) {
   const queryClient = useQueryClient();
   return useMutation<void, Error, void>({
-    mutationFn: () => ipc.deleteStrategy(id),
-    onSettled: () => { void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY }); },
+    mutationFn: () => deleteStrategy(id),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: STRATEGIES_KEY });
+      void queryClient.invalidateQueries({ queryKey: ['community'] });
+    },
   });
 }
 
