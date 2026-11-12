@@ -124,6 +124,8 @@ export interface ProcessedAtlasNode extends AtlasNodeData {
 export interface AtlasTreeConfig {
   allocatedNodeIds: number[];
   treeVersion: string;
+  /** Multiple-choice notable (node id) → the variantEffects effect picked for it. Absent on older trees. */
+  variantChoices?: Record<string, number>;
 }
 
 export interface AtlasTree {

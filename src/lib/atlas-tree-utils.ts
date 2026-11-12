@@ -575,12 +575,38 @@ export function buildConnections(
 // 3i. Saved config checks (autosave)
 // ---------------------------------------------------------------------------
 
-/** Same set of allocated nodes, in any order; the tree version is ignored. Null equals only null. */
+const choiceKey = (choices: Record<string, number> | undefined) =>
+  JSON.stringify(Object.entries(choices ?? {}).sort(([a], [b]) => a.localeCompare(b)));
+
+/** Same set of allocated nodes, in any order, and the same variant choices; the tree version is ignored. Null equals only null. */
 export function atlasConfigsEqual(a: AtlasTreeConfig | null, b: AtlasTreeConfig | null): boolean {
   if (a === null || b === null) return a === b;
   const x = [...a.allocatedNodeIds].sort((p, q) => p - q);
   const y = [...b.allocatedNodeIds].sort((p, q) => p - q);
-  return x.length === y.length && x.every((id, i) => id === y[i]);
+  return x.length === y.length && x.every((id, i) => id === y[i]) && choiceKey(a.variantChoices) === choiceKey(b.variantChoices);
+}
+
+/** The variant choices of the allocated nodes; choices of deallocated nodes are kept in the editor only for undo. */
+export function chosenVariants(choices: Record<string, number> | undefined, allocated: Iterable<number>): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const id of allocated) {
+    const effect = choices?.[String(id)];
+    if (effect !== undefined) result[String(id)] = effect;
+  }
+  return result;
+}
+
+/** Choices that survive a migration: the node was kept and the new patch still offers that variant. */
+export function keepChoices(
+  choices: Record<string, number> | undefined,
+  kept: number[],
+  nextNodes: Record<string, AtlasNodeData>,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [id, effect] of Object.entries(chosenVariants(choices, kept))) {
+    if (nextNodes[id]?.variantEffects?.some((v) => v.effect === effect)) result[id] = effect;
+  }
+  return result;
 }
 
 /** True when no nodes are allocated. */
@@ -786,6 +812,7 @@ export function statsText(
   maxPoints: number,
   keystones: AtlasNodeData[],
   sections: MechanicSection[],
+  choices: Record<string, number> = {},
 ): string {
   const blocks = [`${treeName} — ${points}/${maxPoints} points`];
   if (keystones.length > 0) {
@@ -794,7 +821,10 @@ export function statsText(
   for (const s of sections) {
     blocks.push([
       `${s.mechanic} (${s.points})`,
-      ...s.notables.map((n) => `- ${n.name}`),
+      ...s.notables.map((n) => {
+        const chosen = n.variantEffects?.find((v) => v.effect === choices[String(n.skill)]);
+        return chosen ? `- ${n.name}: ${chosen.stats.join('; ')}` : `- ${n.name}`;
+      }),
       ...s.smallStats.map(formatStatLine),
     ].join('\n'));
   }
