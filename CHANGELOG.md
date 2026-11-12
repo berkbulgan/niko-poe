@@ -2,6 +2,31 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0] - 2026-11-12
+
+### Added
+- **Game data from the N.I.K.O. server** — Map mod regex data and atlas trees now update without an app release. The app checks at startup and every 24 hours, keeps what it downloaded, and works offline with the last saved data (or the bundled data)
+- **Atlas trees per patch** — A tree made on an older patch opens read-only with that patch's tree and an Update button that moves it to the current patch (nodes that no longer exist are removed, disconnected ones are pruned). Trees on another patch show their patch in the sidebar
+- **Atlas Tree autosave** — Trees save themselves as you edit; the first node on a new draft creates "Untitled tree". Rename a tree by clicking its name. "New tree" replaces Reset; Undo (Ctrl+Z) stays
+- Atlas search shows "3 / 12" matches; Enter and Shift+Enter jump between them, a results list opens while typing, Ctrl+F focuses the search and Escape clears it
+- Atlas stats are grouped by mechanic with the points spent on each; click a notable to jump to it, copy all stats as text, and collapse the panel
+- Atlas zoom buttons (+, −, Fit, Allocated) with + / − / 0 keys, a "Jump to…" mechanic picker, and the point cost of a path in the node tooltip
+- Settings: installed and latest version, Check for updates, Install and restart, and an option to skip the startup check; map mod data version with "Check now". About shows the atlas and map mod data versions
+- Filter preset and atlas tree cards show "Used in" links to the strategies that use them; a strategy's linked preset and tree have "Open" buttons
+- Community: budget and difficulty filters, a Show menu (All / My published / Favourites), infinite scroll, and cards marked Imported or Mine
+- Community detail: "Open imported" for strategies you already imported, and previews of the linked preset's regex and the atlas tree
+- Published strategies show a "Published" badge, or "Published · out of date" after local changes, and a "View in Community" button
+
+### Changed
+- The Community list opens on your active league
+- Publish: the patch is filled in automatically, the author name is remembered, and tags are entered as chips with suggestions
+- Map mod data comes from data.poe.re (poe.re's published data) through the N.I.K.O. server
+
+### Removed
+- Atlas Tree: Save, Save As and the discard prompt
+- Community: Copy ID
+- The daily data-sync release (game data no longer needs an app update)
+
 ## [0.8.0] - 2026-11-12
 
 ### Added
