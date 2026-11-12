@@ -12,6 +12,7 @@ import {
   useDeleteAtlasTree,
   useDuplicateAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
+import { useUsedIn } from '@/lib/hooks/use-strategies';
 import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { SaveEntityModal } from '@/components/ui/save-entity-modal';
 import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
@@ -51,6 +52,7 @@ function AtlasTreeRow({
   onExport: () => void;
 }) {
   const deleteTree = useDeleteAtlasTree(tree.id);
+  const usedIn = useUsedIn('atlasTreeId', tree.id);
 
   return (
     <SidebarEntityRow
@@ -62,8 +64,9 @@ function AtlasTreeRow({
       onDelete={() => deleteTree.mutate(undefined)}
       isDeleting={deleteTree.isPending}
       subtitle={
-        <span className="block text-xs text-poe-text-muted">
+        <span className="block truncate text-xs text-poe-text-muted">
           {tree.config.allocatedNodeIds.length} pts
+          {usedIn.length > 0 && ` · Used in ${usedIn.join(', ')}`}
         </span>
       }
     />
