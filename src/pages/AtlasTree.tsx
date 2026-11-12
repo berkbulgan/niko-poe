@@ -4,10 +4,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { EntityTitle } from '@/components/ui/entity-title';
 import { TreeRenderer } from '@/components/atlas-tree/tree-renderer';
 import { StatsPanel } from '@/components/atlas-tree/stats-panel';
+import { AtlasSearch } from '@/components/atlas-tree/atlas-search';
 import {
   useAtlasTrees,
   useDeleteAtlasTree,
@@ -21,7 +21,7 @@ import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
-import { processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
+import { nodeMechanics, processTreeData, pruneDisconnected } from '@/lib/atlas-tree-utils';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import { useConfirmStore } from '@/lib/stores/confirm-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
@@ -74,6 +74,9 @@ function AtlasTreeRow({
 export function AtlasTree() {
   const [showImport, setShowImport] = useState(false);
   const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+  // A new object re-centers the tree on that node (search cycling, stats panel clicks).
+  const [focus, setFocus] = useState<{ nodeId: string } | null>(null);
+  const focusNode = (nodeId: string) => setFocus({ nodeId });
 
   const {
     activeTreeId, allocatedIds, history, searchQuery,
@@ -88,6 +91,17 @@ export function AtlasTree() {
   const activeTree = trees?.find((t) => t.id === activeTreeId);
 
   const processedNodes = useMemo(() => processTreeData(treeData), []);
+  const mechanics = useMemo(() => nodeMechanics(treeData.nodes), []);
+  const jumpTargets = useMemo(() => {
+    const byMechanic = new Map<string, string[]>();
+    for (const [nodeId, mechanic] of mechanics) {
+      const ids = byMechanic.get(mechanic);
+      if (ids) ids.push(nodeId);
+      else byMechanic.set(mechanic, [nodeId]);
+    }
+    return Array.from(byMechanic, ([label, nodeIds]) => ({ label, nodeIds }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [mechanics]);
 
   const rawNodes = treeData.nodes;
 
@@ -216,6 +230,8 @@ export function AtlasTree() {
             imageZoomLevels={treeData.imageZoomLevels}
             bounds={bounds}
             groups={treeData.groups}
+            focus={focus}
+            jumpTargets={jumpTargets}
           />
 
           {/* Over-limit toast */}
@@ -229,11 +245,12 @@ export function AtlasTree() {
 
           {/* Search bar overlay at bottom */}
           <div className="absolute bottom-4 left-1/2 w-80 -translate-x-1/2">
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search nodes..."
-              className="bg-poe-panel/90 shadow-lg backdrop-blur-sm"
+            <AtlasSearch
+              nodes={processedNodes}
+              query={searchQuery}
+              // A new or cleared query drops the old match's focus highlight.
+              onQueryChange={(query) => { setSearchQuery(query); setFocus(null); }}
+              onFocusNode={focusNode}
             />
           </div>
         </div>
