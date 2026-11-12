@@ -46,4 +46,13 @@ describe('presetRegex', () => {
       buildOptimizedVendorRegex([mod], [], ['"m q.*' + generateNumberRegex('80', false) + '%"']),
     );
   });
+
+  it('falls back to pack size for an unknown quality type', () => {
+    const packSize = presetRegex({ ...empty, quality: '20', qualityType: 'pack_size' });
+    for (const qualityType of ['bogus', 'toString']) {
+      const regex = presetRegex({ ...empty, quality: '20', qualityType });
+      expect(regex).not.toContain('undefined');
+      expect(regex).toBe(packSize);
+    }
+  });
 });
