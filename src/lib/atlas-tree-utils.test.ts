@@ -12,6 +12,7 @@ import {
   cycleIndex,
   formatStatLine,
   formatStatTotal,
+  backgroundRect,
   getStartPosition,
   groupByMechanic,
   isEmptyAtlasConfig,
@@ -407,6 +408,26 @@ describe('pickAtlasTag', () => {
     expect(await pickAtlasTag([V3280], V3291, async (t) => { tried.push(t); return true; })).toBe('3.29.1');
     expect(await pickAtlasTag([], V3291, async () => true)).toBe('3.29.1');
     expect(tried).toEqual([]);
+  });
+});
+
+describe('backgroundRect', () => {
+  const bounds = { minX: -6868, maxX: 6953, minY: -14073, maxY: 269 };
+
+  it('stretches a picture background over the tree bounds (3.29.1 and older)', () => {
+    const r = backgroundRect(bounds, { x: 42, y: -6724 }, false);
+    expect(r.cx).toBeCloseTo(42.5);
+    expect(r.cy).toBeCloseTo(-6902);
+    expect(r.w / r.h).toBeCloseTo((6953 + 6868) / (269 + 14073));
+  });
+
+  it('centres a square ring background on the start and keeps it square (3.30)', () => {
+    const r = backgroundRect(bounds, { x: 42, y: -6724 }, true);
+    expect(r).toMatchObject({ cx: 42, cy: -6724 });
+    expect(r.w).toBe(r.h);
+    // Still covers the whole tree from the off-centre start.
+    expect(r.cy - r.h / 2).toBeLessThan(bounds.minY);
+    expect(r.cy + r.h / 2).toBeGreaterThan(bounds.maxY);
   });
 });
 

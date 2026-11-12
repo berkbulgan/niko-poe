@@ -301,6 +301,28 @@ export function getStartPosition(
 }
 
 /**
+ * World rect (centre and size) of the atlas background, with a 15% margin. 3.29.1 and older ship a picture of the
+ * whole tree, stretched over its bounds; 3.30 ships square ring art, centred on the start and kept square.
+ */
+export function backgroundRect(
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  start: { x: number; y: number },
+  square: boolean,
+): { cx: number; cy: number; w: number; h: number } {
+  if (!square) {
+    return {
+      cx: (bounds.minX + bounds.maxX) / 2,
+      cy: (bounds.minY + bounds.maxY) / 2,
+      w: (bounds.maxX - bounds.minX) * 1.15,
+      h: (bounds.maxY - bounds.minY) * 1.15,
+    };
+  }
+  const reach = Math.max(start.x - bounds.minX, bounds.maxX - start.x, start.y - bounds.minY, bounds.maxY - start.y);
+  const side = reach * 2 * 1.15;
+  return { cx: start.x, cy: start.y, w: side, h: side };
+}
+
+/**
  * Finds the starting node IDs reachable from "root" through hidden hub nodes.
  * In GGG data, root → hub (no name) → starting small passives.
  */
