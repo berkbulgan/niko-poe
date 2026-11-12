@@ -1,0 +1,208 @@
+// ABOUTME: Tests for the pure atlas tree helpers: config equality, search, cycling, bounds and mechanic grouping.
+// ABOUTME: Uses small hand-built node graphs, plus one sanity check against the bundled GGG tree data.
+
+import { describe, expect, it } from 'vitest';
+import {
+  atlasConfigsEqual,
+  boundsOf,
+  cycleIndex,
+  formatStatTotal,
+  groupByMechanic,
+  isEmptyAtlasConfig,
+  nodeMechanics,
+  searchMatches,
+  statsText,
+} from './atlas-tree-utils';
+import rawTreeData from '@/data/atlas-tree-data.json';
+import type { AtlasNodeData, AtlasTreeRawData, ProcessedAtlasNode } from '@/types/atlas-tree';
+
+function node(skill: number, extra: Partial<AtlasNodeData> = {}): AtlasNodeData {
+  return { skill, name: `Node ${skill}`, icon: '', stats: [], group: 0, orbit: 0, orbitIndex: 0, out: [], in: [], ...extra };
+}
+
+function pnode(skill: number, extra: Partial<ProcessedAtlasNode> = {}): ProcessedAtlasNode {
+  return { ...node(skill), id: String(skill), nodeType: 'small', x: 0, y: 0, ...extra };
+}
+
+/** Keys nodes by String(skill) ("root" for skill 0) and links each [from, to] pair through out/in. */
+function graph(list: AtlasNodeData[], edges: Array<[string, string]>): Record<string, AtlasNodeData> {
+  const nodes: Record<string, AtlasNodeData> = {};
+  for (const n of list) nodes[n.skill === 0 ? 'root' : String(n.skill)] = n;
+  for (const [from, to] of edges) {
+    nodes[from].out.push(to);
+    nodes[to].in.push(from);
+  }
+  return nodes;
+}
+
+describe('atlasConfigsEqual', () => {
+  it('ignores node order and tree version', () => {
+    expect(atlasConfigsEqual(
+      { allocatedNodeIds: [3, 1, 2], treeVersion: 'a' },
+      { allocatedNodeIds: [1, 2, 3], treeVersion: 'b' },
+    )).toBe(true);
+  });
+  it('detects a different set', () => {
+    expect(atlasConfigsEqual({ allocatedNodeIds: [1, 2], treeVersion: 'a' }, { allocatedNodeIds: [1, 3], treeVersion: 'a' })).toBe(false);
+    expect(atlasConfigsEqual({ allocatedNodeIds: [1], treeVersion: 'a' }, { allocatedNodeIds: [1, 2], treeVersion: 'a' })).toBe(false);
+  });
+  it('treats null as different from any config', () => {
+    expect(atlasConfigsEqual({ allocatedNodeIds: [], treeVersion: 'a' }, null)).toBe(false);
+    expect(atlasConfigsEqual(null, null)).toBe(true);
+  });
+});
+
+describe('isEmptyAtlasConfig', () => {
+  it('is true only with no allocated nodes', () => {
+    expect(isEmptyAtlasConfig({ allocatedNodeIds: [], treeVersion: 'a' })).toBe(true);
+    expect(isEmptyAtlasConfig({ allocatedNodeIds: [7], treeVersion: 'a' })).toBe(false);
+  });
+});
+
+describe('searchMatches', () => {
+  const nodes = [
+    pnode(1, { name: 'Breach Hands', stats: ['Delirium Encounters have 10% more fog'] }),
+    pnode(2, { name: 'Zany Delirium', isNotable: true, nodeType: 'notable' }),
+    pnode(3, { name: 'Delirium Fog' }),
+    pnode(4, { name: 'Delirium', isMastery: true, nodeType: 'mastery' }),
+    pnode(5, { name: '', stats: ['Delirium hub'] }),
+    pnode(6, { name: 'Ascend Delirium', isKeystone: true, nodeType: 'keystone' }),
+    pnode(7, { name: 'Delirium Fog' }),
+    pnode(8, { name: 'Strongbox Hoard' }),
+  ];
+
+  it('matches name or stat line, notables and keystones first, then by name and id', () => {
+    expect(searchMatches(nodes, '  DELIRIUM ').map((n) => n.id)).toEqual(['6', '2', '1', '3', '7']);
+  });
+  it('returns nothing for a blank query', () => {
+    expect(searchMatches(nodes, '   ')).toEqual([]);
+  });
+});
+
+describe('cycleIndex', () => {
+  it('starts at either end when nothing is selected', () => {
+    expect(cycleIndex(-1, 3, 1)).toBe(0);
+    expect(cycleIndex(-1, 3, -1)).toBe(2);
+  });
+  it('steps and wraps at both ends', () => {
+    expect(cycleIndex(0, 3, 1)).toBe(1);
+    expect(cycleIndex(2, 3, 1)).toBe(0);
+    expect(cycleIndex(0, 3, -1)).toBe(2);
+  });
+  it('returns -1 for an empty list', () => {
+    expect(cycleIndex(-1, 0, 1)).toBe(-1);
+    expect(cycleIndex(2, 0, -1)).toBe(-1);
+  });
+});
+
+describe('boundsOf', () => {
+  it('returns null for no points', () => {
+    expect(boundsOf([])).toBeNull();
+  });
+  it('spans all points', () => {
+    expect(boundsOf([{ x: 1, y: 5 }, { x: -2, y: 3 }, { x: 0, y: 9 }])).toEqual({ minX: -2, minY: 3, maxX: 1, maxY: 9 });
+  });
+});
+
+describe('nodeMechanics', () => {
+  // root -> hub 1 -> 10 (group 2, Breach) and 20 (group 3, Delirium).
+  // 30 (no mastery) touches 11 (Breach) and 20 (Delirium); 31 hangs off 30.
+  // 40 is only reachable through the hub; 51 only through wormhole 50.
+  const nodes = graph(
+    [
+      node(0, { name: '' }),
+      node(1, { name: '', group: 1 }),
+      node(10, { group: 2 }),
+      node(11, { group: 2, isNotable: true }),
+      node(100, { name: 'Breach', group: 2, isMastery: true }),
+      node(20, { group: 3 }),
+      node(200, { name: 'Delirium', group: 3, isMastery: true }),
+      node(30, { group: 4 }),
+      node(31, { group: 4 }),
+      node(40, { group: 5 }),
+      node(50, { name: 'Gateway', group: 6, isWormhole: true }),
+      node(51, { group: 7 }),
+    ],
+    [['root', '1'], ['1', '10'], ['1', '20'], ['1', '40'], ['10', '11'], ['20', '30'], ['11', '30'], ['30', '31'], ['20', '50'], ['50', '51']],
+  );
+  const mechanics = nodeMechanics(nodes);
+
+  it('gives a node the mastery name of its own group', () => {
+    expect(mechanics.get('10')).toBe('Breach');
+    expect(mechanics.get('11')).toBe('Breach');
+    expect(mechanics.get('20')).toBe('Delirium');
+  });
+  it('gives other nodes the nearest mapped neighbour, ties to the lowest id', () => {
+    expect(mechanics.get('30')).toBe('Breach');
+    expect(mechanics.get('31')).toBe('Breach');
+  });
+  it('never maps or crosses root, hubs, masteries and wormholes', () => {
+    for (const id of ['root', '1', '100', '200', '50', '40', '51']) expect(mechanics.has(id)).toBe(false);
+  });
+  it('maps every real node with stats except masteries and wormholes', () => {
+    const real = (rawTreeData as unknown as AtlasTreeRawData).nodes;
+    const realMechanics = nodeMechanics(real);
+    const unmapped = Object.entries(real)
+      .filter(([id, n]) => id !== 'root' && n.stats.length > 0 && !n.isMastery && !n.isWormhole && !realMechanics.has(id))
+      .map(([id]) => id);
+    expect(unmapped).toEqual([]);
+  });
+});
+
+describe('groupByMechanic', () => {
+  const mechanics = new Map([['10', 'Breach'], ['11', 'Breach'], ['12', 'Breach'], ['20', 'Delirium'], ['21', 'Abyss']]);
+  const allocated = [
+    node(5, { name: 'Keystone K', isKeystone: true }),
+    node(6, { name: 'Mastery', isMastery: true }),
+    node(10, { stats: ['5% increased Quantity'] }),
+    node(11, { name: 'Breach notable', isNotable: true, stats: ['Breaches have 20% more monsters'] }),
+    node(12, { stats: ['3% increased Quantity'] }),
+    node(20),
+    node(21),
+    node(96),
+    node(97),
+    node(98),
+    node(99),
+  ];
+  const { keystones, sections } = groupByMechanic(allocated, mechanics);
+
+  it('lists keystones apart and skips masteries', () => {
+    expect(keystones.map((n) => n.name)).toEqual(['Keystone K']);
+    expect(sections.reduce((sum, s) => sum + s.points, 0)).toBe(9);
+  });
+  it('sorts by points, then name, with Other last', () => {
+    expect(sections.map((s) => [s.mechanic, s.points])).toEqual([['Breach', 3], ['Abyss', 1], ['Delirium', 1], ['Other', 4]]);
+  });
+  it('splits notables from aggregated small stats', () => {
+    expect(sections[0].notables.map((n) => n.name)).toEqual(['Breach notable']);
+    expect(sections[0].smallStats).toEqual([{ text: 'increased Quantity', total: 8, unit: '%', count: 2 }]);
+  });
+});
+
+describe('formatStatTotal', () => {
+  it('adds a plus sign and the unit, rounding to two decimals', () => {
+    expect(formatStatTotal({ text: 'x', total: 12, unit: '%', count: 2 })).toBe('+12%');
+    expect(formatStatTotal({ text: 'x', total: 1.256, unit: '', count: 1 })).toBe('+1.26');
+    expect(formatStatTotal({ text: 'x', total: -5, unit: '%', count: 1 })).toBe('-5%');
+  });
+});
+
+describe('statsText', () => {
+  it('writes the header, keystones and one block per section', () => {
+    const text = statsText('My tree', 12, 132, [node(5, { name: 'Keystone K' })], [
+      {
+        mechanic: 'Breach',
+        points: 3,
+        notables: [node(11, { name: 'Breach notable' })],
+        smallStats: [{ text: 'increased Quantity', total: 8, unit: '%', count: 2 }],
+      },
+      { mechanic: 'Other', points: 1, notables: [], smallStats: [] },
+    ]);
+    expect(text).toBe(
+      'My tree — 12/132 points\n\nKeystones\n- Keystone K\n\nBreach (3)\n- Breach notable\n+8% increased Quantity\n\nOther (1)',
+    );
+  });
+  it('leaves out the keystones block when there are none', () => {
+    expect(statsText('Atlas tree', 0, 132, [], [])).toBe('Atlas tree — 0/132 points');
+  });
+});
