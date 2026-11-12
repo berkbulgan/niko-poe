@@ -1,13 +1,21 @@
 // ABOUTME: Settings page shell with sidebar navigation for app configuration.
 // ABOUTME: Left sidebar: section nav. Right content: section-specific settings panels.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import { useSetTrackerSettings, useTrackerSettings, useTrackerState } from '@/lib/hooks/use-tracking';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
+import {
+  findUpdate,
+  getAutoCheck,
+  installUpdate,
+  installedVersion,
+  setAutoCheck,
+  type Update,
+} from '@/lib/updater';
 
 type SettingsSection = 'general' | 'tracking' | 'stash-ignore' | 'about';
 
@@ -43,6 +51,69 @@ function GeneralSection() {
             </button>
           ))}
         </div>
+      </div>
+      <UpdatesBlock />
+    </div>
+  );
+}
+
+function UpdatesBlock() {
+  const [autoCheck, setAuto] = useState(getAutoCheck);
+  const [installed, setInstalled] = useState<string | null>(null);
+  // undefined: not checked yet; null: up to date.
+  const [update, setUpdate] = useState<Update | null | undefined>(undefined);
+  const [busy, setBusy] = useState<'checking' | 'installing' | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const runCheck = async () => {
+    setBusy('checking');
+    setFailed(false);
+    try {
+      setUpdate(await findUpdate());
+    } catch {
+      setFailed(true);
+    }
+    setBusy(null);
+  };
+
+  useEffect(() => {
+    installedVersion().then(setInstalled, () => {});
+    if (getAutoCheck()) void runCheck();
+  }, []);
+
+  const latest = failed ? 'Could not check' : update === undefined ? '—' : (update?.version ?? installed ?? '—');
+
+  return (
+    <div className="space-y-3 border-t border-poe-border/20 pt-4">
+      <h3 className="text-xs text-poe-text-dim">Updates</h3>
+      <dl className="grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-xs">
+        <dt className="text-poe-text-muted">Installed version</dt>
+        <dd className="text-poe-text">{installed ?? '—'}</dd>
+        <dt className="text-poe-text-muted">Latest version</dt>
+        <dd className={update ? 'text-poe-gold' : 'text-poe-text'}>{latest}</dd>
+      </dl>
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="secondary" onClick={() => void runCheck()} disabled={busy !== null}>
+          {busy === 'checking' ? 'Checking…' : 'Check for updates'}
+        </Button>
+        {update && (
+          <Button
+            size="sm"
+            onClick={() => { setBusy('installing'); void installUpdate(update).finally(() => setBusy(null)); }}
+            disabled={busy !== null}
+          >
+            {busy === 'installing' ? 'Installing…' : 'Install and restart'}
+          </Button>
+        )}
+        {update === null && !failed && <span className="text-xs text-poe-success">You're up to date</span>}
+      </div>
+      <div className="flex items-center gap-2 text-xs text-poe-text">
+        <Switch
+          id="auto-check-updates"
+          checked={autoCheck}
+          onCheckedChange={(on) => { setAutoCheck(on); setAuto(on); }}
+        />
+        <label htmlFor="auto-check-updates">Check for updates on startup</label>
       </div>
     </div>
   );
