@@ -24,6 +24,7 @@ import { useStrategiesStore, type SelectedItem } from '@/lib/stores/strategies-s
 import rawTreeData from '@/data/atlas-tree-data.json';
 import type { AtlasTreeRawData } from '@/types/atlas-tree';
 import { SimpleSelect } from '@/components/ui/select';
+import { useNavigate } from 'react-router-dom';
 
 const treeData = rawTreeData as unknown as AtlasTreeRawData;
 
@@ -179,6 +180,7 @@ function LinkedPresetSection({
   const { currentLeague } = useLeague();
   const selectedPreset = presets.find((p) => p.id === selectedPresetId);
   const [searching, setSearching] = useState(false);
+  const navigate = useNavigate();
 
   function buildPresetTradeQuery(config: FilterPresetParsed['config']) {
     type StatFilter = { id: string; value?: { min?: number }; disabled: boolean };
@@ -284,12 +286,20 @@ function LinkedPresetSection({
         Linked Filter Preset
       </h4>
 
-      <SimpleSelect
-        value={selectedPresetId ?? ''}
-        onValueChange={(v) => onSelect(v || null)}
-        options={[{ value: '', label: 'No preset linked' }, ...presets.map((p) => ({ value: p.id, label: p.name }))]}
-        aria-label="Linked preset"
-      />
+      <div className="flex gap-2">
+        <SimpleSelect
+          className="flex-1"
+          value={selectedPresetId ?? ''}
+          onValueChange={(v) => onSelect(v || null)}
+          options={[{ value: '', label: 'No preset linked' }, ...presets.map((p) => ({ value: p.id, label: p.name }))]}
+          aria-label="Linked preset"
+        />
+        {selectedPreset && (
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => navigate(`/filters?preset=${selectedPreset.id}`)}>
+            Open
+          </Button>
+        )}
+      </div>
 
       {selectedPreset && (
         <div className="flex items-center justify-between border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">
@@ -331,6 +341,7 @@ function LinkedAtlasTreeSection({
   const selectedTree = trees.find((t) => t.id === selectedTreeId);
   const nodeCount = selectedTree?.config?.allocatedNodeIds?.length ?? 0;
   const maxPoints = treeData.points?.totalPoints ?? 138;
+  const navigate = useNavigate();
 
   // Resolve keystone and notable data from allocated IDs
   const { keystones, notables } = useMemo(() => {
@@ -353,12 +364,20 @@ function LinkedAtlasTreeSection({
         Linked Atlas Tree
       </h4>
 
-      <SimpleSelect
-        value={selectedTreeId ?? ''}
-        onValueChange={(v) => onSelect(v || null)}
-        options={[{ value: '', label: 'No atlas tree linked' }, ...trees.map((t) => ({ value: t.id, label: t.name }))]}
-        aria-label="Linked atlas tree"
-      />
+      <div className="flex gap-2">
+        <SimpleSelect
+          className="flex-1"
+          value={selectedTreeId ?? ''}
+          onValueChange={(v) => onSelect(v || null)}
+          options={[{ value: '', label: 'No atlas tree linked' }, ...trees.map((t) => ({ value: t.id, label: t.name }))]}
+          aria-label="Linked atlas tree"
+        />
+        {selectedTree && (
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => navigate(`/atlas-tree?tree=${selectedTree.id}`)}>
+            Open
+          </Button>
+        )}
+      </div>
 
       {selectedTree && (
         <div className="border border-poe-gold/15 bg-poe-gold/5 px-3 py-2">

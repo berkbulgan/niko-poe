@@ -11,7 +11,8 @@ import {
   type FilterPresetParsed,
 } from '@/lib/hooks/use-filter-presets';
 import { useFiltersAutosave } from '@/lib/hooks/use-filters-autosave';
-import { useUsedIn } from '@/lib/hooks/use-strategies';
+import { useStrategiesUsing } from '@/lib/hooks/use-strategies';
+import { UsedInLinks } from '@/components/ui/used-in-links';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
@@ -38,7 +39,7 @@ function PresetRow({
   onBeforeDelete: () => void;
 }) {
   const deletePreset = useDeletePreset(preset.id);
-  const usedIn = useUsedIn('filterPresetId', preset.id);
+  const usedIn = useStrategiesUsing('filterPresetId', preset.id);
 
   return (
     <SidebarEntityRow
@@ -49,9 +50,7 @@ function PresetRow({
       onDuplicate={onDuplicate}
       onDelete={() => { onBeforeDelete(); deletePreset.mutate(undefined); }}
       isDeleting={deletePreset.isPending}
-      subtitle={usedIn.length > 0 && (
-        <span className="block truncate text-xs text-poe-text-muted">Used in {usedIn.join(', ')}</span>
-      )}
+      extra={usedIn.length > 0 && <UsedInLinks strategies={usedIn} />}
     />
   );
 }

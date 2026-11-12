@@ -1,7 +1,8 @@
 // ABOUTME: Strategies page — preset sidebar + strategy cost calculator.
 // ABOUTME: Left panel: saved strategies with share codes. Right panel: strategy-builder component.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   useStrategies,
   useCreateStrategy,
@@ -133,6 +134,19 @@ export function Strategies() {
     setActiveStrategyId(strategy.id);
     loadConfig(strategy.config, MAPS_PER_USE);
   }
+
+  // Preset/tree cards and Community link here with ?strategy=<id> to open that strategy.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedStrategyId = searchParams.get('strategy');
+  useEffect(() => {
+    if (!linkedStrategyId || !strategies) return;
+    setSearchParams({}, { replace: true });
+    const strategy = strategies.find((s) => s.id === linkedStrategyId);
+    if (!strategy || strategy.id === activeStrategyId) return;
+    void handleLoadStrategy(strategy);
+  // handleLoadStrategy is recreated every render; the param is cleared first, so this runs once per link.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedStrategyId, strategies, activeStrategyId, setSearchParams]);
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
