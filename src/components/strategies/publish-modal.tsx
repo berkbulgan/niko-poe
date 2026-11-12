@@ -16,13 +16,12 @@ import { getPublished } from '@/lib/community-storage';
 import { useLeague } from '@/lib/league-context';
 import { storage } from '@/lib/platform';
 import { toast } from '@/lib/stores/toast-store';
+import { useGameDataStore } from '@/lib/stores/game-data-store';
 import { MAX_TAGS, normalizeTags } from '@/lib/tags';
 import type { StrategyParsed } from '@/lib/hooks/use-strategies';
 import type { Budget, Difficulty } from '@/types/community';
-import sources from '@/data/sources.json';
 
 const NOTES_MAX = 8000;
-const DEFAULT_PATCH = sources.atlasTag.split('.').slice(0, 2).join('.');
 const AUTHOR_KEY = 'niko_community_author';
 
 interface PublishModalProps {
@@ -173,7 +172,8 @@ export function PublishModal({ strategy, onClose }: PublishModalProps) {
           name: form.name,
           authorName: form.authorName || null,
           league: form.league,
-          patch: DEFAULT_PATCH,
+          // The current atlas tag's major.minor (the store starts on the bundled tag).
+          patch: useGameDataStore.getState().atlasTag.split('.').slice(0, 2).join('.'),
           tags: normalizeTags(form.tags),
           budget: form.budget,
           difficulty: form.difficulty,
