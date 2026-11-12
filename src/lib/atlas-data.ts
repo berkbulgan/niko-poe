@@ -85,7 +85,8 @@ export async function refreshAtlasTag(): Promise<string | null> {
   for (const refresh of [false, true]) {
     const versions = await ipc.atlasVersions(refresh).catch(() => [] as AtlasVersion[]);
     const tag = await pickAtlasTag(versions, BUNDLED_ATLAS, canLoad);
-    // ponytail: a new, never-saved draft allocated on the old tag is saved under the new tag; only happens when a tag lands mid-session.
+    // An open tree keeps saving under the tag it was opened on (atlas-tree-store editingTag), so a tag landing mid-session
+    // never restamps old-patch node ids; the tree just turns read-only. Only an empty new draft moves to the new tag.
     useGameDataStore.setState({ atlasVersions: versions, atlasTag: tag });
   }
   const after = useGameDataStore.getState().atlasTag;

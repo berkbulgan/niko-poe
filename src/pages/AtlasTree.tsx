@@ -174,7 +174,7 @@ export function AtlasTree() {
 
   // The open tree's sidebar copy may lag the draft until the list refetches; other trees keep their own patch tag.
   function configFor(tree: AtlasTreeType): AtlasTreeConfig {
-    if (tree.id === activeTreeId && !readOnly) return getConfig(currentTag);
+    if (tree.id === activeTreeId && !readOnly) return getConfig();
     return { ...tree.config, treeVersion: resolveTreeTag(tree, versions) ?? tree.config.treeVersion };
   }
 
