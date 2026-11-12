@@ -9,6 +9,7 @@ import { PoeIcon } from '@/components/ui/poe-icon';
 import { useSetTrackerSettings, useTrackerSettings, useTrackerState } from '@/lib/hooks/use-tracking';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
 import { refreshMapMods, useGameDataStore } from '@/lib/stores/game-data-store';
+import { refreshAtlasTag } from '@/lib/atlas-data';
 import { toast } from '@/lib/stores/toast-store';
 import { formatTimeAgo } from '@/lib/utils';
 import {
@@ -136,11 +137,13 @@ function GameDataRow() {
 
   const checkNow = async () => {
     setChecking(true);
-    const status = await refreshMapMods();
+    // Neither rejects. The atlas check can take a while when a new tag downloads.
+    const [status, newAtlasTag] = await Promise.all([refreshMapMods(), refreshAtlasTag()]);
     setChecking(false);
     if (status === 'updated') toast.success(`Map mod data updated to ${useGameDataStore.getState().mapModPatch}`);
-    else if (status === 'unchanged') toast.success('Game data is up to date');
-    else toast.error('Could not check for game data updates');
+    if (newAtlasTag) toast.success(`New atlas tree ${newAtlasTag} available`);
+    if (status === 'unchanged' && !newAtlasTag) toast.success('Game data is up to date');
+    if (status === 'failed') toast.error('Could not check for game data updates');
   };
 
   return (
@@ -212,6 +215,7 @@ function StashIgnoreSection() {
 
 function AboutSection() {
   const mapModPatch = useGameDataStore((s) => s.mapModPatch);
+  const atlasTag = useGameDataStore((s) => s.atlasTag);
 
   return (
     <div className="p-6 space-y-6">
@@ -221,7 +225,8 @@ function AboutSection() {
           Desktop companion for Path of Exile 1 players. Regex filter builder, trade search,
           strategy cost calculator, atlas tree planner, and GGG account integration.
         </p>
-        <p className="mt-2 text-xs text-poe-text-muted">Map mod data: {mapModPatch}</p>
+        <p className="mt-2 text-xs text-poe-text-muted">Atlas tree data: {atlasTag}</p>
+        <p className="text-xs text-poe-text-muted">Map mod data: {mapModPatch}</p>
       </div>
 
       {/* Developer */}
