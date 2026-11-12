@@ -21,6 +21,7 @@ export function NodeChoices({ node, chosen, chosenOnly }: { node: AtlasNodeData;
             className={cn('text-xs', v === picked ? 'text-poe-gold' : picked ? 'text-poe-text-muted' : 'text-poe-text-dim')}
           >
             {v === picked && !chosenOnly ? '✓' : '•'} {v.stats.join('; ')}
+            {v.reminderText && <span className="block italic text-poe-text-muted">{v.reminderText.join(' ')}</span>}
           </li>
         ))}
       </ul>
@@ -32,10 +33,12 @@ export function NodeChoices({ node, chosen, chosenOnly }: { node: AtlasNodeData;
  * Popup at a screen point asking which variant of `node` to take. Picking calls onPick with the effect id;
  * Escape or a click outside calls onCancel.
  */
-export function VariantPicker({ node, x, y, onPick, onCancel }: {
+export function VariantPicker({ node, x, y, maxHeight, onPick, onCancel }: {
   node: AtlasNodeData;
   x: number;
   y: number;
+  /** Space left below y in the tree; longer option lists scroll. */
+  maxHeight: number;
   onPick: (effect: number) => void;
   onCancel: () => void;
 }) {
@@ -59,8 +62,8 @@ export function VariantPicker({ node, x, y, onPick, onCancel }: {
       <div
         role="dialog"
         aria-label={`Choose ${node.name}`}
-        className="fixed w-80 rounded border border-poe-border bg-poe-panel px-3 py-2 shadow-lg"
-        style={{ left: x, top: y }}
+        className="fixed w-80 overflow-y-auto rounded border border-poe-border bg-poe-panel px-3 py-2 shadow-lg"
+        style={{ left: x, top: y, maxHeight }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <p className="text-sm font-semibold text-poe-gold">{node.name}</p>
@@ -75,6 +78,7 @@ export function VariantPicker({ node, x, y, onPick, onCancel }: {
               className="rounded border border-poe-border/40 px-2 py-1 text-left text-xs text-poe-text hover:border-poe-gold/60 hover:bg-poe-panel-light/40"
             >
               {v.stats.join('; ')}
+              {v.reminderText && <span className="mt-0.5 block italic text-poe-text-muted">{v.reminderText.join(' ')}</span>}
             </button>
           ))}
         </div>

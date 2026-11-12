@@ -367,9 +367,9 @@ describe('statsText', () => {
     );
   });
   it('adds the chosen variant after a multiple-choice notable', () => {
-    const notable = node(11, { name: 'Unthreaded', stats: ['Threads cannot be of type'], variantEffects: [{ stats: ['Abyss'], effect: 7 }] });
+    const notable = node(11, { name: 'Unthreaded', stats: ['Threads cannot be of type'], variantEffects: [{ stats: ['Abyss and\nmore'], effect: 7 }] });
     const text = statsText('T', 1, 132, [], [{ mechanic: 'Delirium', points: 1, notables: [notable], smallStats: [] }], { 11: 7 });
-    expect(text).toBe('T — 1/132 points\n\nDelirium (1)\n- Unthreaded: Abyss');
+    expect(text).toBe('T — 1/132 points\n\nDelirium (1)\n- Unthreaded: Abyss and more');
   });
   it('leaves out the keystones block when there are none', () => {
     expect(statsText('Atlas tree', 0, 132, [], [])).toBe('Atlas tree — 0/132 points');

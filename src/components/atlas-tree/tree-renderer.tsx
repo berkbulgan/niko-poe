@@ -56,12 +56,15 @@ interface TooltipState {
 
 /** An allocation waiting for its multiple-choice notables' variants, asked one node at a time. */
 interface PickState {
+  /** The allocation the skills were computed from; any change to it (undo, another tree) drops the pick. */
+  base: Set<number>;
   skills: number[];
   path: boolean;
   queue: AtlasNodeData[];
   picked: Record<string, number>;
   x: number;
   y: number;
+  maxHeight: number;
 }
 
 interface PanState {
@@ -517,10 +520,12 @@ export function TreeRenderer({
           return;
         }
         setTooltip(null);
+        const y = Math.max(rect.top, Math.min(e.clientY + 12, rect.bottom - 260));
         setPicking({
-          skills, path, queue, picked: {},
+          base: allocatedIds, skills, path, queue, picked: {},
           x: Math.max(rect.left, Math.min(e.clientX + 12, rect.right - 330)),
-          y: Math.max(rect.top, Math.min(e.clientY + 12, rect.bottom - 260)),
+          y,
+          maxHeight: rect.bottom - y - 8,
         });
       };
       const isAllocated = allocatedIds.has(hit.skill);
@@ -546,8 +551,9 @@ export function TreeRenderer({
     }
   }, [readOnly, renderState, allocatedIds, allocatedStringIds, allocatableNeighbors, hubNodeIds, onToggleNode, onAllocatePath, rawNodes]);
 
+  const activePick = picking?.base === allocatedIds ? picking : null;
   const handlePick = useCallback((effect: number) => {
-    if (!picking) return;
+    if (!picking || picking.base !== allocatedIds) return;
     const [node, ...rest] = picking.queue;
     const picked = { ...picking.picked, [String(node.skill)]: effect };
     if (rest.length > 0) {
@@ -557,7 +563,7 @@ export function TreeRenderer({
     setPicking(null);
     if (picking.path) onAllocatePath?.(picking.skills, picked);
     else onToggleNode?.(picking.skills[0], picked);
-  }, [picking, onAllocatePath, onToggleNode]);
+  }, [picking, allocatedIds, onAllocatePath, onToggleNode]);
   const cancelPick = useCallback(() => setPicking(null), []);
 
   const handleMouseLeave = useCallback(() => {
@@ -647,12 +653,13 @@ export function TreeRenderer({
         document.body,
       )}
 
-      {picking && (
+      {activePick && (
         <VariantPicker
-          key={picking.queue[0].skill}
-          node={picking.queue[0]}
-          x={picking.x}
-          y={picking.y}
+          key={activePick.queue[0].skill}
+          node={activePick.queue[0]}
+          x={activePick.x}
+          y={activePick.y}
+          maxHeight={activePick.maxHeight}
           onPick={handlePick}
           onCancel={cancelPick}
         />

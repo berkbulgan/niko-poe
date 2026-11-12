@@ -107,7 +107,7 @@ export function cleanTreeText(raw: AtlasTreeRawData): AtlasTreeRawData {
       stats: node.stats?.map(stripMarkup),
       reminderText: node.reminderText?.map(stripMarkup),
       flavourText: node.flavourText?.map(stripMarkup),
-      variantEffects: node.variantEffects?.map((v) => ({ ...v, stats: v.stats.map(stripMarkup) })),
+      variantEffects: node.variantEffects?.map((v) => ({ ...v, stats: v.stats.map(stripMarkup), reminderText: v.reminderText?.map(stripMarkup) })),
     };
   }
   return { ...raw, nodes };
@@ -823,7 +823,8 @@ export function statsText(
       `${s.mechanic} (${s.points})`,
       ...s.notables.map((n) => {
         const chosen = n.variantEffects?.find((v) => v.effect === choices[String(n.skill)]);
-        return chosen ? `- ${n.name}: ${chosen.stats.join('; ')}` : `- ${n.name}`;
+        // GGG breaks long stat lines with "\n"; the copied list keeps one line per notable.
+        return chosen ? `- ${n.name}: ${chosen.stats.join('; ').replace(/\s*\n\s*/g, ' ')}` : `- ${n.name}`;
       }),
       ...s.smallStats.map(formatStatLine),
     ].join('\n'));
