@@ -3,11 +3,14 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  aggregateStats,
   atlasConfigsEqual,
   boundsOf,
   clampPan,
   buildConnections,
+  cleanTreeText,
   cycleIndex,
+  formatStatLine,
   formatStatTotal,
   getStartPosition,
   groupByMechanic,
@@ -17,7 +20,9 @@ import {
   migrateTree,
   nodeMechanics,
   pickAtlasTag,
+  processTreeData,
   resolveTreeTag,
+  stripMarkup,
   searchMatches,
   statsText,
 } from './atlas-tree-utils';
@@ -86,6 +91,45 @@ describe('searchMatches', () => {
   });
   it('returns nothing for a blank query', () => {
     expect(searchMatches(nodes, '   ')).toEqual([]);
+  });
+});
+
+describe('stripMarkup', () => {
+  it('keeps the display text of [Id|Display] and [Id] links', () => {
+    expect(stripMarkup('+1% [SurpassChance|Surpassing Chance] for [ContainsAbyss|Abysses]')).toBe('+1% Surpassing Chance for Abysses');
+    expect(stripMarkup('contain a [Mirage]')).toBe('contain a Mirage');
+    expect(stripMarkup('no markup here')).toBe('no markup here');
+  });
+});
+
+describe('cleanTreeText', () => {
+  const raw = {
+    nodes: {
+      1: node(1, {
+        stats: ['[ContainsAbyss|Abysses] in your Maps'],
+        reminderText: ['([SurpassChance|Surpassing Chance] is rolled first)'],
+        flavourText: ['The [Mirage] fades'],
+        variantEffects: [{ stats: ['contain a [DemonicEvocator|Demonic Evocator]'], effect: 7 }],
+      }),
+      2: node(2),
+    },
+  } as unknown as AtlasTreeRawData;
+  const cleaned = cleanTreeText(raw);
+
+  it('strips markup from stats, reminder, flavour and variant effect text', () => {
+    expect(cleaned.nodes[1].stats).toEqual(['Abysses in your Maps']);
+    expect(cleaned.nodes[1].reminderText).toEqual(['(Surpassing Chance is rolled first)']);
+    expect(cleaned.nodes[1].flavourText).toEqual(['The Mirage fades']);
+    expect(cleaned.nodes[1].variantEffects).toEqual([{ stats: ['contain a Demonic Evocator'], effect: 7 }]);
+    expect(cleaned.nodes[2]).toEqual(node(2));
+  });
+  it('leaves the input untouched', () => {
+    expect(raw.nodes[1].stats).toEqual(['[ContainsAbyss|Abysses] in your Maps']);
+  });
+  it('lets search match the display text of the bundled data', () => {
+    const nodes = processTreeData(cleanTreeText(rawTreeData as unknown as AtlasTreeRawData));
+    expect(searchMatches(nodes, 'Abysses').length).toBeGreaterThan(0);
+    expect(searchMatches(nodes, 'ContainsAbyss')).toEqual([]);
   });
 });
 
@@ -237,15 +281,41 @@ describe('groupByMechanic', () => {
   });
   it('splits notables from aggregated small stats', () => {
     expect(sections[0].notables.map((n) => n.name)).toEqual(['Breach notable']);
-    expect(sections[0].smallStats).toEqual([{ text: 'increased Quantity', total: 8, unit: '%', count: 2 }]);
+    expect(sections[0].smallStats).toEqual([{ text: '# increased Quantity', total: 8, unit: '%', count: 2, signed: false }]);
+  });
+});
+
+describe('aggregateStats', () => {
+  it('keeps the sign out of the template and sums signed values', () => {
+    const stats = aggregateStats([
+      node(1, { stats: ['Your Maps have +6% chance to contain Ore Deposits'] }),
+      node(2, { stats: ['Your Maps have +10% chance to contain Ore Deposits'] }),
+      node(3, { stats: ['+2% increased Quantity of Items found in your Maps', '-1 to maximum Seals'] }),
+      node(4, { stats: ['+3% increased Quantity of Items found in your Maps', '-2 to maximum Seals'] }),
+    ]);
+    expect(stats).toEqual([
+      { text: 'Your Maps have # chance to contain Ore Deposits', total: 16, unit: '%', count: 2, signed: true },
+      { text: '# increased Quantity of Items found in your Maps', total: 5, unit: '%', count: 2, signed: true },
+      { text: '# to maximum Seals', total: -3, unit: '', count: 2, signed: true },
+    ]);
   });
 });
 
 describe('formatStatTotal', () => {
-  it('adds a plus sign and the unit, rounding to two decimals', () => {
-    expect(formatStatTotal({ text: 'x', total: 12, unit: '%', count: 2 })).toBe('+12%');
-    expect(formatStatTotal({ text: 'x', total: 1.256, unit: '', count: 1 })).toBe('+1.26');
-    expect(formatStatTotal({ text: 'x', total: -5, unit: '%', count: 1 })).toBe('-5%');
+  it('adds the unit and a plus sign when the stat had one, rounding to two decimals', () => {
+    expect(formatStatTotal({ text: 'x', total: 12, unit: '%', count: 2, signed: true })).toBe('+12%');
+    expect(formatStatTotal({ text: 'x', total: 1.256, unit: '', count: 1, signed: true })).toBe('+1.26');
+    expect(formatStatTotal({ text: 'x', total: -5, unit: '%', count: 1, signed: true })).toBe('-5%');
+    expect(formatStatTotal({ text: 'x', total: 8, unit: '%', count: 2, signed: false })).toBe('8%');
+  });
+});
+
+describe('formatStatLine', () => {
+  it('puts the summed value where the number was', () => {
+    expect(formatStatLine({ text: 'Your Maps have # chance to contain Ore Deposits', total: 16, unit: '%', count: 2, signed: true }))
+      .toBe('Your Maps have +16% chance to contain Ore Deposits');
+    expect(formatStatLine({ text: 'Beyond Portals in your Maps have # increased Merging Radius', total: 16, unit: '%', count: 2, signed: false }))
+      .toBe('Beyond Portals in your Maps have 16% increased Merging Radius');
   });
 });
 
@@ -256,12 +326,16 @@ describe('statsText', () => {
         mechanic: 'Breach',
         points: 3,
         notables: [node(11, { name: 'Breach notable' })],
-        smallStats: [{ text: 'increased Quantity', total: 8, unit: '%', count: 2 }],
+        smallStats: [
+          { text: '# increased Quantity', total: 8, unit: '%', count: 2, signed: true },
+          { text: 'Your Maps have # chance to contain Ore Deposits', total: 16, unit: '%', count: 2, signed: true },
+        ],
       },
       { mechanic: 'Other', points: 1, notables: [], smallStats: [] },
     ]);
     expect(text).toBe(
-      'My tree — 12/132 points\n\nKeystones\n- Keystone K\n\nBreach (3)\n- Breach notable\n+8% increased Quantity\n\nOther (1)',
+      'My tree — 12/132 points\n\nKeystones\n- Keystone K\n\nBreach (3)\n- Breach notable\n+8% increased Quantity\n'
+        + 'Your Maps have +16% chance to contain Ore Deposits\n\nOther (1)',
     );
   });
   it('leaves out the keystones block when there are none', () => {

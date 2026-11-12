@@ -92,25 +92,46 @@ export function processTreeData(raw: AtlasTreeRawData): ProcessedAtlasNode[] {
   return processed;
 }
 
+/** GGG link markup to its display text: "[ContainsAbyss|Abysses]" → "Abysses", "[Mirage]" → "Mirage". */
+export function stripMarkup(text: string): string {
+  return text.replace(/\[[^|\]]+\|([^\]]+)\]/g, '$1').replace(/\[([^|\]]+)\]/g, '$1');
+}
+
+/** A copy of the tree with link markup stripped from every node's stat, reminder, flavour and variant text. */
+export function cleanTreeText(raw: AtlasTreeRawData): AtlasTreeRawData {
+  const nodes: Record<string, AtlasNodeData> = {};
+  for (const [id, node] of Object.entries(raw.nodes)) {
+    nodes[id] = {
+      ...node,
+      // The root node has no stats.
+      stats: node.stats?.map(stripMarkup),
+      reminderText: node.reminderText?.map(stripMarkup),
+      flavourText: node.flavourText?.map(stripMarkup),
+      variantEffects: node.variantEffects?.map((v) => ({ ...v, stats: v.stats.map(stripMarkup) })),
+    };
+  }
+  return { ...raw, nodes };
+}
+
 // ---------------------------------------------------------------------------
 // 3c. Stat aggregation
 // ---------------------------------------------------------------------------
 
-const STAT_NUMBER_REGEX = /(\d+(?:\.\d+)?)\s*(%?)/;
+const STAT_NUMBER_REGEX = /([+-]?)(\d+(?:\.\d+)?)(%?)/;
 
 /**
- * Parses a stat string to extract the numeric value, unit, and the template text
- * with the number removed for grouping purposes.
+ * Parses a stat string to extract the signed numeric value, unit, and the template text
+ * with "#" in place of the signed number, for grouping purposes.
  */
-function parseStat(stat: string): { template: string; value: number; unit: string } | undefined {
+function parseStat(stat: string): { template: string; value: number; unit: string; signed: boolean } | undefined {
   const match = STAT_NUMBER_REGEX.exec(stat);
   if (!match) return undefined;
 
-  const value = parseFloat(match[1]);
-  const unit = match[2];
-  const template = stat.replace(STAT_NUMBER_REGEX, '').trim();
+  const value = parseFloat(match[1] + match[2]);
+  const unit = match[3];
+  const template = stat.replace(STAT_NUMBER_REGEX, '#').trim();
 
-  return { template, value, unit };
+  return { template, value, unit, signed: match[1] !== '' };
 }
 
 /**
@@ -135,6 +156,7 @@ export function aggregateStats(nodes: AtlasNodeData[]): AggregatedStat[] {
           total: parsed.value,
           unit: parsed.unit,
           count: 1,
+          signed: parsed.signed,
         });
       }
     }
@@ -724,10 +746,15 @@ export function groupByMechanic(
   return { keystones, sections };
 }
 
-/** "+12%" style total, rounded to at most two decimals. */
+/** "+12%" style total ("12%" when the stat had no sign), rounded to at most two decimals. */
 export function formatStatTotal(stat: AggregatedStat): string {
   const total = Number.isInteger(stat.total) ? stat.total : parseFloat(stat.total.toFixed(2));
-  return `${total > 0 ? '+' : ''}${total}${stat.unit}`;
+  return `${stat.signed && total > 0 ? '+' : ''}${total}${stat.unit}`;
+}
+
+/** The stat line with the summed total where the number was. */
+export function formatStatLine(stat: AggregatedStat): string {
+  return stat.text.replace('#', formatStatTotal(stat));
 }
 
 /** Plain-text summary for Copy stats: header, keystones, then one block per mechanic section. */
@@ -746,7 +773,7 @@ export function statsText(
     blocks.push([
       `${s.mechanic} (${s.points})`,
       ...s.notables.map((n) => `- ${n.name}`),
-      ...s.smallStats.map((stat) => `${formatStatTotal(stat)} ${stat.text}`),
+      ...s.smallStats.map(formatStatLine),
     ].join('\n'));
   }
   return blocks.join('\n\n');
