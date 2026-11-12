@@ -421,6 +421,9 @@ export function TreeRenderer({
       setZoom(newZoom);
       setPanX(clamped.x);
       setPanY(clamped.y);
+      // The node under the cursor changes with the zoom; the next mouse move hit-tests again.
+      setTooltip(null);
+      setHoveredNodeId(null);
     }
 
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -529,7 +532,7 @@ export function TreeRenderer({
   const controls = [
     { label: 'Zoom in (+)', icon: Plus, onClick: () => zoomBy(ZOOM_STEP), disabled: false },
     { label: 'Zoom out (−)', icon: Minus, onClick: () => zoomBy(1 / ZOOM_STEP), disabled: false },
-    { label: 'Fit tree (0)', icon: Maximize, onClick: () => fitBox(bounds), disabled: false },
+    { label: 'Zoom out fully (0)', icon: Maximize, onClick: () => fitBox(bounds), disabled: false },
     { label: 'Fit allocated', icon: Crosshair, onClick: () => { if (allocatedBox) fitBox(allocatedBox); }, disabled: !allocatedBox },
   ];
 
