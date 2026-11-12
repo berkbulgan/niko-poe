@@ -27,13 +27,10 @@ export function useAtlasTrees() {
   });
 }
 
-export function useCreateAtlasTree() {
+export function useRenameAtlasTree() {
   const queryClient = useQueryClient();
-  return useMutation<AtlasTreeParsed, Error, { name: string; config: AtlasTreeConfig }>({
-    mutationFn: async ({ name, config }) => {
-      const record = await ipc.createAtlasTree({ name, config: JSON.stringify(config) });
-      return parseAtlasTree(record);
-    },
+  return useMutation<void, Error, { id: string; name: string }>({
+    mutationFn: async ({ id, name }) => { await ipc.updateAtlasTree(id, { name }); },
     onSettled: () => { void queryClient.invalidateQueries({ queryKey: ATLAS_TREES_KEY }); },
   });
 }

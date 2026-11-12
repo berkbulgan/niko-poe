@@ -24,11 +24,11 @@ interface AtlasTreeState {
   toggleNode: (nodeId: number, rawNodes: Record<string, AtlasNodeData>, pruneDisconnected: (nodeId: string, allocated: Set<string>, rawNodes: Record<string, AtlasNodeData>) => Set<string>) => void;
   allocatePath: (nodeIds: number[]) => void;
   undo: () => void;
-  reset: () => void;
 
   // Config get/load
   getConfig: (treeVersion: string) => AtlasTreeConfig;
-  loadTree: (treeId: string, allocatedNodeIds: number[]) => void;
+  /** Replaces the allocation and clears undo history (opening a tree, or a new empty draft). */
+  loadAllocation: (ids: number[]) => void;
 }
 
 export const useAtlasTreeStore = create<AtlasTreeState>((set, get) => ({
@@ -80,22 +80,13 @@ export const useAtlasTreeStore = create<AtlasTreeState>((set, get) => ({
     };
   }),
 
-  reset: () => set((state) => {
-    if (state.allocatedIds.size === 0) return state;
-    return {
-      history: [...state.history.slice(-(MAX_HISTORY - 1)), state.allocatedIds],
-      allocatedIds: new Set(),
-    };
-  }),
-
   getConfig: (treeVersion) => ({
     allocatedNodeIds: Array.from(get().allocatedIds),
     treeVersion,
   }),
 
-  loadTree: (treeId, allocatedNodeIds) => set({
-    activeTreeId: treeId,
-    allocatedIds: new Set(allocatedNodeIds),
+  loadAllocation: (ids) => set({
+    allocatedIds: new Set(ids),
     history: [],
   }),
 }));

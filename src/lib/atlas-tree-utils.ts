@@ -1,5 +1,5 @@
 // ABOUTME: Pure utility functions for processing the GGG atlas passive tree data.
-// ABOUTME: Handles orbital positioning, stat aggregation, BFS pathfinding, and connectivity checks.
+// ABOUTME: Handles positioning, stat aggregation, pathfinding, connectivity, search and mechanic grouping.
 
 import type {
   AtlasGroupData,
@@ -10,6 +10,7 @@ import type {
   ProcessedAtlasNode,
   AtlasConnection,
   AggregatedStat,
+  AtlasTreeConfig,
 } from '@/types/atlas-tree';
 
 // ---------------------------------------------------------------------------
@@ -497,4 +498,174 @@ export function buildConnections(
   }
 
   return connections;
+}
+
+// ---------------------------------------------------------------------------
+// 3i. Saved config checks (autosave)
+// ---------------------------------------------------------------------------
+
+/** Same set of allocated nodes, in any order; the tree version is ignored. Null equals only null. */
+export function atlasConfigsEqual(a: AtlasTreeConfig | null, b: AtlasTreeConfig | null): boolean {
+  if (a === null || b === null) return a === b;
+  const x = [...a.allocatedNodeIds].sort((p, q) => p - q);
+  const y = [...b.allocatedNodeIds].sort((p, q) => p - q);
+  return x.length === y.length && x.every((id, i) => id === y[i]);
+}
+
+/** True when no nodes are allocated. */
+export function isEmptyAtlasConfig(config: AtlasTreeConfig): boolean {
+  return config.allocatedNodeIds.length === 0;
+}
+
+// ---------------------------------------------------------------------------
+// 3j. Search
+// ---------------------------------------------------------------------------
+
+/**
+ * Nodes whose name or any stat line contains the query (trimmed, case-insensitive).
+ * Masteries and nameless nodes never match. Keystones and notables come first, then by name, then by id.
+ */
+export function searchMatches(nodes: ProcessedAtlasNode[], query: string): ProcessedAtlasNode[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const rank = (n: ProcessedAtlasNode) => (n.isKeystone || n.isNotable ? 0 : 1);
+  return nodes
+    .filter((n) => !n.isMastery && !!n.name
+      && (n.name.toLowerCase().includes(q) || n.stats.some((s) => s.toLowerCase().includes(q))))
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || Number(a.id) - Number(b.id));
+}
+
+/** Next (step 1) or previous (step -1) index, wrapping; -1 when the list is empty. From -1 it starts at either end. */
+export function cycleIndex(current: number, length: number, step: 1 | -1): number {
+  if (length === 0) return -1;
+  if (current < 0) return step === 1 ? 0 : length - 1;
+  return (current + step + length) % length;
+}
+
+/** Bounding box of the points, or null when there are none. */
+export function boundsOf(points: Array<{ x: number; y: number }>): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (points.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+// ---------------------------------------------------------------------------
+// 3k. Mechanic grouping
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps node ids to a mechanic name. A node takes the name of the mastery in its own group;
+ * the rest take the mechanic of the nearest mapped node along in/out edges (layered BFS, each
+ * layer in ascending id order, so ties go to the lowest-id neighbour). Root, hubs, masteries,
+ * wormholes and missing nodes are never mapped nor crossed. Unmapped nodes are absent ("Other").
+ */
+export function nodeMechanics(nodes: Record<string, AtlasNodeData>): Map<string, string> {
+  const hubs = getHubNodeIds(nodes);
+  const skipped = (id: string) => {
+    const n = nodes[id];
+    return id === 'root' || !n || hubs.has(id) || !!n.isMastery || !!n.isWormhole;
+  };
+
+  const masteryByGroup = new Map<number, string>();
+  for (const n of Object.values(nodes)) {
+    if (n.isMastery) masteryByGroup.set(n.group, n.name);
+  }
+
+  const result = new Map<string, string>();
+  for (const [id, n] of Object.entries(nodes)) {
+    if (skipped(id)) continue;
+    const mechanic = masteryByGroup.get(n.group);
+    if (mechanic !== undefined) result.set(id, mechanic);
+  }
+
+  let frontier = Array.from(result.keys());
+  while (frontier.length > 0) {
+    frontier.sort((a, b) => Number(a) - Number(b));
+    const next: string[] = [];
+    for (const id of frontier) {
+      const mechanic = result.get(id)!;
+      for (const neighbor of [...nodes[id].out, ...nodes[id].in]) {
+        if (skipped(neighbor) || result.has(neighbor)) continue;
+        result.set(neighbor, mechanic);
+        next.push(neighbor);
+      }
+    }
+    frontier = next;
+  }
+  return result;
+}
+
+export interface MechanicSection {
+  mechanic: string;
+  /** Allocated non-keystone, non-mastery nodes in this mechanic. */
+  points: number;
+  notables: AtlasNodeData[];
+  /** aggregateStats over the mechanic's small passives. */
+  smallStats: AggregatedStat[];
+}
+
+/** Splits allocated nodes into keystones and one section per mechanic (most points first, "Other" last). */
+export function groupByMechanic(
+  allocated: AtlasNodeData[],
+  mechanics: Map<string, string>,
+): { keystones: AtlasNodeData[]; sections: MechanicSection[] } {
+  const keystones: AtlasNodeData[] = [];
+  const buckets = new Map<string, { notables: AtlasNodeData[]; small: AtlasNodeData[]; points: number }>();
+  for (const node of allocated) {
+    if (node.isKeystone) { keystones.push(node); continue; }
+    if (node.isMastery) continue;
+    const key = mechanics.get(String(node.skill)) ?? 'Other';
+    let bucket = buckets.get(key);
+    if (!bucket) { bucket = { notables: [], small: [], points: 0 }; buckets.set(key, bucket); }
+    bucket.points += 1;
+    if (node.isNotable) bucket.notables.push(node);
+    else bucket.small.push(node);
+  }
+  const sections = Array.from(buckets, ([mechanic, b]) => ({
+    mechanic,
+    points: b.points,
+    notables: b.notables,
+    smallStats: aggregateStats(b.small),
+  }));
+  sections.sort((a, b) => Number(a.mechanic === 'Other') - Number(b.mechanic === 'Other')
+    || b.points - a.points
+    || a.mechanic.localeCompare(b.mechanic));
+  return { keystones, sections };
+}
+
+/** "+12%" style total, rounded to at most two decimals. */
+export function formatStatTotal(stat: AggregatedStat): string {
+  const total = Number.isInteger(stat.total) ? stat.total : parseFloat(stat.total.toFixed(2));
+  return `${total > 0 ? '+' : ''}${total}${stat.unit}`;
+}
+
+/** Plain-text summary for Copy stats: header, keystones, then one block per mechanic section. */
+export function statsText(
+  treeName: string,
+  points: number,
+  maxPoints: number,
+  keystones: AtlasNodeData[],
+  sections: MechanicSection[],
+): string {
+  const blocks = [`${treeName} — ${points}/${maxPoints} points`];
+  if (keystones.length > 0) {
+    blocks.push(['Keystones', ...keystones.map((n) => `- ${n.name}`)].join('\n'));
+  }
+  for (const s of sections) {
+    blocks.push([
+      `${s.mechanic} (${s.points})`,
+      ...s.notables.map((n) => `- ${n.name}`),
+      ...s.smallStats.map((stat) => `${formatStatTotal(stat)} ${stat.text}`),
+    ].join('\n'));
+  }
+  return blocks.join('\n\n');
 }
