@@ -2,6 +2,7 @@
 // ABOUTME: Uses GGG sprite sheets for authentic rendering with hit-test based tooltips; readOnly turns off allocation.
 
 import { useState, useCallback, useRef, useMemo, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Crosshair, Maximize, Minus, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -572,9 +573,9 @@ export function TreeRenderer({
       )}
 
       {/* Tooltip overlay */}
-      {tooltip && (
+      {tooltip && createPortal(
         <div
-          className="pointer-events-none fixed z-50 max-w-xs rounded border border-poe-border bg-poe-panel px-3 py-2 shadow-lg"
+          className="pointer-events-none fixed z-[60] max-w-xs rounded border border-poe-border bg-poe-panel px-3 py-2 shadow-lg"
           style={{
             left: tooltip.screenX + 12,
             top: tooltip.screenY + 12,
@@ -607,7 +608,8 @@ export function TreeRenderer({
               {tooltip.node.flavourText.join(' ')}
             </p>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
 
       {/* Zoom controls and Jump to (stop mouse events so clicks here don't pan or allocate) */}

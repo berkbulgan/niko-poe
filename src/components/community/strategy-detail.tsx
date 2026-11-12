@@ -1,7 +1,8 @@
 // ABOUTME: Detail panel for a community strategy: metadata, notes, live-priced items, import/favourite/report.
-// ABOUTME: Item prices are re-looked-up from the current poe.ninja data, falling back to the author's prices.
+// ABOUTME: Item prices are re-looked-up from current poe.ninja data; the preset and tree boxes open previews.
 
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,27 +11,39 @@ import { Markdown } from '@/components/ui/markdown';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import { PricedItemTable, type PricedItem } from '@/components/ui/priced-item-table';
 import { Spinner } from '@/components/ui/spinner';
+import { PresetPreviewModal } from '@/components/community/preset-preview-modal';
+import { TreePreviewModal } from '@/components/community/tree-preview-modal';
 import { useCommunityStrategy, useReportStrategy, useToggleFavourite } from '@/lib/hooks/use-community';
 import { useDivinePrice } from '@/lib/hooks/use-prices';
-import { useImportEntity } from '@/lib/hooks/use-sharing';
-import { isFavourited } from '@/lib/community-storage';
+import { useImportEntity, type StrategyBundlePayload } from '@/lib/hooks/use-sharing';
+import { useStrategies } from '@/lib/hooks/use-strategies';
+import { importedStrategyId, isFavourited } from '@/lib/community-storage';
 import { useLeague } from '@/lib/league-context';
-import { copyToClipboard, openExternal } from '@/lib/platform';
+import { openExternal } from '@/lib/platform';
 import { toast } from '@/lib/stores/toast-store';
 import { strategyCostPerMap } from '@/lib/strategy-cost';
 import * as ipc from '@/lib/ipc';
 import type { StrategyConfig } from '@/types/strategies';
 import type { StrategyStats } from '@/types/community';
 
-interface StrategyBundle {
-  name: string;
-  config: StrategyConfig;
-  filterPreset: { name: string } | null;
-  atlasTree: { name: string } | null;
-}
-
 function Chip({ children }: { children: React.ReactNode }) {
   return <span className="rounded bg-poe-panel-light/60 px-1.5 py-0.5 text-[11px] capitalize text-poe-text-dim">{children}</span>;
+}
+
+/** Linked preset or tree box; a button that opens a preview when the bundle carries that payload. */
+function LinkedBox({ label, name, onOpen }: { label: string; name: string | undefined; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      disabled={!name}
+      title={name ? 'Preview' : undefined}
+      className="min-w-0 border border-poe-border/30 px-3 py-2 text-left transition-colors enabled:hover:border-poe-gold/50 disabled:cursor-default"
+    >
+      <p className="text-poe-text-muted">{label}</p>
+      <p className="mt-1 truncate text-sm text-poe-text">{name ?? '—'}</p>
+    </button>
+  );
 }
 
 function MeasuredResults({ stats }: { stats: StrategyStats | null }) {
@@ -61,16 +74,19 @@ export function StrategyDetailPanel({ id }: { id: string }) {
   const { currentLeague } = useLeague();
   const divinePrice = useDivinePrice(currentLeague);
   const { data: detail, isLoading, error } = useCommunityStrategy(id);
+  const { data: strategies } = useStrategies();
+  const navigate = useNavigate();
   const importEntity = useImportEntity();
   const toggleFavourite = useToggleFavourite();
   const report = useReportStrategy();
   const [reportReason, setReportReason] = useState<string | null>(null);
+  const [preview, setPreview] = useState<'preset' | 'tree' | null>(null);
 
   const bundle = useQuery({
     queryKey: ['community', 'bundle', detail?.shareCode],
     queryFn: async () => {
       const decoded = await ipc.decodeShareCode(detail!.shareCode);
-      return JSON.parse(decoded.payloadJson) as StrategyBundle;
+      return JSON.parse(decoded.payloadJson) as StrategyBundlePayload;
     },
     enabled: !!detail,
     staleTime: Infinity,
@@ -104,6 +120,8 @@ export function StrategyDetailPanel({ id }: { id: string }) {
   }));
   const costPerMap = repriced ? strategyCostPerMap(repriced) : null;
   const favourited = isFavourited(detail.id);
+  // Refreshes on its own after an import: useImportEntity invalidates the strategies query.
+  const imported = importedStrategyId(detail.id, strategies ?? []);
 
   function handleImport() {
     importEntity.mutate({ code: detail!.shareCode, communityId: detail!.id }, {
@@ -148,16 +166,20 @@ export function StrategyDetailPanel({ id }: { id: string }) {
             <Star size={14} className={favourited ? 'fill-poe-currency text-poe-currency' : ''} />
             <span className="ml-1.5">{detail.favouriteCount}</span>
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void copyToClipboard(detail.id).then((ok) => ok && toast.success('ID copied'))}
-          >
-            Copy ID
-          </Button>
-          <Button variant="primary" size="sm" onClick={handleImport} disabled={importEntity.isPending}>
-            {importEntity.isPending ? 'Importing...' : 'Import'}
-          </Button>
+          {imported ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={handleImport} disabled={importEntity.isPending}>
+                {importEntity.isPending ? 'Importing...' : 'Import again'}
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => navigate(`/strategies?strategy=${imported}`)}>
+                Open imported
+              </Button>
+            </>
+          ) : (
+            <Button variant="primary" size="sm" onClick={handleImport} disabled={importEntity.isPending}>
+              {importEntity.isPending ? 'Importing...' : 'Import'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -173,14 +195,8 @@ export function StrategyDetailPanel({ id }: { id: string }) {
             )}
           </p>
         </div>
-        <div className="border border-poe-border/30 px-3 py-2">
-          <p className="text-poe-text-muted">Filter preset</p>
-          <p className="mt-1 truncate text-sm text-poe-text">{bundle.data?.filterPreset?.name ?? '—'}</p>
-        </div>
-        <div className="border border-poe-border/30 px-3 py-2">
-          <p className="text-poe-text-muted">Atlas tree</p>
-          <p className="mt-1 truncate text-sm text-poe-text">{bundle.data?.atlasTree?.name ?? '—'}</p>
-        </div>
+        <LinkedBox label="Filter preset" name={bundle.data?.filterPreset?.name} onOpen={() => setPreview('preset')} />
+        <LinkedBox label="Atlas tree" name={bundle.data?.atlasTree?.name} onOpen={() => setPreview('tree')} />
       </div>
       <MeasuredResults stats={detail.stats} />
 
@@ -230,6 +246,15 @@ export function StrategyDetailPanel({ id }: { id: string }) {
           </div>
         )}
       </section>
+
+      <PresetPreviewModal
+        preset={preview === 'preset' ? bundle.data?.filterPreset ?? null : null}
+        onClose={() => setPreview(null)}
+      />
+      <TreePreviewModal
+        tree={preview === 'tree' ? bundle.data?.atlasTree ?? null : null}
+        onClose={() => setPreview(null)}
+      />
     </div>
   );
 }

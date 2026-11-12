@@ -10,17 +10,17 @@ import type { AtlasTreeConfig } from '@/types/atlas-tree';
 
 // --- Export payload shapes ---
 
-interface FilterPresetPayload {
+export interface FilterPresetPayload {
   name: string;
   config: FilterPresetConfig;
 }
 
-interface AtlasTreePayload {
+export interface AtlasTreePayload {
   name: string;
   config: AtlasTreeConfig;
 }
 
-interface StrategyBundlePayload {
+export interface StrategyBundlePayload {
   name: string;
   config: StrategyConfig;
   filterPreset: FilterPresetPayload | null;
