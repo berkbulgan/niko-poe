@@ -38,15 +38,18 @@ function StrategyRow({
   onSelect,
   onDuplicate,
   onExport,
+  onDeleted,
 }: {
   strategy: StrategyParsed;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
   onExport: () => void;
+  onDeleted: () => void;
 }) {
   const deleteStrategy = useDeleteStrategy(strategy.id);
   const publishState = usePublishState(strategy);
+  const published = getPublished(strategy.id) !== null;
 
   return (
     <SidebarEntityRow
@@ -55,8 +58,12 @@ function StrategyRow({
       onSelect={onSelect}
       onExport={onExport}
       onDuplicate={onDuplicate}
-      onDelete={() => deleteStrategy.mutate(undefined)}
+      // mutateAsync: the row unmounts once the list refetches, which would drop a mutate() callback.
+      onDelete={() => { deleteStrategy.mutateAsync().then(onDeleted, () => { /* toasted by the query client */ }); }}
       isDeleting={deleteStrategy.isPending}
+      deleteDescription={published
+        ? "It is also removed from the community list. This can't be undone."
+        : undefined}
       subtitle={<PublishBadge state={publishState} />}
     />
   );
@@ -175,6 +182,12 @@ export function Strategies() {
             onSelect={() => handleLoadStrategy(strategy)}
             onDuplicate={() => handleDuplicate(strategy)}
             onExport={() => setExportInput({ type: 'S', name: strategy.name, config: strategy.config })}
+            onDeleted={() => {
+              // Deleting the open strategy starts an empty draft, as on Filters and Atlas Tree.
+              if (useStrategiesStore.getState().activeStrategyId === strategy.id) {
+                useStrategiesStore.setState(useStrategiesStore.getInitialState());
+              }
+            }}
           />
         ))}
       </EntitySidebar>

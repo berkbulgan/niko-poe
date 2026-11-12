@@ -64,6 +64,8 @@ export interface AtlasNodeData {
   isWormhole?: boolean;
   flavourText?: string[];
   reminderText?: string[];
+  /** Since 3.30: alternative stats a node can roll. */
+  variantEffects?: Array<{ stats: string[]; effect: number }>;
   /** Since 3.30: connections drawn as an arc around a given centre instead of the group's. */
   connections?: Array<{ to: string; orbit: number; orbitX?: number; orbitY?: number }>;
 }
@@ -133,10 +135,13 @@ export interface AtlasTree {
 }
 
 export interface AggregatedStat {
+  /** The stat line with "#" where the number was (sign and unit excluded). */
   text: string;
   total: number;
   unit: string;
   count: number;
+  /** The source line wrote an explicit sign ("+16%"), so a positive total shows a "+". */
+  signed: boolean;
 }
 
 // ---------------------------------------------------------------------------

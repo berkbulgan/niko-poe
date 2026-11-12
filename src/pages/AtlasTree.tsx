@@ -23,7 +23,7 @@ import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
-import { migrateTree, nodeMechanics, pruneDisconnected, resolveTreeTag } from '@/lib/atlas-tree-utils';
+import { mechanicCoreNodeIds, migrateTree, nodeMechanics, pruneDisconnected, resolveTreeTag } from '@/lib/atlas-tree-utils';
 import { useAtlasData, useAtlasVersions, useTreeAtlas } from '@/lib/atlas-data';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import { useConfirmStore } from '@/lib/stores/confirm-store';
@@ -114,16 +114,11 @@ export function AtlasTree() {
   const processedNodes = useMemo(() => atlas?.nodes ?? [], [atlas]);
   const rawNodes = useMemo<Record<string, AtlasNodeData>>(() => treeData?.nodes ?? {}, [treeData]);
   const mechanics = useMemo(() => nodeMechanics(rawNodes), [rawNodes]);
-  const jumpTargets = useMemo(() => {
-    const byMechanic = new Map<string, string[]>();
-    for (const [nodeId, mechanic] of mechanics) {
-      const ids = byMechanic.get(mechanic);
-      if (ids) ids.push(nodeId);
-      else byMechanic.set(mechanic, [nodeId]);
-    }
-    return Array.from(byMechanic, ([label, nodeIds]) => ({ label, nodeIds }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [mechanics]);
+  const jumpTargets = useMemo(
+    () => Array.from(mechanicCoreNodeIds(rawNodes), ([label, nodeIds]) => ({ label, nodeIds }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+    [rawNodes],
+  );
 
   const allocatedNodeData = useMemo(() => {
     const result: AtlasNodeData[] = [];

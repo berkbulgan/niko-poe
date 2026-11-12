@@ -13,7 +13,7 @@ import { PricedItemTable, type PricedItem } from '@/components/ui/priced-item-ta
 import { Spinner } from '@/components/ui/spinner';
 import { PresetPreviewModal } from '@/components/community/preset-preview-modal';
 import { TreePreviewModal } from '@/components/community/tree-preview-modal';
-import { useCommunityStrategy, useReportStrategy, useToggleFavourite } from '@/lib/hooks/use-community';
+import { isGone, useCommunityStrategy, useReportStrategy, useToggleFavourite } from '@/lib/hooks/use-community';
 import { useDivinePrice } from '@/lib/hooks/use-prices';
 import { useImportEntity, type StrategyBundlePayload } from '@/lib/hooks/use-sharing';
 import { useStrategies } from '@/lib/hooks/use-strategies';
@@ -101,7 +101,7 @@ export function StrategyDetailPanel({ id }: { id: string }) {
 
   if (isLoading) return <div className="flex justify-center py-12"><Spinner /></div>;
   if (error || !detail) {
-    return <p className="p-6 text-sm text-poe-error">{error?.message ?? 'Strategy not found'}</p>;
+    return <p className="p-6 text-sm text-poe-error">{isGone(error) ? 'This strategy no longer exists' : (error?.message ?? 'Strategy not found')}</p>;
   }
 
   const config = bundle.data?.config;

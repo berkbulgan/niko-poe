@@ -92,25 +92,46 @@ export function processTreeData(raw: AtlasTreeRawData): ProcessedAtlasNode[] {
   return processed;
 }
 
+/** GGG link markup to its display text: "[ContainsAbyss|Abysses]" → "Abysses", "[Mirage]" → "Mirage". */
+export function stripMarkup(text: string): string {
+  return text.replace(/\[[^|\]]+\|([^\]]+)\]/g, '$1').replace(/\[([^|\]]+)\]/g, '$1');
+}
+
+/** A copy of the tree with link markup stripped from every node's stat, reminder, flavour and variant text. */
+export function cleanTreeText(raw: AtlasTreeRawData): AtlasTreeRawData {
+  const nodes: Record<string, AtlasNodeData> = {};
+  for (const [id, node] of Object.entries(raw.nodes)) {
+    nodes[id] = {
+      ...node,
+      // The root node has no stats.
+      stats: node.stats?.map(stripMarkup),
+      reminderText: node.reminderText?.map(stripMarkup),
+      flavourText: node.flavourText?.map(stripMarkup),
+      variantEffects: node.variantEffects?.map((v) => ({ ...v, stats: v.stats.map(stripMarkup) })),
+    };
+  }
+  return { ...raw, nodes };
+}
+
 // ---------------------------------------------------------------------------
 // 3c. Stat aggregation
 // ---------------------------------------------------------------------------
 
-const STAT_NUMBER_REGEX = /(\d+(?:\.\d+)?)\s*(%?)/;
+const STAT_NUMBER_REGEX = /([+-]?)(\d+(?:\.\d+)?)(%?)/;
 
 /**
- * Parses a stat string to extract the numeric value, unit, and the template text
- * with the number removed for grouping purposes.
+ * Parses a stat string to extract the signed numeric value, unit, and the template text
+ * with "#" in place of the signed number, for grouping purposes.
  */
-function parseStat(stat: string): { template: string; value: number; unit: string } | undefined {
+function parseStat(stat: string): { template: string; value: number; unit: string; signed: boolean } | undefined {
   const match = STAT_NUMBER_REGEX.exec(stat);
   if (!match) return undefined;
 
-  const value = parseFloat(match[1]);
-  const unit = match[2];
-  const template = stat.replace(STAT_NUMBER_REGEX, '').trim();
+  const value = parseFloat(match[1] + match[2]);
+  const unit = match[3];
+  const template = stat.replace(STAT_NUMBER_REGEX, '#').trim();
 
-  return { template, value, unit };
+  return { template, value, unit, signed: match[1] !== '' };
 }
 
 /**
@@ -135,6 +156,7 @@ export function aggregateStats(nodes: AtlasNodeData[]): AggregatedStat[] {
           total: parsed.value,
           unit: parsed.unit,
           count: 1,
+          signed: parsed.signed,
         });
       }
     }
@@ -585,9 +607,74 @@ export function boundsOf(points: Array<{ x: number; y: number }>): { minX: numbe
   return { minX, minY, maxX, maxY };
 }
 
+/**
+ * The box "Jump to" frames: all points when their box fits in maxW x maxH (world units). A mechanic's
+ * groups are usually spread too far apart for that, so then it is the group nearest `from` (the view
+ * centre), widened with the next nearest groups while the box still fits.
+ */
+export function jumpBox(
+  points: Array<{ x: number; y: number; group: number }>,
+  from: { x: number; y: number },
+  maxW: number,
+  maxH: number,
+): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  type Box = NonNullable<ReturnType<typeof boundsOf>>;
+  const fits = (b: Box) => b.maxX - b.minX <= maxW && b.maxY - b.minY <= maxH;
+  const all = boundsOf(points);
+  if (!all || fits(all)) return all;
+
+  const byGroup = new Map<number, Array<{ x: number; y: number }>>();
+  for (const p of points) byGroup.set(p.group, [...(byGroup.get(p.group) ?? []), p]);
+  const boxes = Array.from(byGroup.values(), (g) => boundsOf(g) as Box);
+  const dist = (b: Box, p: { x: number; y: number }) => Math.hypot((b.minX + b.maxX) / 2 - p.x, (b.minY + b.maxY) / 2 - p.y);
+
+  const anchor = boxes.reduce((a, b) => (dist(b, from) < dist(a, from) ? b : a));
+  const anchorCentre = { x: (anchor.minX + anchor.maxX) / 2, y: (anchor.minY + anchor.maxY) / 2 };
+  let box = anchor;
+  for (const b of boxes.sort((a, c) => dist(a, anchorCentre) - dist(c, anchorCentre))) {
+    const union = {
+      minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY),
+      maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY),
+    };
+    if (fits(union)) box = union;
+  }
+  return box;
+}
+
 // ---------------------------------------------------------------------------
 // 3k. Mechanic grouping
 // ---------------------------------------------------------------------------
+
+function isMechanicSkipped(nodes: Record<string, AtlasNodeData>, hubs: Set<string>, id: string): boolean {
+  const n = nodes[id];
+  return id === 'root' || !n || hubs.has(id) || !!n.isMastery || !!n.isWormhole;
+}
+
+/**
+ * Each mechanic's core: the node ids in the groups that hold a mastery of that name. Root, hubs,
+ * masteries and wormholes are left out. These are the nodes "Jump to" frames, unlike nodeMechanics,
+ * which also spreads over the travel paths between clusters.
+ */
+export function mechanicCoreNodeIds(
+  nodes: Record<string, AtlasNodeData>,
+  hubs: Set<string> = getHubNodeIds(nodes),
+): Map<string, string[]> {
+  const masteryByGroup = new Map<number, string>();
+  for (const n of Object.values(nodes)) {
+    if (n.isMastery) masteryByGroup.set(n.group, n.name);
+  }
+
+  const result = new Map<string, string[]>();
+  for (const [id, n] of Object.entries(nodes)) {
+    if (isMechanicSkipped(nodes, hubs, id)) continue;
+    const mechanic = masteryByGroup.get(n.group);
+    if (mechanic === undefined) continue;
+    const ids = result.get(mechanic);
+    if (ids) ids.push(id);
+    else result.set(mechanic, [id]);
+  }
+  return result;
+}
 
 /**
  * Maps node ids to a mechanic name. A node takes the name of the mastery in its own group;
@@ -597,21 +684,11 @@ export function boundsOf(points: Array<{ x: number; y: number }>): { minX: numbe
  */
 export function nodeMechanics(nodes: Record<string, AtlasNodeData>): Map<string, string> {
   const hubs = getHubNodeIds(nodes);
-  const skipped = (id: string) => {
-    const n = nodes[id];
-    return id === 'root' || !n || hubs.has(id) || !!n.isMastery || !!n.isWormhole;
-  };
-
-  const masteryByGroup = new Map<number, string>();
-  for (const n of Object.values(nodes)) {
-    if (n.isMastery) masteryByGroup.set(n.group, n.name);
-  }
+  const skipped = (id: string) => isMechanicSkipped(nodes, hubs, id);
 
   const result = new Map<string, string>();
-  for (const [id, n] of Object.entries(nodes)) {
-    if (skipped(id)) continue;
-    const mechanic = masteryByGroup.get(n.group);
-    if (mechanic !== undefined) result.set(id, mechanic);
+  for (const [mechanic, ids] of mechanicCoreNodeIds(nodes, hubs)) {
+    for (const id of ids) result.set(id, mechanic);
   }
 
   let frontier = Array.from(result.keys());
@@ -669,10 +746,15 @@ export function groupByMechanic(
   return { keystones, sections };
 }
 
-/** "+12%" style total, rounded to at most two decimals. */
+/** "+12%" style total ("12%" when the stat had no sign), rounded to at most two decimals. */
 export function formatStatTotal(stat: AggregatedStat): string {
   const total = Number.isInteger(stat.total) ? stat.total : parseFloat(stat.total.toFixed(2));
-  return `${total > 0 ? '+' : ''}${total}${stat.unit}`;
+  return `${stat.signed && total > 0 ? '+' : ''}${total}${stat.unit}`;
+}
+
+/** The stat line with the summed total where the number was. */
+export function formatStatLine(stat: AggregatedStat): string {
+  return stat.text.replace('#', formatStatTotal(stat));
 }
 
 /** Plain-text summary for Copy stats: header, keystones, then one block per mechanic section. */
@@ -691,7 +773,7 @@ export function statsText(
     blocks.push([
       `${s.mechanic} (${s.points})`,
       ...s.notables.map((n) => `- ${n.name}`),
-      ...s.smallStats.map((stat) => `${formatStatTotal(stat)} ${stat.text}`),
+      ...s.smallStats.map(formatStatLine),
     ].join('\n'));
   }
   return blocks.join('\n\n');
@@ -773,4 +855,26 @@ export async function pickAtlasTag(
     if (v.tag === bundled.tag || (await canLoad(v.tag))) return v.tag;
   }
   return bundled.tag;
+}
+
+/**
+ * Clamps pan so the tree (bounds scaled by zoom, plus a 10% margin) keeps covering the viewport.
+ * On an axis where the tree is smaller than the viewport, it is centred instead.
+ */
+export function clampPan(
+  px: number,
+  py: number,
+  zoom: number,
+  containerW: number,
+  containerH: number,
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+): { x: number; y: number } {
+  // Screen edge = pan + world * zoom, so pan must lie in [container - maxX*zoom - margin, -minX*zoom + margin]
+  const marginX = (bounds.maxX - bounds.minX) * zoom * 0.1;
+  const marginY = (bounds.maxY - bounds.minY) * zoom * 0.1;
+  const clamp = (v: number, lo: number, hi: number) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
+  return {
+    x: clamp(px, containerW - bounds.maxX * zoom - marginX, -bounds.minX * zoom + marginX),
+    y: clamp(py, containerH - bounds.maxY * zoom - marginY, -bounds.minY * zoom + marginY),
+  };
 }

@@ -3,18 +3,26 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  aggregateStats,
   atlasConfigsEqual,
   boundsOf,
+  clampPan,
   buildConnections,
+  cleanTreeText,
   cycleIndex,
+  formatStatLine,
   formatStatTotal,
   getStartPosition,
   groupByMechanic,
   isEmptyAtlasConfig,
+  jumpBox,
+  mechanicCoreNodeIds,
   migrateTree,
   nodeMechanics,
   pickAtlasTag,
+  processTreeData,
   resolveTreeTag,
+  stripMarkup,
   searchMatches,
   statsText,
 } from './atlas-tree-utils';
@@ -86,6 +94,45 @@ describe('searchMatches', () => {
   });
 });
 
+describe('stripMarkup', () => {
+  it('keeps the display text of [Id|Display] and [Id] links', () => {
+    expect(stripMarkup('+1% [SurpassChance|Surpassing Chance] for [ContainsAbyss|Abysses]')).toBe('+1% Surpassing Chance for Abysses');
+    expect(stripMarkup('contain a [Mirage]')).toBe('contain a Mirage');
+    expect(stripMarkup('no markup here')).toBe('no markup here');
+  });
+});
+
+describe('cleanTreeText', () => {
+  const raw = {
+    nodes: {
+      1: node(1, {
+        stats: ['[ContainsAbyss|Abysses] in your Maps'],
+        reminderText: ['([SurpassChance|Surpassing Chance] is rolled first)'],
+        flavourText: ['The [Mirage] fades'],
+        variantEffects: [{ stats: ['contain a [DemonicEvocator|Demonic Evocator]'], effect: 7 }],
+      }),
+      2: node(2),
+    },
+  } as unknown as AtlasTreeRawData;
+  const cleaned = cleanTreeText(raw);
+
+  it('strips markup from stats, reminder, flavour and variant effect text', () => {
+    expect(cleaned.nodes[1].stats).toEqual(['Abysses in your Maps']);
+    expect(cleaned.nodes[1].reminderText).toEqual(['(Surpassing Chance is rolled first)']);
+    expect(cleaned.nodes[1].flavourText).toEqual(['The Mirage fades']);
+    expect(cleaned.nodes[1].variantEffects).toEqual([{ stats: ['contain a Demonic Evocator'], effect: 7 }]);
+    expect(cleaned.nodes[2]).toEqual(node(2));
+  });
+  it('leaves the input untouched', () => {
+    expect(raw.nodes[1].stats).toEqual(['[ContainsAbyss|Abysses] in your Maps']);
+  });
+  it('lets search match the display text of the bundled data', () => {
+    const nodes = processTreeData(cleanTreeText(rawTreeData as unknown as AtlasTreeRawData));
+    expect(searchMatches(nodes, 'Abysses').length).toBeGreaterThan(0);
+    expect(searchMatches(nodes, 'ContainsAbyss')).toEqual([]);
+  });
+});
+
 describe('cycleIndex', () => {
   it('starts at either end when nothing is selected', () => {
     expect(cycleIndex(-1, 3, 1)).toBe(0);
@@ -108,6 +155,29 @@ describe('boundsOf', () => {
   });
   it('spans all points', () => {
     expect(boundsOf([{ x: 1, y: 5 }, { x: -2, y: 3 }, { x: 0, y: 9 }])).toEqual({ minX: -2, minY: 3, maxX: 1, maxY: 9 });
+  });
+});
+
+describe('jumpBox', () => {
+  // Group 1 near the origin, group 2 just right of it, group 3 far away.
+  const points = [
+    { x: 0, y: 0, group: 1 }, { x: 10, y: 10, group: 1 },
+    { x: 20, y: 0, group: 2 }, { x: 30, y: 10, group: 2 },
+    { x: 1000, y: 1000, group: 3 }, { x: 1010, y: 1010, group: 3 },
+  ];
+
+  it('returns null for no points', () => {
+    expect(jumpBox([], { x: 0, y: 0 }, 100, 100)).toBeNull();
+  });
+  it('frames every point when they all fit', () => {
+    expect(jumpBox(points, { x: 0, y: 0 }, 2000, 2000)).toEqual({ minX: 0, minY: 0, maxX: 1010, maxY: 1010 });
+  });
+  it('otherwise frames the group nearest the view, widened with nearby groups that still fit', () => {
+    expect(jumpBox(points, { x: 0, y: 0 }, 100, 100)).toEqual({ minX: 0, minY: 0, maxX: 30, maxY: 10 });
+    expect(jumpBox(points, { x: 900, y: 900 }, 100, 100)).toEqual({ minX: 1000, minY: 1000, maxX: 1010, maxY: 1010 });
+  });
+  it('keeps the nearest group alone when no other group fits with it', () => {
+    expect(jumpBox(points, { x: 0, y: 0 }, 15, 15)).toEqual({ minX: 0, minY: 0, maxX: 10, maxY: 10 });
   });
 });
 
@@ -156,6 +226,35 @@ describe('nodeMechanics', () => {
   });
 });
 
+describe('mechanicCoreNodeIds', () => {
+  // Breach masteries sit in groups 2 and 4; 12 is a path node outside them that nodeMechanics would spread to.
+  const nodes = graph(
+    [
+      node(0, { name: '' }),
+      node(1, { name: '', group: 2 }),
+      node(10, { group: 2 }),
+      node(11, { group: 4 }),
+      node(12, { group: 5 }),
+      node(13, { name: 'Gateway', group: 2, isWormhole: true }),
+      node(100, { name: 'Breach', group: 2, isMastery: true }),
+      node(101, { name: 'Breach', group: 4, isMastery: true }),
+      node(20, { group: 3 }),
+      node(200, { name: 'Delirium', group: 3, isMastery: true }),
+    ],
+    [['root', '1'], ['1', '10'], ['1', '20'], ['10', '12'], ['12', '11'], ['10', '13']],
+  );
+  const core = mechanicCoreNodeIds(nodes);
+
+  it('takes only the nodes in the groups holding the mastery, not the paths between them', () => {
+    expect([...(core.get('Breach') ?? [])].sort()).toEqual(['10', '11']);
+    expect(core.get('Delirium')).toEqual(['20']);
+  });
+  it('leaves out hubs, masteries and wormholes', () => {
+    const all = [...core.values()].flat();
+    for (const id of ['root', '1', '13', '100', '101', '200', '12']) expect(all).not.toContain(id);
+  });
+});
+
 describe('groupByMechanic', () => {
   const mechanics = new Map([['10', 'Breach'], ['11', 'Breach'], ['12', 'Breach'], ['20', 'Delirium'], ['21', 'Abyss']]);
   const allocated = [
@@ -182,15 +281,41 @@ describe('groupByMechanic', () => {
   });
   it('splits notables from aggregated small stats', () => {
     expect(sections[0].notables.map((n) => n.name)).toEqual(['Breach notable']);
-    expect(sections[0].smallStats).toEqual([{ text: 'increased Quantity', total: 8, unit: '%', count: 2 }]);
+    expect(sections[0].smallStats).toEqual([{ text: '# increased Quantity', total: 8, unit: '%', count: 2, signed: false }]);
+  });
+});
+
+describe('aggregateStats', () => {
+  it('keeps the sign out of the template and sums signed values', () => {
+    const stats = aggregateStats([
+      node(1, { stats: ['Your Maps have +6% chance to contain Ore Deposits'] }),
+      node(2, { stats: ['Your Maps have +10% chance to contain Ore Deposits'] }),
+      node(3, { stats: ['+2% increased Quantity of Items found in your Maps', '-1 to maximum Seals'] }),
+      node(4, { stats: ['+3% increased Quantity of Items found in your Maps', '-2 to maximum Seals'] }),
+    ]);
+    expect(stats).toEqual([
+      { text: 'Your Maps have # chance to contain Ore Deposits', total: 16, unit: '%', count: 2, signed: true },
+      { text: '# increased Quantity of Items found in your Maps', total: 5, unit: '%', count: 2, signed: true },
+      { text: '# to maximum Seals', total: -3, unit: '', count: 2, signed: true },
+    ]);
   });
 });
 
 describe('formatStatTotal', () => {
-  it('adds a plus sign and the unit, rounding to two decimals', () => {
-    expect(formatStatTotal({ text: 'x', total: 12, unit: '%', count: 2 })).toBe('+12%');
-    expect(formatStatTotal({ text: 'x', total: 1.256, unit: '', count: 1 })).toBe('+1.26');
-    expect(formatStatTotal({ text: 'x', total: -5, unit: '%', count: 1 })).toBe('-5%');
+  it('adds the unit and a plus sign when the stat had one, rounding to two decimals', () => {
+    expect(formatStatTotal({ text: 'x', total: 12, unit: '%', count: 2, signed: true })).toBe('+12%');
+    expect(formatStatTotal({ text: 'x', total: 1.256, unit: '', count: 1, signed: true })).toBe('+1.26');
+    expect(formatStatTotal({ text: 'x', total: -5, unit: '%', count: 1, signed: true })).toBe('-5%');
+    expect(formatStatTotal({ text: 'x', total: 8, unit: '%', count: 2, signed: false })).toBe('8%');
+  });
+});
+
+describe('formatStatLine', () => {
+  it('puts the summed value where the number was', () => {
+    expect(formatStatLine({ text: 'Your Maps have # chance to contain Ore Deposits', total: 16, unit: '%', count: 2, signed: true }))
+      .toBe('Your Maps have +16% chance to contain Ore Deposits');
+    expect(formatStatLine({ text: 'Beyond Portals in your Maps have # increased Merging Radius', total: 16, unit: '%', count: 2, signed: false }))
+      .toBe('Beyond Portals in your Maps have 16% increased Merging Radius');
   });
 });
 
@@ -201,12 +326,16 @@ describe('statsText', () => {
         mechanic: 'Breach',
         points: 3,
         notables: [node(11, { name: 'Breach notable' })],
-        smallStats: [{ text: 'increased Quantity', total: 8, unit: '%', count: 2 }],
+        smallStats: [
+          { text: '# increased Quantity', total: 8, unit: '%', count: 2, signed: true },
+          { text: 'Your Maps have # chance to contain Ore Deposits', total: 16, unit: '%', count: 2, signed: true },
+        ],
       },
       { mechanic: 'Other', points: 1, notables: [], smallStats: [] },
     ]);
     expect(text).toBe(
-      'My tree — 12/132 points\n\nKeystones\n- Keystone K\n\nBreach (3)\n- Breach notable\n+8% increased Quantity\n\nOther (1)',
+      'My tree — 12/132 points\n\nKeystones\n- Keystone K\n\nBreach (3)\n- Breach notable\n+8% increased Quantity\n'
+        + 'Your Maps have +16% chance to contain Ore Deposits\n\nOther (1)',
     );
   });
   it('leaves out the keystones block when there are none', () => {
@@ -333,5 +462,19 @@ describe('buildConnections arc centres', () => {
     const c = pnode('3', { group: 2, orbit: 1 });
     const conns = buildConnections([a, b, c], new Map([['1', a], ['2', b], ['3', c]]));
     expect(conns.map((x) => [x.toId, x.sameOrbit, x.arcCenter])).toEqual([['2', true, undefined], ['3', false, undefined]]);
+  });
+});
+
+describe('clampPan', () => {
+  const bounds = { minX: 0, minY: 0, maxX: 1000, maxY: 1000 };
+
+  it('keeps a tree larger than the viewport inside its 10% margin', () => {
+    // zoom 1: tree is 1000px in a 500px viewport, so pan x ranges over [500-1000-100, 0+100]
+    expect(clampPan(500, -9999, 1, 500, 500, bounds)).toEqual({ x: 100, y: -600 });
+  });
+
+  it('centres a tree that fits in the viewport with room to spare', () => {
+    // zoom 0.1: tree is 100px in an 800x400 viewport, so it sits in the middle
+    expect(clampPan(0, 0, 0.1, 800, 400, bounds)).toEqual({ x: 350, y: 150 });
   });
 });

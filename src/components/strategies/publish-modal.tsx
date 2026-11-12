@@ -17,7 +17,7 @@ import { useLeague } from '@/lib/league-context';
 import { storage } from '@/lib/platform';
 import { toast } from '@/lib/stores/toast-store';
 import { useGameDataStore } from '@/lib/stores/game-data-store';
-import { MAX_TAGS, normalizeTags } from '@/lib/tags';
+import { MAX_TAGS, TAG_RULE, isValidTag, normalizeTags } from '@/lib/tags';
 import type { StrategyParsed } from '@/lib/hooks/use-strategies';
 import type { Budget, Difficulty } from '@/types/community';
 
@@ -49,7 +49,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-/** Chip input: Enter or "," adds the typed tag, Backspace on an empty input removes the last chip. */
+/** Chip input: Enter or "," adds the typed tag (or says why it is invalid), Backspace on an empty input removes the last chip. */
 function TagInput({
   tags,
   onChange,
@@ -60,11 +60,16 @@ function TagInput({
   suggestions: string[];
 }) {
   const [text, setText] = useState('');
+  const [invalid, setInvalid] = useState(false);
   const full = tags.length >= MAX_TAGS;
   const typed = text.trim().toLowerCase();
   const matches = suggestions.filter((s) => !tags.includes(s) && s.includes(typed)).slice(0, 8);
 
   function add(tag: string) {
+    if (!isValidTag(tag.trim().toLowerCase())) {
+      setInvalid(true);
+      return;
+    }
     onChange(normalizeTags([...tags, tag]));
     setText('');
   }
@@ -87,7 +92,7 @@ function TagInput({
         ))}
         <input
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => { setText(e.target.value); setInvalid(false); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ',') {
               e.preventDefault();
@@ -96,12 +101,15 @@ function TagInput({
               onChange(tags.slice(0, -1));
             }
           }}
-          disabled={full}
+          // readOnly, not disabled: a disabled input drops focus, and Backspace must still remove chips.
+          readOnly={full}
+          aria-invalid={invalid}
           placeholder={full ? `Up to ${MAX_TAGS} tags` : 'delirium, strongbox...'}
           aria-label="Add tag"
           className="min-w-24 flex-1 bg-transparent py-0.5 text-sm text-poe-text outline-none placeholder:text-poe-text-muted"
         />
       </div>
+      {invalid && <p className="text-xs text-poe-error">{TAG_RULE}</p>}
       {!full && matches.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {matches.map((s) => (
@@ -206,79 +214,82 @@ export function PublishModal({ strategy, onClose }: PublishModalProps) {
           {existing.isError ? `Could not load the published copy: ${existing.error.message}` : 'Loading...'}
         </p>
       ) : (
-        <form onSubmit={(e) => void handleSubmit(e)} className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
-          <div className="space-y-1">
-            <p className="text-xs text-poe-text-dim">
-              Strategy <span className="text-poe-text">{strategy?.name}</span>
-              {' · '}Filter preset <span className="text-poe-text">{presetName ?? 'none'}</span>
-              {' · '}Atlas tree <span className="text-poe-text">{treeName ?? 'none'}</span>
+        <form onSubmit={(e) => void handleSubmit(e)} className="flex max-h-[70vh] flex-col gap-3">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+            <div className="space-y-1">
+              <p className="text-xs text-poe-text-dim">
+                Strategy <span className="text-poe-text">{strategy?.name}</span>
+                {' · '}Filter preset <span className="text-poe-text">{presetName ?? 'none'}</span>
+                {' · '}Atlas tree <span className="text-poe-text">{treeName ?? 'none'}</span>
+              </p>
+              {(!presetName || !treeName) && (
+                <p className="text-xs text-poe-currency">Not linked: players will import the strategy without it.</p>
+              )}
+            </div>
+            <p className="text-xs text-poe-text-muted">
+              Publishes the saved version of this strategy, including its linked filter preset and atlas tree.
             </p>
-            {(!presetName || !treeName) && (
-              <p className="text-xs text-poe-currency">Not linked: players will import the strategy without it.</p>
-            )}
-          </div>
-          <p className="text-xs text-poe-text-muted">
-            Publishes the saved version of this strategy, including its linked filter preset and atlas tree.
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Name">
-              <Input value={form.name} onChange={(e) => update('name', e.target.value)} maxLength={80} required />
-            </Field>
-            <Field label="Author (optional)">
-              <Input value={form.authorName} onChange={(e) => update('authorName', e.target.value)} maxLength={40} />
-            </Field>
-            <Field label="League">
-              <SimpleSelect
-                value={form.league}
-                onValueChange={(v) => update('league', v)}
-                options={[
-                  ...(leagues.some((l) => l.id === form.league) ? [] : [{ value: form.league, label: form.league }]),
-                  ...leagues.map((l) => ({ value: l.id, label: l.text })),
-                ]}
-                aria-label="League"
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Name">
+                <Input value={form.name} onChange={(e) => update('name', e.target.value)} maxLength={80} required />
+              </Field>
+              <Field label="Author (optional)">
+                <Input value={form.authorName} onChange={(e) => update('authorName', e.target.value)} maxLength={40} />
+              </Field>
+              <Field label="League">
+                <SimpleSelect
+                  value={form.league}
+                  onValueChange={(v) => update('league', v)}
+                  options={[
+                    ...(leagues.some((l) => l.id === form.league) ? [] : [{ value: form.league, label: form.league }]),
+                    ...leagues.map((l) => ({ value: l.id, label: l.text })),
+                  ]}
+                  aria-label="League"
+                />
+              </Field>
+              <Field label="Budget">
+                <SimpleSelect
+                  value={form.budget}
+                  onValueChange={(v) => update('budget', v as Budget)}
+                  options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]}
+                  aria-label="Budget"
+                />
+              </Field>
+              <Field label="Difficulty">
+                <SimpleSelect
+                  value={form.difficulty}
+                  onValueChange={(v) => update('difficulty', v as Difficulty)}
+                  options={[{ value: 'easy', label: 'Easy' }, { value: 'medium', label: 'Medium' }, { value: 'hard', label: 'Hard' }]}
+                  aria-label="Difficulty"
+                />
+              </Field>
+            </div>
+            <div>
+              <span className="mb-1 block text-xs text-poe-text-muted">Tags (up to {MAX_TAGS})</span>
+              <TagInput
+                tags={form.tags}
+                onChange={(tags) => update('tags', tags)}
+                suggestions={tagCounts.data?.map((t) => t.tag) ?? []}
               />
+            </div>
+            <Field label="Video link (optional)">
+              <Input value={form.videoUrl} onChange={(e) => update('videoUrl', e.target.value)} placeholder="https://" maxLength={300} />
             </Field>
-            <Field label="Budget">
-              <SimpleSelect
-                value={form.budget}
-                onValueChange={(v) => update('budget', v as Budget)}
-                options={[{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]}
-                aria-label="Budget"
+            <div>
+              <span className="mb-1 block text-xs text-poe-text-muted">Notes (markdown)</span>
+              <MarkdownEditor
+                value={form.notes}
+                onChange={(v) => update('notes', v)}
+                maxLength={NOTES_MAX}
+                placeholder="Map choice, scarab slots, build requirements, how to run it..."
               />
-            </Field>
-            <Field label="Difficulty">
-              <SimpleSelect
-                value={form.difficulty}
-                onValueChange={(v) => update('difficulty', v as Difficulty)}
-                options={[{ value: 'easy', label: 'Easy' }, { value: 'medium', label: 'Medium' }, { value: 'hard', label: 'Hard' }]}
-                aria-label="Difficulty"
-              />
-            </Field>
-          </div>
-          <div>
-            <span className="mb-1 block text-xs text-poe-text-muted">Tags (up to {MAX_TAGS})</span>
-            <TagInput
-              tags={form.tags}
-              onChange={(tags) => update('tags', tags)}
-              suggestions={tagCounts.data?.map((t) => t.tag) ?? []}
-            />
-          </div>
-          <Field label="Video link (optional)">
-            <Input value={form.videoUrl} onChange={(e) => update('videoUrl', e.target.value)} placeholder="https://" maxLength={300} />
-          </Field>
-          <div>
-            <span className="mb-1 block text-xs text-poe-text-muted">Notes (markdown)</span>
-            <MarkdownEditor
-              value={form.notes}
-              onChange={(v) => update('notes', v)}
-              maxLength={NOTES_MAX}
-              placeholder="Map choice, scarab slots, build requirements, how to run it..."
-            />
+            </div>
           </div>
 
+          {/* Outside the scroll area so Cancel/Publish stay visible on short windows. */}
           {error && <p className="text-xs text-poe-error">{error.message}</p>}
 
-          <div className="flex justify-end gap-3 pt-1">
+          <div className="flex justify-end gap-3">
             <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={busy}>
               {busy ? 'Publishing...' : published ? 'Update' : 'Publish'}
