@@ -744,8 +744,11 @@ function drawPreviewRing(
 // ---------------------------------------------------------------------------
 
 const ARROW_MARGIN = 40;
-/** Top-left screen area covered by the zoom controls and the Jump to select; arrows stay out of it. */
-export const CONTROLS_KEEP_OUT = { width: 56, height: 192 };
+/**
+ * Top-left screen area covered by the zoom controls and the Jump to select (w-40 at left-3, so x 12-172), plus a 12px
+ * arrow margin; arrows stay out of it. Kept even on trees without the select, where it only nudges a few arrows.
+ */
+export const CONTROLS_KEEP_OUT = { width: 184, height: 192 };
 
 /**
  * Where to draw the arrow pointing at screen point (sx, sy), or null when the point is on screen.

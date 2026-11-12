@@ -28,3 +28,20 @@ describe('offScreenArrowPoint', () => {
     expect(p!.y).toBeGreaterThanOrEqual(CONTROLS_KEEP_OUT.height);
   });
 });
+
+describe('offScreenArrowPoint and the Jump to select', () => {
+  // The select is w-40 h-7 at left-3 below the buttons: x 12-172, y 150-178; pad by the 12px arrow size
+  const underSelect = (p: { x: number; y: number }) => p.x < 172 + 12 && p.y > 150 - 12 && p.y < 178 + 12;
+
+  it.each([
+    [512, 743],
+    [900, 700],
+    [1200, 800],
+  ])('keeps up-left arrows off the select in a %ix%i viewport', (w, h) => {
+    for (let deg = -150; deg <= -120; deg += 1) {
+      const a = (deg * Math.PI) / 180;
+      const p = offScreenArrowPoint(w / 2 + Math.cos(a) * 1e5, h / 2 + Math.sin(a) * 1e5, w, h);
+      expect(underSelect(p!), `${deg} deg -> (${p!.x.toFixed(0)}, ${p!.y.toFixed(0)})`).toBe(false);
+    }
+  });
+});
