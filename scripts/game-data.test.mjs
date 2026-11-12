@@ -10,6 +10,7 @@ import {
   latestTag,
   modIdAliases,
   nextPatchVersion,
+  sha256For,
   summarizeAtlas,
   summarizeMapMods,
 } from './game-data.mjs';
@@ -158,5 +159,24 @@ describe('insertChangelogEntry', () => {
     expect(insertChangelogEntry(head, '0.0.1', '2026-11-03', ['one'])).toBe(
       `${head}## [0.0.1] - 2026-11-03\n\n### Changed\n- one\n\n`,
     );
+  });
+});
+
+describe('sha256For', () => {
+  const sums = [
+    'e809c1bed515dc84a95e0c1a2ef647b4a3c9f5d6c178dabd996719de547f08e8  mapmods/Generated.Map.ENGLISH.json',
+    'ea5c17b8c43cae31c470b0b1baf2cd31c47a7cc60d8c5577fe87f378caab89ec  mapmods/Generated.Map.ENGLISH.min.json',
+    '',
+  ].join('\n');
+  it('finds the hash of an exact path', () => {
+    expect(sha256For(sums, 'mapmods/Generated.Map.ENGLISH.json')).toBe(
+      'e809c1bed515dc84a95e0c1a2ef647b4a3c9f5d6c178dabd996719de547f08e8',
+    );
+  });
+  it('returns null for a path that is not listed', () => {
+    expect(sha256For(sums, 'mapmods/Generated.Map.GERMAN.json')).toBeNull();
+  });
+  it('accepts binary-mode entries and CRLF line ends', () => {
+    expect(sha256For('abc123 *mapmods/x.json\r\n', 'mapmods/x.json')).toBe('abc123');
   });
 });
