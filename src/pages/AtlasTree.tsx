@@ -201,6 +201,7 @@ export function AtlasTree() {
         void open(activeTree.id, config);
         toast.success(`Updated to ${currentTag}: kept ${kept.length} nodes, removed ${removed.length}`);
       },
+      onError: () => toast.error('Could not update atlas tree'),
     });
   }
 
