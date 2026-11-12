@@ -1,8 +1,7 @@
 // ABOUTME: Refreshes the app's bundled fallback game data by hand: the latest atlas tree (GGG atlastree-export, with its
-// ABOUTME: release date) and map-mod regex data (data.poe.re); adds a CHANGELOG entry, reports changed/valid. --dry-run writes nothing.
+// ABOUTME: release date) and map-mod regex data (data.poe.re); adds a CHANGELOG entry, prints a summary. --dry-run writes nothing.
 
 import { createHash } from 'node:crypto';
-import { appendFileSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -16,8 +15,6 @@ const POE_RE_DATA = 'https://data.poe.re';
 const MAP_MODS_PATH = 'mapmods/Generated.Map.ENGLISH.json';
 
 const dryRun = process.argv.includes('--dry-run');
-const summaryIndex = process.argv.indexOf('--summary');
-const summaryFile = summaryIndex > -1 ? process.argv[summaryIndex + 1] : null;
 
 // data.poe.re asks every client for a `<name>/<version> (<url>)` User-Agent. The GitHub token only goes to GitHub.
 const USER_AGENT = 'niko-data-sync/1.0 (https://github.com/berkbulgan/niko-poe)';
@@ -118,5 +115,3 @@ const summary = changed
   ? [...changelog.map((l) => `- ${l}`), ...(valid ? [] : ['', '**Problems:**', ...problems.map((p) => `- ${p}`)])].join('\n')
   : 'No changes.';
 console.log(summary);
-if (summaryFile) await writeFile(summaryFile, summary + '\n');
-if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changed}\nvalid=${valid}\n`);
