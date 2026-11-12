@@ -1,28 +1,32 @@
-// ABOUTME: Filters page — preset sidebar + map mod picker.
-// ABOUTME: Left panel: saved presets with share codes. Right panel: avoid/prefer mod columns.
+// ABOUTME: Regex Filters page — preset sidebar + map mod picker, autosaved.
+// ABOUTME: Toolbar shows the open preset's editable name, save status and a New preset button.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   useFilterPresets,
-  useCreatePreset,
   useUpdatePreset,
   useDuplicatePreset,
   useDeletePreset,
   type FilterPresetParsed,
 } from '@/lib/hooks/use-filter-presets';
+import { useFiltersAutosave, type AutosaveStatus } from '@/lib/hooks/use-filters-autosave';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
-import { SaveEntityModal } from '@/components/ui/save-entity-modal';
 import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
 import { EntitySidebar } from '@/components/ui/entity-sidebar';
-import { EditorToolbar } from '@/components/ui/editor-toolbar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { StatPicker } from '@/components/filters/stat-picker';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
-import { useQueryClient } from '@tanstack/react-query';
-import { toast } from '@/lib/stores/toast-store';
-import { confirmDiscard } from '@/lib/platform';
 import { useFiltersStore } from '@/lib/stores/filters-store';
+
+const STATUS_TEXT: Record<AutosaveStatus, string> = {
+  idle: '',
+  saving: 'Saving…',
+  saved: 'Saved',
+  error: 'Not saved',
+};
 
 function PresetRow({
   preset,
@@ -30,12 +34,14 @@ function PresetRow({
   onSelect,
   onDuplicate,
   onExport,
+  onBeforeDelete,
 }: {
   preset: FilterPresetParsed;
   active: boolean;
   onSelect: () => void;
   onDuplicate: () => void;
   onExport: () => void;
+  onBeforeDelete: () => void;
 }) {
   const deletePreset = useDeletePreset(preset.id);
 
@@ -46,75 +52,71 @@ function PresetRow({
       onSelect={onSelect}
       onExport={onExport}
       onDuplicate={onDuplicate}
-      onDelete={() => deletePreset.mutate(undefined)}
+      onDelete={() => { onBeforeDelete(); deletePreset.mutate(undefined); }}
       isDeleting={deletePreset.isPending}
     />
   );
 }
 
-export function Filters() {
-  const [showSaveAs, setShowSaveAs] = useState(false);
-  const [showImport, setShowImport] = useState(false);
-  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+/** Click to rename; Enter or blur saves, Escape cancels, a blank name reverts. */
+function PresetName({ name, onRename }: { name: string; onRename: (name: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const cancelled = useRef(false);
 
-  const { activePresetId, setActivePresetId, getConfig, loadConfig } = useFiltersStore();
-
-  const { data: presets, isLoading } = useFilterPresets();
-  const createPreset = useCreatePreset();
-  const duplicatePreset = useDuplicatePreset();
-  const queryClient = useQueryClient();
-
-  // Find active preset for Save (overwrite) operation
-  const activePreset = presets?.find((p) => p.id === activePresetId);
-
-  const updatePreset = useUpdatePreset(activePresetId ?? '');
-
-  // Detect unsaved changes by comparing current store state to saved preset config
-  const currentConfig = getConfig();
-  const hasUnsavedChanges = activePreset
-    ? JSON.stringify(currentConfig) !== JSON.stringify(activePreset.config)
-    : currentConfig.avoidModIds.length > 0 || currentConfig.preferModIds.length > 0 ||
-      currentConfig.quantity !== '' || currentConfig.packSize !== '' ||
-      currentConfig.rarity !== '' || currentConfig.quality !== '' ||
-      currentConfig.moreCurrency !== '' || currentConfig.moreMaps !== '' ||
-      currentConfig.moreScarabs !== '' || currentConfig.moreDivination !== '' ||
-      currentConfig.corrupted !== 'natural' || currentConfig.isNightmareMap === true;
-
-  function handleSaveAs(name: string) {
-    const config = getConfig();
-    createPreset.mutate({ name, config }, {
-      onSuccess: (saved) => {
-        setActivePresetId(saved.id);
-        void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
-        toast.success(`Saved "${saved.name}"`);
-      },
-      onError: (err) => { console.error('[Filters] createPreset failed:', err); },
-    });
-  }
-
-  function handleSaveOverwrite() {
-    if (!activePresetId) return;
-    const config = getConfig();
-    updatePreset.mutate({ config }, {
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: ['filter-presets'] });
-        toast.success(`Saved "${activePreset?.name ?? 'preset'}"`);
-      },
-    });
-  }
-
-  async function handleDuplicate(preset: FilterPresetParsed) {
-    if (!(await confirmDiscard(hasUnsavedChanges))) return;
-    duplicatePreset.mutate(
-      { name: `${preset.name} (copy)`, config: preset.config },
-      { onSuccess: (dup) => { setActivePresetId(dup.id); loadConfig(dup.config); } },
+  if (draft === null) {
+    return (
+      <button
+        type="button"
+        onClick={() => setDraft(name)}
+        title="Rename"
+        className="truncate text-sm font-semibold tracking-wide text-poe-text-dim hover:text-poe-text"
+      >
+        {name}
+      </button>
     );
   }
 
-  async function handleLoadPreset(preset: FilterPresetParsed) {
-    if (!(await confirmDiscard(hasUnsavedChanges))) return;
-    setActivePresetId(preset.id);
-    loadConfig(preset.config);
+  return (
+    <Input
+      autoFocus
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const next = draft.trim();
+        setDraft(null);
+        if (cancelled.current) { cancelled.current = false; return; }
+        if (next && next !== name) onRename(next);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') { cancelled.current = true; e.currentTarget.blur(); }
+      }}
+      aria-label="Preset name"
+      className="h-7 w-64 text-sm"
+    />
+  );
+}
+
+export function Filters() {
+  const [showImport, setShowImport] = useState(false);
+  const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+
+  const { activePresetId, getConfig } = useFiltersStore();
+  const { data: presets, isLoading } = useFilterPresets();
+  const duplicatePreset = useDuplicatePreset();
+  const updatePreset = useUpdatePreset(activePresetId ?? '');
+  const { status, flush, open, startNew } = useFiltersAutosave(presets?.map((p) => p.name) ?? []);
+
+  const activePreset = presets?.find((p) => p.id === activePresetId);
+
+  async function handleDuplicate(preset: FilterPresetParsed) {
+    await flush();
+    // The open preset's sidebar copy may lag the draft until the list refetches.
+    const config = preset.id === activePresetId ? getConfig() : preset.config;
+    duplicatePreset.mutate(
+      { name: `${preset.name} (copy)`, config },
+      { onSuccess: (dup) => { void open(dup.id, dup.config); } },
+    );
   }
 
   // Dashboard links here with ?preset=<id> to open that preset.
@@ -125,12 +127,8 @@ export function Filters() {
     setSearchParams({}, { replace: true });
     const preset = presets.find((p) => p.id === linkedPresetId);
     if (!preset || preset.id === activePresetId) return;
-    void confirmDiscard(hasUnsavedChanges).then((ok) => {
-      if (!ok) return;
-      setActivePresetId(preset.id);
-      loadConfig(preset.config);
-    });
-  }, [linkedPresetId, presets, activePresetId, hasUnsavedChanges, setActivePresetId, loadConfig, setSearchParams]);
+    void open(preset.id, preset.config);
+  }, [linkedPresetId, presets, activePresetId, open, setSearchParams]);
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
@@ -140,42 +138,43 @@ export function Filters() {
         isLoading={isLoading}
         isEmpty={!presets || presets.length === 0}
         emptyTitle="No presets saved"
-        emptyDescription="Configure your filters and hit Save"
+        emptyDescription="Pick a mod to start a preset"
       >
         {presets?.map((preset) => (
           <PresetRow
             key={preset.id}
             preset={preset}
             active={activePresetId === preset.id}
-            onSelect={() => handleLoadPreset(preset)}
-            onDuplicate={() => handleDuplicate(preset)}
+            onSelect={() => { if (preset.id !== activePresetId) void open(preset.id, preset.config); }}
+            onDuplicate={() => { void handleDuplicate(preset); }}
             onExport={() => setExportInput({ type: 'F', name: preset.name, config: preset.config })}
+            onBeforeDelete={() => { if (preset.id === activePresetId) void startNew({ discard: true }); }}
           />
         ))}
       </EntitySidebar>
 
       {/* ── Right panel: Regex Filters editor ── */}
       <main className="flex flex-1 flex-col overflow-y-auto">
-        <EditorToolbar
-          title="Regex Filters"
-          hasUnsavedChanges={hasUnsavedChanges}
-          hasActiveEntity={!!activePreset}
-          onSave={handleSaveOverwrite}
-          onSaveAs={() => setShowSaveAs(true)}
-        />
+        <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            {activePreset ? (
+              <PresetName name={activePreset.name} onRename={(name) => updatePreset.mutate({ name })} />
+            ) : (
+              <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">New preset</h3>
+            )}
+            {STATUS_TEXT[status] && (
+              <span className={`text-xs ${status === 'error' ? 'text-poe-error' : 'text-poe-text-muted'}`}>
+                {STATUS_TEXT[status]}
+              </span>
+            )}
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => { void startNew(); }}>New preset</Button>
+        </div>
         <div className="flex-1 overflow-hidden">
           <StatPicker />
         </div>
       </main>
 
-      <SaveEntityModal
-        open={showSaveAs}
-        onClose={() => setShowSaveAs(false)}
-        onSave={handleSaveAs}
-        title="Save Preset"
-        placeholder="e.g. Breach-RF, Expedition, Bow Maps..."
-        label="Preset Name"
-      />
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />
       <ExportModal open={exportInput !== null} onClose={() => setExportInput(null)} input={exportInput} />
     </div>
