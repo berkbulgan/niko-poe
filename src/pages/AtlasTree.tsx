@@ -156,6 +156,12 @@ export function AtlasTree() {
     );
   }
 
+  async function handleExport(tree: AtlasTreeType) {
+    await flush();
+    const config = tree.id === activeTreeId ? getConfig(treeData.tree) : tree.config;
+    setExportInput({ type: 'A', name: tree.name, config });
+  }
+
   // Strategies link here with ?tree=<id> to open that tree.
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedTreeId = searchParams.get('tree');
@@ -184,7 +190,7 @@ export function AtlasTree() {
             active={activeTreeId === tree.id}
             onSelect={() => { if (tree.id !== activeTreeId) void open(tree.id, tree.config); }}
             onDuplicate={() => { void handleDuplicate(tree); }}
-            onExport={() => setExportInput({ type: 'A', name: tree.name, config: tree.config })}
+            onExport={() => { void handleExport(tree); }}
             onBeforeDelete={() => { if (tree.id === activeTreeId) void startNew({ discard: true }); }}
           />
         ))}

@@ -77,6 +77,12 @@ export function Filters() {
     );
   }
 
+  async function handleExport(preset: FilterPresetParsed) {
+    await flush();
+    const config = preset.id === activePresetId ? getConfig() : preset.config;
+    setExportInput({ type: 'F', name: preset.name, config });
+  }
+
   // Dashboard links here with ?preset=<id> to open that preset.
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedPresetId = searchParams.get('preset');
@@ -105,7 +111,7 @@ export function Filters() {
             active={activePresetId === preset.id}
             onSelect={() => { if (preset.id !== activePresetId) void open(preset.id, preset.config); }}
             onDuplicate={() => { void handleDuplicate(preset); }}
-            onExport={() => setExportInput({ type: 'F', name: preset.name, config: preset.config })}
+            onExport={() => { void handleExport(preset); }}
             onBeforeDelete={() => { if (preset.id === activePresetId) void startNew({ discard: true }); }}
           />
         ))}
