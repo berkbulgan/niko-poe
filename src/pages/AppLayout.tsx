@@ -6,9 +6,11 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { useLeague } from '@/lib/league-context';
 import { Toaster } from '@/components/ui/toaster';
+import { ConfirmProvider } from '@/components/ui/confirm-dialog';
+import { IconTooltip, TooltipProvider } from '@/components/ui/tooltip';
 import { checkForUpdate } from '@/lib/updater';
-import { useCommunityServerUrl } from '@/lib/hooks/use-community';
 import { Zap, Sword, BarChart3, Globe, TreePine, Archive, LogOut, Menu, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { SimpleSelect } from '@/components/ui/select';
 
 interface NavItemProps {
   href: string;
@@ -53,9 +55,6 @@ export function AppLayout() {
 
   useEffect(() => { void checkForUpdate(); }, []);
 
-  // Push any saved community server override to Rust before anything talks to the server.
-  useCommunityServerUrl();
-
   const navItems = [
     { href: '/dashboard', icon: <Zap size={18} />, label: 'Dashboard' },
     { href: '/filters', icon: <Sword size={18} />, label: 'Regex Filters' },
@@ -67,6 +66,7 @@ export function AppLayout() {
   ];
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="flex h-screen overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -94,37 +94,38 @@ export function AppLayout() {
               N.I.K.O.
             </Link>
           )}
-          <button
-            onClick={() => setNavCollapsed((prev) => !prev)}
-            className="hidden rounded p-1 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-text lg:block"
-            title={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-          </button>
+          <IconTooltip label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            <button
+              onClick={() => setNavCollapsed((prev) => !prev)}
+              className="hidden rounded p-1 text-poe-text-muted hover:bg-poe-panel-light hover:text-poe-text lg:block"
+              aria-label={navCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
+              {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            </button>
+          </IconTooltip>
         </div>
 
         {/* Navigation */}
         <nav className="mt-4 flex-1 space-y-0.5 overflow-y-auto" aria-label="Main navigation">
           {navItems.map((item) => (
             collapsed ? (
-              <Link
-                key={item.href}
-                to={item.href}
-                title={item.label}
-                aria-label={item.label}
-                className={`
-                  flex items-center justify-center py-2.5 transition-all duration-150
-                  ${pathname === item.href
-                    ? 'border-r-2 border-poe-gold bg-poe-gold/5 text-poe-gold'
-                    : 'requiresAuth' in item && item.requiresAuth && !isAuthenticated
-                      ? 'text-poe-text-muted opacity-50 hover:bg-poe-panel-light hover:opacity-70'
-                      : 'text-poe-text-dim hover:bg-poe-panel-light hover:text-poe-text'
-                  }
-                `}
-              >
-                {item.icon}
-              </Link>
+              <IconTooltip key={item.href} label={item.label}>
+                <Link
+                  to={item.href}
+                  aria-label={item.label}
+                  className={`
+                    flex items-center justify-center py-2.5 transition-all duration-150
+                    ${pathname === item.href
+                      ? 'border-r-2 border-poe-gold bg-poe-gold/5 text-poe-gold'
+                      : 'requiresAuth' in item && item.requiresAuth && !isAuthenticated
+                        ? 'text-poe-text-muted opacity-50 hover:bg-poe-panel-light hover:opacity-70'
+                        : 'text-poe-text-dim hover:bg-poe-panel-light hover:text-poe-text'
+                    }
+                  `}
+                >
+                  {item.icon}
+                </Link>
+              </IconTooltip>
             ) : (
               <NavItem
                 key={item.href}
@@ -144,15 +145,13 @@ export function AppLayout() {
             <label className="mb-1 block text-[10px] tracking-wider text-poe-text-muted">
               LEAGUE
             </label>
-            <select
+            <SimpleSelect
               value={currentLeague}
-              onChange={(e) => setLeague(e.target.value)}
-              className="w-full border border-poe-border/40 bg-poe-panel px-2 py-1.5 text-xs text-poe-text focus:border-poe-gold/50 focus:outline-none"
-            >
-              {leagues.map((l) => (
-                <option key={l.id} value={l.id}>{l.text}</option>
-              ))}
-            </select>
+              onValueChange={setLeague}
+              options={leagues.map((l) => ({ value: l.id, label: l.text }))}
+              size="sm"
+              aria-label="League"
+            />
             {pricesLoading && (
               <p className="mt-1 text-[10px] text-poe-gold/70 animate-pulse">
                 Fetching prices...
@@ -241,6 +240,8 @@ export function AppLayout() {
         </main>
       </div>
       <Toaster />
+      <ConfirmProvider />
     </div>
+    </TooltipProvider>
   );
 }

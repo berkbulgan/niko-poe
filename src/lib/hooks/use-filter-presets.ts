@@ -32,17 +32,6 @@ export function useFilterPresets() {
   });
 }
 
-export function useCreatePreset() {
-  const queryClient = useQueryClient();
-  return useMutation<FilterPresetParsed, Error, { name: string; config: FilterPresetConfig }>({
-    mutationFn: async ({ name, config }) => {
-      const preset = await ipc.createFilterPreset({ name, config: JSON.stringify(config) });
-      return parsePreset(preset);
-    },
-    onSettled: () => { void queryClient.invalidateQueries({ queryKey: PRESETS_KEY }); },
-  });
-}
-
 export function useDeletePreset(id: string) {
   const queryClient = useQueryClient();
   return useMutation<void, Error, void>({

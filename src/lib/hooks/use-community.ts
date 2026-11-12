@@ -5,10 +5,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import * as ipc from '@/lib/ipc';
 import {
   getPublished,
-  getServerUrlOverride,
   setFavourited,
   setPublished,
-  setServerUrlOverride,
 } from '@/lib/community-storage';
 import { strategyHash } from '@/lib/result-sharing';
 import type { StrategyConfig } from '@/types/strategies';
@@ -23,31 +21,12 @@ function isGone(err: unknown): boolean {
   return err instanceof Error && /not found/i.test(err.message);
 }
 
-/**
- * Pushes the saved override (if any) to Rust and returns the server URL in use, or null when none is configured.
- * Other community queries wait for this so they never run against a stale URL.
- */
+/** Returns the built-in community server URL, or null when this build has none. */
 export function useCommunityServerUrl() {
   return useQuery<string | null>({
     queryKey: SERVER_URL_KEY,
-    queryFn: () => ipc.setCommunityBaseUrl(getServerUrlOverride()),
+    queryFn: () => ipc.setCommunityBaseUrl(null),
     staleTime: Infinity,
-  });
-}
-
-export function useSetCommunityServerUrl() {
-  const queryClient = useQueryClient();
-  return useMutation<string | null, Error, string | null>({
-    meta: { inlineError: true },
-    mutationFn: async (url) => {
-      const inUse = await ipc.setCommunityBaseUrl(url);
-      setServerUrlOverride(url);
-      return inUse;
-    },
-    onSuccess: (inUse) => {
-      queryClient.setQueryData(SERVER_URL_KEY, inUse);
-      void queryClient.invalidateQueries({ queryKey: COMMUNITY_KEY });
-    },
   });
 }
 

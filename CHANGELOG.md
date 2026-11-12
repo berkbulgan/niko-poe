@@ -2,6 +2,21 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.0] - 2026-11-12
+
+### Added
+- **Regex filter autosave** — Presets save themselves as you edit; the first change on a new draft creates "Untitled preset". Rename a preset by clicking its name in the toolbar. Save, Save As and the discard prompt are gone (Duplicate in the sidebar covers Save As)
+- The regex sits in a strip at the top of the Regex Filters page with a Copy button; Ctrl+Shift+C copies it too
+- Selected mods are listed first in each column; Escape clears the mod search
+
+### Changed
+- New look across the app: themed dropdowns, confirm dialogs, modals, tabs, switches and tooltips on icon buttons
+- "Clear All" on Regex Filters is replaced by "New preset"
+- Start menu and desktop shortcuts are named "N.I.K.O."
+
+### Removed
+- Settings: custom community server address (the built-in server is always used)
+
 ## [0.7.0] - 2026-11-09
 
 ### Added

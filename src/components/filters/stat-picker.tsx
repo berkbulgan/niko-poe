@@ -1,7 +1,7 @@
 // ABOUTME: Scary-inspired two-column mod picker with map stat filters.
 // ABOUTME: Quantity/packsize/rarity/quality/bonus filters affect both vendor regex and trade search.
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useLeague } from '@/lib/league-context';
@@ -14,7 +14,9 @@ import { generateNumberRegex } from '@/lib/generate-number-regex';
 import { buildOptimizedVendorRegex } from '@/lib/optimize-regex';
 import { PoeIcon, type PoeIconName } from '@/components/ui/poe-icon';
 import { useFiltersStore } from '@/lib/stores/filters-store';
+import { selectedFirst } from '@/lib/mod-order';
 import type { MapStatFilters, QualityType } from '@/types/filters';
+import { SimpleSelect } from '@/components/ui/select';
 
 const QUALITY_TYPE_OPTIONS: Array<{ value: QualityType; label: string }> = [
   { value: 'pack_size', label: 'Pack Size' },
@@ -139,13 +141,13 @@ function StatFilterInput({
       <label className="mb-1 flex items-center gap-1.5 text-xs text-poe-text-muted">
         <PoeIcon name={iconName} size={16} /> {label}
       </label>
-      <input
+      <Input
         type="number"
         min="0"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="min"
-        className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-currency tabular-nums placeholder:text-poe-text-muted focus:border-poe-gold/40 focus:outline-none"
+        className="tabular-nums text-poe-currency"
       />
     </div>
   );
@@ -190,7 +192,7 @@ export function StatPicker() {
   const {
     avoidIds, preferIds, filters, searchQuery, showNightmare, isNightmareMap,
     setSearchQuery, setShowNightmare, setIsNightmareMap,
-    toggleAvoid, togglePrefer, updateFilter, clearAll,
+    toggleAvoid, togglePrefer, updateFilter,
   } = store;
   const [copied, setCopied] = useState(false);
   const [searching, setSearching] = useState(false);
@@ -207,8 +209,14 @@ export function StatPicker() {
     return mods;
   }, [searchQuery, showNightmare]);
 
-  const avoidSorted = useMemo(() => [...filteredMods].sort((a, b) => b.scary - a.scary), [filteredMods]);
-  const preferSorted = useMemo(() => [...filteredMods].sort((a, b) => a.scary - b.scary), [filteredMods]);
+  const avoidSorted = useMemo(
+    () => selectedFirst([...filteredMods].sort((a, b) => b.scary - a.scary), avoidIds),
+    [filteredMods, avoidIds],
+  );
+  const preferSorted = useMemo(
+    () => selectedFirst([...filteredMods].sort((a, b) => a.scary - b.scary), preferIds),
+    [filteredMods, preferIds],
+  );
 
   const avoidMods = MAP_MODS.filter((m) => avoidIds.has(m.id));
   const preferMods = MAP_MODS.filter((m) => preferIds.has(m.id));
@@ -223,6 +231,32 @@ export function StatPicker() {
     filters.quality !== '' ||
     filters.moreCurrency !== '' || filters.moreMaps !== '' ||
     filters.moreScarabs !== '' || filters.moreDivination !== '';
+
+  const canCopy = hasAnyFilter && vendorRegex.length > 0;
+
+  async function copyRegex() {
+    if (!canCopy) return;
+    if (!(await copyToClipboard(vendorRegex))) {
+      toast.error('Could not copy to clipboard');
+      return;
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  // Ctrl+Shift+C copies the regex, unless the user is copying selected text from a field.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey && e.shiftKey && e.code === 'KeyC')) return;
+      if (e.repeat) return;
+      const t = e.target;
+      if ((t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) && t.selectionStart !== t.selectionEnd) return;
+      e.preventDefault();
+      void copyRegex();
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
 
   // useImperativeHandle removed — store.getConfig()/loadConfig() used by parent page directly
 
@@ -343,13 +377,35 @@ export function StatPicker() {
     }
   }
 
-  function handleClear() {
-    clearAll();
-  }
-
   return (
     // Scrolls as a whole on short windows; the mod lists keep a usable minimum height.
     <div className="flex h-full flex-col overflow-y-auto">
+      {/* ── Regex strip: stays visible while the page scrolls ── */}
+      <div className="sticky top-0 z-10 shrink-0 border-b border-poe-border/30 bg-poe-bg px-4 py-3 lg:px-6">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {canCopy ? (
+              <>
+                <p className="break-all font-mono text-sm text-poe-currency">{vendorRegex}</p>
+                <p className={`mt-1 text-xs ${vendorRegex.length > 250 ? 'text-poe-error' : 'text-poe-text-muted'}`}>
+                  {vendorRegex.length}/250 chars{vendorRegex.length > 250 ? ' — too long! Remove some filters' : ' — paste in stash tab search'}
+                </p>
+              </>
+            ) : (
+              <p className="py-1 text-xs text-poe-text-muted">Pick mods or set map stats to build a regex</p>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="primary" size="sm" onClick={() => { void copyRegex(); }} disabled={!canCopy}>
+              {copied ? 'Copied ✓' : 'Copy'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleOpenTrade} disabled={searching || !hasAnyFilter}>
+              {searching ? 'Searching...' : 'Open Trade ↗'}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* ── Map stat filters — 3 rows ── */}
       <div className="mx-4 mt-4 shrink-0 space-y-3 border border-poe-border/20 bg-poe-panel/20 p-4 lg:mx-6">
         <div className="flex items-center justify-between">
@@ -393,15 +449,12 @@ export function StatPicker() {
             <label className="mb-1 flex items-center gap-1.5 text-xs text-poe-text-muted">
               <PoeIcon name="chisel" size={16} /> Quality Type
             </label>
-            <select
+            <SimpleSelect
               value={filters.qualityType}
-              onChange={(e) => updateFilter('qualityType', e.target.value as QualityType)}
-              className="w-full border border-poe-border/30 bg-poe-panel/40 px-2 py-1.5 text-sm text-poe-text focus:border-poe-gold/40 focus:outline-none"
-            >
-              {QUALITY_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
+              onValueChange={(v) => updateFilter('qualityType', v as QualityType)}
+              options={QUALITY_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              aria-label="Quality type"
+            />
           </div>
           {/* Corrupted: 3-state */}
           <div className="flex flex-col">
@@ -444,6 +497,7 @@ export function StatPicker() {
       <Input
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape') setSearchQuery(''); }}
         placeholder="Filter mods... (e.g. reflect, regen, life)"
         className="mx-4 mt-4 w-auto text-xs lg:mx-6"
       />
@@ -483,56 +537,6 @@ export function StatPicker() {
             {preferSorted.map((mod) => (
               <ModRow key={mod.id} mod={mod} selected={preferIds.has(mod.id)} onToggle={() => togglePrefer(mod.id)} />
             ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Bottom bar: vendor regex + actions ── */}
-      <div className="shrink-0 mt-auto border-t border-poe-border/30 bg-poe-bg px-4 py-3 lg:px-6">
-        {hasAnyFilter && vendorRegex.length > 0 && (
-          <div className="mb-3 border border-poe-gold/30 bg-poe-panel/40 p-3">
-            <div className="mb-1.5 flex items-center justify-between">
-              <h4 className="text-xs font-medium tracking-wide text-poe-gold/70">
-                Stash Search Regex
-              </h4>
-              <button
-                onClick={async () => {
-                  if (!(await copyToClipboard(vendorRegex))) {
-                    toast.error('Could not copy to clipboard');
-                    return;
-                  }
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-                className={`text-[11px] ${copied ? 'text-poe-success' : 'text-poe-text-dim hover:text-poe-gold'}`}
-              >
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
-            </div>
-            <p className="break-all font-mono text-sm text-poe-currency">{vendorRegex}</p>
-            <p className={`mt-1.5 text-xs ${vendorRegex.length > 250 ? 'text-poe-error' : 'text-poe-text-muted'}`}>
-              {vendorRegex.length}/250 chars{vendorRegex.length > 250 ? ' — too long! Remove some filters' : ' — paste in stash tab search'}
-            </p>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-poe-text-dim">
-            <span className="text-poe-error">{avoidIds.size}</span> avoid
-            {' · '}
-            <span className="text-poe-success">{preferIds.size}</span> prefer
-            {isNightmareMap && <span className="text-purple-400"> · nightmare</span>}
-            {Object.values(filters).some((v) => v !== '') && (
-              <span className="text-poe-currency"> · stats active</span>
-            )}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={handleClear}>
-              Clear All
-            </Button>
-            <Button variant="primary" size="sm" onClick={handleOpenTrade} disabled={searching || !hasAnyFilter}>
-              {searching ? 'Searching...' : 'Open Trade ↗'}
-            </Button>
           </div>
         </div>
       </div>

@@ -105,11 +105,11 @@ export function Strategies() {
   function handleSaveOverwrite() {
     if (!activeStrategyId) return;
     const config = getConfig();
-    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success('Strategy saved') });
+    overwriteMutation.mutate({ config }, { onSuccess: () => toast.success(`Saved "${activeStrategy?.name ?? 'strategy'}"`) });
   }
 
-  function handleDuplicate(strategy: StrategyParsed) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleDuplicate(strategy: StrategyParsed) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     duplicateStrategy.mutate(
       { name: `${strategy.name} (copy)`, config: strategy.config },
       { onSuccess: (dup) => { setActiveStrategyId(dup.id); loadConfig(dup.config, MAPS_PER_USE); } },
@@ -118,13 +118,18 @@ export function Strategies() {
 
   const published = activeStrategy ? getPublished(activeStrategy.id) : null;
 
-  function handleUnpublish() {
-    if (!activeStrategy || !confirmAction(`Remove "${activeStrategy.name}" from the community list?`)) return;
+  async function handleUnpublish() {
+    if (!activeStrategy) return;
+    const ok = await confirmAction(`Remove "${activeStrategy.name}" from the community list?`, {
+      confirmLabel: 'Unpublish',
+      destructive: true,
+    });
+    if (!ok) return;
     unpublish.mutate(activeStrategy.id, { onSuccess: () => toast.success('Strategy unpublished') });
   }
 
-  function handleLoadStrategy(strategy: StrategyParsed) {
-    if (!confirmDiscard(hasUnsavedChanges)) return;
+  async function handleLoadStrategy(strategy: StrategyParsed) {
+    if (!(await confirmDiscard(hasUnsavedChanges))) return;
     setActiveStrategyId(strategy.id);
     loadConfig(strategy.config, MAPS_PER_USE);
   }

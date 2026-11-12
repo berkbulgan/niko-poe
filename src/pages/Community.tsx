@@ -2,7 +2,6 @@
 // ABOUTME: Left: search, filters and results. Right: detail panel for the selected strategy.
 
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,11 +10,9 @@ import { StrategyDetailPanel } from '@/components/community/strategy-detail';
 import { useCommunityList, useCommunityServerUrl, useCommunityTags } from '@/lib/hooks/use-community';
 import { useLeague } from '@/lib/league-context';
 import type { CommunitySort } from '@/types/community';
+import { SimpleSelect } from '@/components/ui/select';
 
 const PAGE_SIZE = 20;
-
-const selectClass =
-  'h-8 rounded-md border border-poe-border bg-poe-panel px-2 text-xs text-poe-text focus:border-poe-gold/50 focus:outline-none';
 
 export function Community() {
   const { leagues } = useLeague();
@@ -49,7 +46,7 @@ export function Community() {
       <div className="mx-auto max-w-md py-16 text-center">
         <h2 className="text-sm font-semibold text-poe-text-dim">Community server not configured</h2>
         <p className="mt-2 text-xs text-poe-text-muted">
-          This build has no community server. Set one under <Link to="/settings" className="text-poe-gold">Settings</Link>.
+          This build has no community server.
         </p>
       </div>
     );
@@ -67,15 +64,25 @@ export function Community() {
           <h2 className="text-sm font-semibold text-poe-text-dim">Community Strategies</h2>
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name..." className="h-8 text-xs" />
           <div className="flex gap-2">
-            <select className={`${selectClass} flex-1`} value={league} onChange={(e) => filter(() => { setLeague(e.target.value); setTag(''); })} aria-label="League">
-              <option value="">All leagues</option>
-              {leagues.map((l) => <option key={l.id} value={l.id}>{l.text}</option>)}
-            </select>
-            <select className={selectClass} value={sort} onChange={(e) => filter(() => setSort(e.target.value as CommunitySort))} aria-label="Sort">
-              <option value="new">Newest</option>
-              <option value="favourites">Most favourited</option>
-              <option value="profit">Most profitable</option>
-            </select>
+            <SimpleSelect
+              className="flex-1"
+              value={league}
+              onValueChange={(v) => filter(() => { setLeague(v); setTag(''); })}
+              options={[{ value: '', label: 'All leagues' }, ...leagues.map((l) => ({ value: l.id, label: l.text }))]}
+              size="sm"
+              aria-label="League"
+            />
+            <SimpleSelect
+              value={sort}
+              onValueChange={(v) => filter(() => setSort(v as CommunitySort))}
+              options={[
+                { value: 'new', label: 'Newest' },
+                { value: 'favourites', label: 'Most favourited' },
+                { value: 'profit', label: 'Most profitable' },
+              ]}
+              size="sm"
+              aria-label="Sort"
+            />
           </div>
           {tags.data && tags.data.length > 0 && (
             <div className="flex flex-wrap gap-1">
