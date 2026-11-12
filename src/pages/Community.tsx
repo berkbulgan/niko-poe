@@ -23,7 +23,7 @@ import {
   isFavourited,
 } from '@/lib/community-storage';
 import { useLeague } from '@/lib/league-context';
-import type { CommunitySort, StrategySummary } from '@/types/community';
+import type { Budget, CommunitySort, Difficulty, StrategySummary } from '@/types/community';
 
 type Show = 'all' | 'mine' | 'favourites';
 
@@ -90,6 +90,18 @@ function StrategyCard({
   );
 }
 
+const BUDGETS: ReadonlyArray<{ value: Budget; label: string }> = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+];
+
+const DIFFICULTIES: ReadonlyArray<{ value: Difficulty; label: string }> = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'hard', label: 'Hard' },
+];
+
 export function Community() {
   const { leagues, currentLeague } = useLeague();
   const server = useCommunityServerUrl();
@@ -102,6 +114,8 @@ export function Community() {
   const [league, setLeague] = useState(currentLeague);
   const [tag, setTag] = useState('');
   const [sort, setSort] = useState<CommunitySort>('new');
+  const [budget, setBudget] = useState<Budget | ''>('');
+  const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
   const [show, setShow] = useState<Show>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const showAll = show === 'all';
@@ -122,7 +136,14 @@ export function Community() {
   }, [linkedId, setSearchParams]);
 
   const list = useCommunityList(
-    { q: q || undefined, tag: tag || undefined, league: league || undefined, sort },
+    {
+      q: q || undefined,
+      tag: tag || undefined,
+      league: league || undefined,
+      budget: budget || undefined,
+      difficulty: difficulty || undefined,
+      sort,
+    },
     configured && showAll,
   );
   const localIds = !configured || showAll ? [] : show === 'mine' ? getPublishedIds() : getFavouriteIds();
@@ -161,6 +182,7 @@ export function Community() {
     ? [...new Map((list.data?.pages.flatMap((p) => p.items) ?? []).map((s) => [s.id, s])).values()]
     : local.items.filter((s) => s.name.toLowerCase().includes(needle));
   const loading = showAll ? list.isLoading : local.isLoading;
+  const error = showAll ? list.error : local.error;
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
@@ -205,6 +227,8 @@ export function Community() {
               aria-label="Sort"
             />
           </div>
+          <ChipRow label="Budget" options={BUDGETS} value={budget} onChange={setBudget} disabled={!showAll} />
+          <ChipRow label="Difficulty" options={DIFFICULTIES} value={difficulty} onChange={setDifficulty} disabled={!showAll} />
           {tags.data && tags.data.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {tags.data.map((t) => (
@@ -228,8 +252,8 @@ export function Community() {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex justify-center py-8"><Spinner /></div>
-          ) : showAll && list.isError ? (
-            <p className="p-4 text-xs text-poe-error">{list.error.message}</p>
+          ) : error ? (
+            <p className="p-4 text-xs text-poe-error">{error.message}</p>
           ) : items.length === 0 ? (
             <p className="p-4 text-center text-sm text-poe-text-dim">{EMPTY_TEXT[show]}</p>
           ) : (
@@ -261,6 +285,41 @@ export function Community() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+/** One-of toggle chips; clicking the active chip clears the filter. */
+function ChipRow<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  value: T | '';
+  onChange: (value: T | '') => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1" role="group" aria-label={label}>
+      <span className="w-14 shrink-0 text-[11px] text-poe-text-muted">{label}</span>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(value === o.value ? '' : o.value)}
+          aria-pressed={value === o.value}
+          className={`rounded px-1.5 py-0.5 text-[11px] transition-colors disabled:pointer-events-none disabled:opacity-50 ${
+            value === o.value ? 'bg-poe-gold/20 text-poe-gold' : 'bg-poe-panel-light/50 text-poe-text-dim hover:text-poe-text'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }

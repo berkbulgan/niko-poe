@@ -76,7 +76,10 @@ function toFilters(config: FilterPresetConfig): MapStatFilters {
     rarity: config.rarity ?? '',
     mapTier: config.mapTier ?? '',
     quality: config.quality ?? '',
-    qualityType: (config.qualityType as QualityType) ?? 'pack_size',
+    // Imported configs can carry any string; an unknown type would put 'undefined' in the regex.
+    qualityType: Object.prototype.hasOwnProperty.call(QUALITY_REGEX_MAP, config.qualityType)
+      ? (config.qualityType as QualityType)
+      : 'pack_size',
     moreCurrency: config.moreCurrency ?? '',
     moreMaps: config.moreMaps ?? '',
     moreScarabs: config.moreScarabs ?? '',
