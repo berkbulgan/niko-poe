@@ -17,6 +17,7 @@ import {
   statsText,
 } from './atlas-tree-utils';
 import rawTreeData from '@/data/atlas-tree-data.json';
+import sources from '@/data/sources.json';
 import type { AtlasNodeData, AtlasTreeRawData, ProcessedAtlasNode } from '@/types/atlas-tree';
 import type { AtlasVersion } from '@/types/game-data';
 
@@ -227,7 +228,9 @@ describe('resolveTreeTag', () => {
     expect(resolveTreeTag(legacy('2026-07-30 23:00:00'), [V3301, V3291, V3280])).toBe('3.28.0');
   });
   it('never maps a legacy tree past the bundled tag, even when updated after a newer release', () => {
-    expect(resolveTreeTag(legacy('2026-11-12 05:00:00'), [V3291, V3301])).toBe('3.29.1');
+    const bundled: AtlasVersion = { tag: sources.atlasTag, releasedAt: sources.atlasReleasedAt };
+    const newer: AtlasVersion = { tag: '99.0.0', releasedAt: '2099-01-01T00:00:00Z' };
+    expect(resolveTreeTag(legacy('2099-06-01 00:00:00'), [bundled, newer])).toBe(sources.atlasTag);
   });
   it('returns null for an unknown older patch or a tree without a date', () => {
     expect(resolveTreeTag(legacy('2026-07-30 23:00:00'), [V3301, V3291])).toBeNull();
