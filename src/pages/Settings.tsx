@@ -8,6 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { PoeIcon } from '@/components/ui/poe-icon';
 import { useSetTrackerSettings, useTrackerSettings, useTrackerState } from '@/lib/hooks/use-tracking';
 import { useCurrencyDisplay } from '@/lib/stores/currency-display-store';
+import { refreshMapMods, useGameDataStore } from '@/lib/stores/game-data-store';
+import { toast } from '@/lib/stores/toast-store';
+import { formatTimeAgo } from '@/lib/utils';
 import {
   findUpdate,
   getAutoCheck,
@@ -115,6 +118,39 @@ function UpdatesBlock() {
         />
         <label htmlFor="auto-check-updates">Check for updates on startup</label>
       </div>
+      <GameDataRow />
+    </div>
+  );
+}
+
+/** Map mod data in use, where it came from, and a button that asks the server for newer data. */
+function GameDataRow() {
+  const { mapModPatch, mapModSource, checkedAt, offline } = useGameDataStore();
+  const [checking, setChecking] = useState(false);
+
+  const suffix =
+    mapModSource === 'bundled' ? '(bundled)'
+    : offline ? '(offline, using saved data)'
+    : checkedAt ? `· checked ${formatTimeAgo(new Date(checkedAt))}`
+    : '';
+
+  const checkNow = async () => {
+    setChecking(true);
+    const status = await refreshMapMods();
+    setChecking(false);
+    if (status === 'updated') toast.success(`Map mod data updated to ${useGameDataStore.getState().mapModPatch}`);
+    else if (status === 'unchanged') toast.success('Game data is up to date');
+    else toast.error('Could not check for game data updates');
+  };
+
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-poe-text-muted">Map mod data:</span>
+      <span className="text-poe-text">{mapModPatch}</span>
+      {suffix && <span className="text-poe-text-muted">{suffix}</span>}
+      <Button size="sm" variant="secondary" onClick={() => void checkNow()} disabled={checking}>
+        {checking ? 'Checking…' : 'Check now'}
+      </Button>
     </div>
   );
 }
@@ -175,6 +211,8 @@ function StashIgnoreSection() {
 }
 
 function AboutSection() {
+  const mapModPatch = useGameDataStore((s) => s.mapModPatch);
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -183,6 +221,7 @@ function AboutSection() {
           Desktop companion for Path of Exile 1 players. Regex filter builder, trade search,
           strategy cost calculator, atlas tree planner, and GGG account integration.
         </p>
+        <p className="mt-2 text-xs text-poe-text-muted">Map mod data: {mapModPatch}</p>
       </div>
 
       {/* Developer */}
