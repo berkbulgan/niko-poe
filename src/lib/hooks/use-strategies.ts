@@ -29,6 +29,12 @@ export function useStrategies() {
   });
 }
 
+/** The strategies that link this filter preset or atlas tree. */
+export function useStrategiesUsing(field: 'filterPresetId' | 'atlasTreeId', id: string): Array<{ id: string; name: string }> {
+  const { data } = useStrategies();
+  return data?.filter((s) => s.config[field] === id).map((s) => ({ id: s.id, name: s.name })) ?? [];
+}
+
 export function useCreateStrategy() {
   const queryClient = useQueryClient();
   return useMutation<StrategyParsed, Error, { name: string; config: StrategyConfig }>({

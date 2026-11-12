@@ -5,6 +5,7 @@ pub mod atlas_trees;
 pub mod auth;
 pub mod community;
 pub mod filter_presets;
+pub mod game_data;
 pub mod prices;
 pub mod regex_filters;
 pub mod stash;

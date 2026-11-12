@@ -1,5 +1,5 @@
 // ABOUTME: Pure utility functions for processing the GGG atlas passive tree data.
-// ABOUTME: Handles orbital positioning, stat aggregation, BFS pathfinding, and connectivity checks.
+// ABOUTME: Handles positioning, stat aggregation, pathfinding, connectivity, search, mechanic grouping and atlas patch tags.
 
 import type {
   AtlasGroupData,
@@ -10,7 +10,10 @@ import type {
   ProcessedAtlasNode,
   AtlasConnection,
   AggregatedStat,
+  AtlasTreeConfig,
 } from '@/types/atlas-tree';
+import type { AtlasVersion } from '@/types/game-data';
+import sources from '@/data/sources.json';
 
 // ---------------------------------------------------------------------------
 // 3a. Orbit position calculator
@@ -420,11 +423,18 @@ export function pruneDisconnected(
   remaining.delete(removedNodeId);
 
   if (remaining.size === 0) return remaining;
+  return reachableAllocated(remaining, nodes);
+}
 
+/** The allocated ids reachable from the root through allocated nodes and hubs (hubs always count as allocated). */
+function reachableAllocated(
+  allocated: Set<string>,
+  nodes: Record<string, AtlasNodeData>,
+): Set<string> {
   const hubs = getHubNodeIds(nodes);
   const adj = buildAdjacencyList(nodes);
 
-  // BFS from hub nodes through (remaining allocated + hub nodes)
+  // BFS from hub nodes through (allocated + hub nodes)
   const visited = new Set<string>();
   const queue: string[] = [];
 
@@ -447,16 +457,16 @@ export function pruneDisconnected(
 
     for (const neighbor of neighbors) {
       if (visited.has(neighbor)) continue;
-      if (remaining.has(neighbor) || hubs.has(neighbor)) {
+      if (allocated.has(neighbor) || hubs.has(neighbor)) {
         visited.add(neighbor);
         queue.push(neighbor);
       }
     }
   }
 
-  // Return only remaining nodes that were reached from root/hubs
+  // Return only allocated nodes that were reached from root/hubs
   const reachable = new Set<string>();
-  for (const id of remaining) {
+  for (const id of allocated) {
     if (visited.has(id)) reachable.add(id);
   }
   return reachable;
@@ -497,4 +507,252 @@ export function buildConnections(
   }
 
   return connections;
+}
+
+// ---------------------------------------------------------------------------
+// 3i. Saved config checks (autosave)
+// ---------------------------------------------------------------------------
+
+/** Same set of allocated nodes, in any order; the tree version is ignored. Null equals only null. */
+export function atlasConfigsEqual(a: AtlasTreeConfig | null, b: AtlasTreeConfig | null): boolean {
+  if (a === null || b === null) return a === b;
+  const x = [...a.allocatedNodeIds].sort((p, q) => p - q);
+  const y = [...b.allocatedNodeIds].sort((p, q) => p - q);
+  return x.length === y.length && x.every((id, i) => id === y[i]);
+}
+
+/** True when no nodes are allocated. */
+export function isEmptyAtlasConfig(config: AtlasTreeConfig): boolean {
+  return config.allocatedNodeIds.length === 0;
+}
+
+// ---------------------------------------------------------------------------
+// 3j. Search
+// ---------------------------------------------------------------------------
+
+/**
+ * Nodes whose name or any stat line contains the query (trimmed, case-insensitive).
+ * Masteries and nameless nodes never match. Keystones and notables come first, then by name, then by id.
+ */
+export function searchMatches(nodes: ProcessedAtlasNode[], query: string): ProcessedAtlasNode[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const rank = (n: ProcessedAtlasNode) => (n.isKeystone || n.isNotable ? 0 : 1);
+  return nodes
+    .filter((n) => !n.isMastery && !!n.name
+      && (n.name.toLowerCase().includes(q) || n.stats.some((s) => s.toLowerCase().includes(q))))
+    .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || Number(a.id) - Number(b.id));
+}
+
+/** Next (step 1) or previous (step -1) index, wrapping; -1 when the list is empty. From -1 it starts at either end. */
+export function cycleIndex(current: number, length: number, step: 1 | -1): number {
+  if (length === 0) return -1;
+  if (current < 0) return step === 1 ? 0 : length - 1;
+  return (current + step + length) % length;
+}
+
+/** Bounding box of the points, or null when there are none. */
+export function boundsOf(points: Array<{ x: number; y: number }>): { minX: number; minY: number; maxX: number; maxY: number } | null {
+  if (points.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+// ---------------------------------------------------------------------------
+// 3k. Mechanic grouping
+// ---------------------------------------------------------------------------
+
+/**
+ * Maps node ids to a mechanic name. A node takes the name of the mastery in its own group;
+ * the rest take the mechanic of the nearest mapped node along in/out edges (layered BFS, each
+ * layer in ascending id order, so ties go to the lowest-id neighbour). Root, hubs, masteries,
+ * wormholes and missing nodes are never mapped nor crossed. Unmapped nodes are absent ("Other").
+ */
+export function nodeMechanics(nodes: Record<string, AtlasNodeData>): Map<string, string> {
+  const hubs = getHubNodeIds(nodes);
+  const skipped = (id: string) => {
+    const n = nodes[id];
+    return id === 'root' || !n || hubs.has(id) || !!n.isMastery || !!n.isWormhole;
+  };
+
+  const masteryByGroup = new Map<number, string>();
+  for (const n of Object.values(nodes)) {
+    if (n.isMastery) masteryByGroup.set(n.group, n.name);
+  }
+
+  const result = new Map<string, string>();
+  for (const [id, n] of Object.entries(nodes)) {
+    if (skipped(id)) continue;
+    const mechanic = masteryByGroup.get(n.group);
+    if (mechanic !== undefined) result.set(id, mechanic);
+  }
+
+  let frontier = Array.from(result.keys());
+  while (frontier.length > 0) {
+    frontier.sort((a, b) => Number(a) - Number(b));
+    const next: string[] = [];
+    for (const id of frontier) {
+      const mechanic = result.get(id)!;
+      for (const neighbor of [...nodes[id].out, ...nodes[id].in]) {
+        if (skipped(neighbor) || result.has(neighbor)) continue;
+        result.set(neighbor, mechanic);
+        next.push(neighbor);
+      }
+    }
+    frontier = next;
+  }
+  return result;
+}
+
+export interface MechanicSection {
+  mechanic: string;
+  /** Allocated non-keystone, non-mastery nodes in this mechanic. */
+  points: number;
+  notables: AtlasNodeData[];
+  /** aggregateStats over the mechanic's small passives. */
+  smallStats: AggregatedStat[];
+}
+
+/** Splits allocated nodes into keystones and one section per mechanic (most points first, "Other" last). */
+export function groupByMechanic(
+  allocated: AtlasNodeData[],
+  mechanics: Map<string, string>,
+): { keystones: AtlasNodeData[]; sections: MechanicSection[] } {
+  const keystones: AtlasNodeData[] = [];
+  const buckets = new Map<string, { notables: AtlasNodeData[]; small: AtlasNodeData[]; points: number }>();
+  for (const node of allocated) {
+    if (node.isKeystone) { keystones.push(node); continue; }
+    if (node.isMastery) continue;
+    const key = mechanics.get(String(node.skill)) ?? 'Other';
+    let bucket = buckets.get(key);
+    if (!bucket) { bucket = { notables: [], small: [], points: 0 }; buckets.set(key, bucket); }
+    bucket.points += 1;
+    if (node.isNotable) bucket.notables.push(node);
+    else bucket.small.push(node);
+  }
+  const sections = Array.from(buckets, ([mechanic, b]) => ({
+    mechanic,
+    points: b.points,
+    notables: b.notables,
+    smallStats: aggregateStats(b.small),
+  }));
+  sections.sort((a, b) => Number(a.mechanic === 'Other') - Number(b.mechanic === 'Other')
+    || b.points - a.points
+    || a.mechanic.localeCompare(b.mechanic));
+  return { keystones, sections };
+}
+
+/** "+12%" style total, rounded to at most two decimals. */
+export function formatStatTotal(stat: AggregatedStat): string {
+  const total = Number.isInteger(stat.total) ? stat.total : parseFloat(stat.total.toFixed(2));
+  return `${total > 0 ? '+' : ''}${total}${stat.unit}`;
+}
+
+/** Plain-text summary for Copy stats: header, keystones, then one block per mechanic section. */
+export function statsText(
+  treeName: string,
+  points: number,
+  maxPoints: number,
+  keystones: AtlasNodeData[],
+  sections: MechanicSection[],
+): string {
+  const blocks = [`${treeName} — ${points}/${maxPoints} points`];
+  if (keystones.length > 0) {
+    blocks.push(['Keystones', ...keystones.map((n) => `- ${n.name}`)].join('\n'));
+  }
+  for (const s of sections) {
+    blocks.push([
+      `${s.mechanic} (${s.points})`,
+      ...s.notables.map((n) => `- ${n.name}`),
+      ...s.smallStats.map((stat) => `${formatStatTotal(stat)} ${stat.text}`),
+    ].join('\n'));
+  }
+  return blocks.join('\n\n');
+}
+
+// ---------------------------------------------------------------------------
+// 3l. Atlas patches (GGG atlastree-export tags)
+// ---------------------------------------------------------------------------
+
+const ATLAS_TAG = /^\d+\.\d+\.\d+$/;
+
+/** Milliseconds for an RFC 3339 date or SQLite's `YYYY-MM-DD HH:MM:SS` (UTC, no zone). */
+function utcMs(date: string): number {
+  return Date.parse(date.includes('T') ? date : `${date.replace(' ', 'T')}Z`);
+}
+
+/** True when X.Y.Z tag `a` is newer than `b`. */
+function tagNewer(a: string, b: string): boolean {
+  return a.localeCompare(b, undefined, { numeric: true }) > 0;
+}
+
+/**
+ * The atlas tag a saved tree was made on. New saves store it in treeVersion. Older saves hold "Atlas",
+ * so they get the newest known tag released at or before the tree's last update, capped at the bundled
+ * tag: legacy saves were only ever made on the bundled atlas data or older.
+ * Null: an unknown older patch, or no date to go by.
+ */
+export function resolveTreeTag(
+  tree: { config: AtlasTreeConfig; updatedAt?: string },
+  versions: AtlasVersion[],
+): string | null {
+  if (ATLAS_TAG.test(tree.config.treeVersion)) return tree.config.treeVersion;
+  if (!tree.updatedAt) return null;
+  const updated = utcMs(tree.updatedAt);
+  let best: AtlasVersion | null = null;
+  for (const v of versions) {
+    if (tagNewer(v.tag, sources.atlasTag)) continue;
+    const released = utcMs(v.releasedAt);
+    if (released <= updated && (!best || released > utcMs(best.releasedAt))) best = v;
+  }
+  return best?.tag ?? null;
+}
+
+/**
+ * Moves a saved allocation onto another patch's nodes. Ids missing there, hubs and masteries go first;
+ * then every node no longer connected to the root (same rule as pruneDisconnected). Order is kept.
+ */
+export function migrateTree(
+  allocatedIds: number[],
+  nextNodes: Record<string, AtlasNodeData>,
+): { kept: number[]; removed: number[] } {
+  const hubs = getHubNodeIds(nextNodes);
+  const candidates = new Set<string>();
+  for (const id of allocatedIds) {
+    const key = String(id);
+    const node = nextNodes[key];
+    if (node && !hubs.has(key) && !node.isMastery) candidates.add(key);
+  }
+  const reachable = reachableAllocated(candidates, nextNodes);
+  return {
+    kept: allocatedIds.filter((id) => reachable.has(String(id))),
+    removed: allocatedIds.filter((id) => !reachable.has(String(id))),
+  };
+}
+
+/**
+ * The current atlas tag: the newest listed tag, no older than the bundled one, whose files load.
+ * Falls back to the bundled tag. Tags are tried one at a time, newest first; the bundled tag never needs loading.
+ */
+export async function pickAtlasTag(
+  versions: AtlasVersion[],
+  bundled: AtlasVersion,
+  canLoad: (tag: string) => Promise<boolean>,
+): Promise<string> {
+  const candidates = versions
+    .filter((v) => utcMs(v.releasedAt) >= utcMs(bundled.releasedAt))
+    .sort((a, b) => utcMs(b.releasedAt) - utcMs(a.releasedAt));
+  for (const v of candidates) {
+    if (v.tag === bundled.tag || (await canLoad(v.tag))) return v.tag;
+  }
+  return bundled.tag;
 }

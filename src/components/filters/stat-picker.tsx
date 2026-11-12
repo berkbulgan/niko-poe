@@ -10,12 +10,11 @@ import { toast } from '@/lib/stores/toast-store';
 import { proxySearch } from '@/lib/ipc';
 import { useTradeStats, matchModTexts } from '@/lib/hooks/use-trade-stats';
 import { MAP_MODS, type MapMod, NIGHTMARE_THRESHOLD } from '@/data';
-import { generateNumberRegex } from '@/lib/generate-number-regex';
-import { buildOptimizedVendorRegex } from '@/lib/optimize-regex';
+import { hasRegexFilter, presetRegex } from '@/lib/preset-regex';
 import { PoeIcon, type PoeIconName } from '@/components/ui/poe-icon';
 import { useFiltersStore } from '@/lib/stores/filters-store';
 import { selectedFirst } from '@/lib/mod-order';
-import type { MapStatFilters, QualityType } from '@/types/filters';
+import type { FilterPresetConfig, QualityType } from '@/types/filters';
 import { SimpleSelect } from '@/components/ui/select';
 
 const QUALITY_TYPE_OPTIONS: Array<{ value: QualityType; label: string }> = [
@@ -42,70 +41,7 @@ const TRADE_QUALITY_TYPE_IDS: Record<QualityType, string> = {
   cards: 'pseudo.pseudo_map_quality_cards',
 };
 
-// In-game stash search regex keywords — sourced from poe-vendor-string (OptimizedMapOutput.ts)
-const STASH_REGEX_MAP = {
-  quantity: 'm q',       // "Ite**m Q**uantity"
-  packSize: 'iz',        // "Pack S**iz**e"
-  rarity: 'm rar',       // "Ite**m Rar**ity"
-  moreCurrency: 'urr',   // "C**urr**ency"
-  moreMaps: 're maps',   // "Mo**re Maps**"
-  moreScarabs: 'sca',    // "**Sca**rab"
-  moreDivination: 'div', // "**Div**ination"
-} as const;
-
-// Quality type → stash regex keyword
-const QUALITY_REGEX_MAP: Record<QualityType, string> = {
-  pack_size: 'ze\\).*',   // "Pack Si**ze)**"
-  rarity: 'ty\\).*',      // "Rari**ty)**"
-  currency: 'urr.*',      // "C**urr**ency"
-  scarabs: 'sca.*',       // "**Sca**rab"
-  cards: 'div.*',         // "**Div**ination"
-};
-
-
 // StatPickerRef removed — store handles get/load config directly
-
-function buildStatParts(filters: MapStatFilters): string[] {
-  const parts: string[] = [];
-
-  // Basic numeric filters (quantity, packSize, rarity)
-  const basicKeys = ['quantity', 'packSize', 'rarity'] as const;
-  for (const key of basicKeys) {
-    const value = filters[key];
-    if (!value) continue;
-    const numRegex = generateNumberRegex(value, false);
-    if (!numRegex) continue;
-    parts.push(`"${STASH_REGEX_MAP[key]}.*${numRegex}%"`);
-  }
-
-  // "More X drops" filters
-  const moreKeys = ['moreCurrency', 'moreMaps', 'moreScarabs', 'moreDivination'] as const;
-  for (const key of moreKeys) {
-    const value = filters[key];
-    if (!value) continue;
-    const numRegex = generateNumberRegex(value, false);
-    if (!numRegex) continue;
-    parts.push(`"${STASH_REGEX_MAP[key]}.*${numRegex}%"`);
-  }
-
-  // Quality filter with type-specific regex
-  if (filters.quality) {
-    const numRegex = generateNumberRegex(filters.quality, false);
-    if (numRegex) {
-      const qualityKeyword = QUALITY_REGEX_MAP[filters.qualityType];
-      parts.push(`"${qualityKeyword}${numRegex}%"`);
-    }
-  }
-
-  // Corrupted: "pte" matches "Corrupted", "!pte" matches non-corrupted
-  if (filters.corrupted === 'prefer') {
-    parts.push('"pte"');
-  } else if (filters.corrupted === 'avoid') {
-    parts.push('"!pte"');
-  }
-
-  return parts;
-}
 
 // ── Scary color helpers ──
 
@@ -220,17 +156,16 @@ export function StatPicker() {
 
   const avoidMods = MAP_MODS.filter((m) => avoidIds.has(m.id));
   const preferMods = MAP_MODS.filter((m) => preferIds.has(m.id));
-  const vendorRegex = useMemo(() => {
-    const statParts = buildStatParts(filters);
-    return buildOptimizedVendorRegex(avoidMods, preferMods, statParts);
-  }, [avoidMods, preferMods, filters]);
+  const regexConfig: FilterPresetConfig = {
+    ...filters,
+    isNightmareMap,
+    avoidModIds: [...avoidIds],
+    preferModIds: [...preferIds],
+  };
+  const vendorRegex = presetRegex(regexConfig);
 
   // Only show action bar when something affects regex output (not mapTier — trade-only field)
-  const hasAnyFilter = avoidIds.size > 0 || preferIds.size > 0 || filters.corrupted !== 'natural' ||
-    filters.quantity !== '' || filters.packSize !== '' || filters.rarity !== '' ||
-    filters.quality !== '' ||
-    filters.moreCurrency !== '' || filters.moreMaps !== '' ||
-    filters.moreScarabs !== '' || filters.moreDivination !== '';
+  const hasAnyFilter = hasRegexFilter(regexConfig);
 
   const canCopy = hasAnyFilter && vendorRegex.length > 0;
 

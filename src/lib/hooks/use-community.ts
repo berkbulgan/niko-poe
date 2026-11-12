@@ -1,7 +1,14 @@
 // ABOUTME: TanStack Query hooks for the community strategies server.
 // ABOUTME: Edit tokens and favourites are kept locally via community-storage.
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
 import {
   getPublished,
@@ -30,10 +37,19 @@ export function useCommunityServerUrl() {
   });
 }
 
-export function useCommunityList(query: ListQuery, enabled: boolean) {
-  return useQuery({
+const PAGE_SIZE = 20;
+
+/** Pages of 20; the next page loads while fewer than `total` items are loaded. */
+export function useCommunityList(query: Omit<ListQuery, 'page' | 'limit'>, enabled: boolean) {
+  return useInfiniteQuery({
     queryKey: [...COMMUNITY_KEY, 'list', query],
-    queryFn: () => ipc.communityList(query),
+    queryFn: ({ pageParam }) => ipc.communityList({ ...query, page: pageParam, limit: PAGE_SIZE }),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.items.length, 0);
+      // An empty page means the list shrank while scrolling; stop instead of asking forever.
+      return last.items.length > 0 && loaded < last.total ? pages.length + 1 : undefined;
+    },
     enabled,
     placeholderData: keepPreviousData,
   });
@@ -44,6 +60,24 @@ export function useCommunityStrategy(id: string | null) {
     queryKey: [...COMMUNITY_KEY, 'detail', id],
     queryFn: () => ipc.communityGet(id!),
     enabled: id !== null,
+  });
+}
+
+/**
+ * Details for a list of ids (my published, favourites), sharing the detail cache. Deleted ids are dropped;
+ * `error` is the first other failure (e.g. server down), so the page can say so instead of showing an empty list.
+ */
+export function useCommunityStrategies(ids: string[]) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: [...COMMUNITY_KEY, 'detail', id],
+      queryFn: () => ipc.communityGet(id),
+    })),
+    combine: (results) => ({
+      items: results.flatMap((r) => (r.data ? [r.data] : [])),
+      isLoading: results.some((r) => r.isLoading),
+      error: results.find((r) => r.error && !isGone(r.error))?.error ?? null,
+    }),
   });
 }
 

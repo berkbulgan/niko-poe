@@ -18,6 +18,11 @@ describe('untitledName', () => {
     expect(untitledName(['Untitled preset', 'Untitled preset 3'])).toBe('Untitled preset 2');
     expect(untitledName(['Untitled preset', 'Untitled preset 2'])).toBe('Untitled preset 3');
   });
+  it('uses the given base name', () => {
+    expect(untitledName(['Untitled preset'], 'Untitled tree')).toBe('Untitled tree');
+    expect(untitledName(['Untitled tree', 'Untitled tree 3'], 'Untitled tree')).toBe('Untitled tree 2');
+    expect(untitledName(['Untitled tree', 'Untitled tree 2'], 'Untitled tree')).toBe('Untitled tree 3');
+  });
 });
 
 describe('isEmptyConfig', () => {

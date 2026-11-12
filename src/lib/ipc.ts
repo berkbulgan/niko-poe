@@ -42,6 +42,7 @@ import type {
   StrategyDetail,
   TagCount,
 } from '@/types/community';
+import type { AtlasVersion, MapModData } from '@/types/game-data';
 
 /**
  * Rust commands reject with the serialized `Error` enum (e.g. `{ Auth: "..." }`), not an Error.
@@ -292,6 +293,52 @@ export function communitySubmitResult(id: string, result: ResultSubmission): Pro
 /** Sets the server URL override (null restores the built-in default). Returns the URL now in use. */
 export function setCommunityBaseUrl(url: string | null): Promise<string | null> {
   return invoke<string | null>('set_community_base_url', { url });
+}
+
+// --- Game data (N.I.K.O. server) ---
+
+/** game-data/map-mods.json: the last map mod data the server sent, and when it last answered. */
+export interface CachedMapMods {
+  patch: string;
+  sha256: string;
+  checkedAt: string;
+  data: MapModData;
+}
+
+/** `data` only with 'updated'; `checkedAt` whenever the server answered. */
+export interface MapModRefresh {
+  status: 'updated' | 'unchanged' | 'failed';
+  data?: MapModData;
+  checkedAt?: string;
+}
+
+/** The map mod data saved by an earlier refresh; null when none is saved (or the file is corrupt). */
+export function mapModDataCached(): Promise<CachedMapMods | null> {
+  return invoke<CachedMapMods | null>('map_mod_data_cached');
+}
+
+/** Asks the server for newer map mod data and saves it. Server problems resolve to status 'failed'. */
+export function refreshMapModData(): Promise<MapModRefresh> {
+  return invoke<MapModRefresh>('refresh_map_mod_data');
+}
+
+// --- Game data: atlas tree ---
+
+/** One atlas tag's files on disk (Rust `AtlasPatchFiles`): GGG's data.json text and the folder holding its sprites. */
+export interface AtlasPatchFiles {
+  tag: string;
+  dataJson: string;
+  assetDir: string;
+}
+
+/** The cached atlas tag list, newest first; `refresh` fetches the server's instead and rejects when it does not answer. */
+export function atlasVersions(refresh: boolean): Promise<AtlasVersion[]> {
+  return invoke<AtlasVersion[]>('atlas_versions', { refresh });
+}
+
+/** Makes sure the tag's data.json and sprites are on disk, downloading what is missing; null when the server lacks it. */
+export function atlasData(tag: string): Promise<AtlasPatchFiles | null> {
+  return invoke<AtlasPatchFiles | null>('atlas_data', { tag });
 }
 
 // --- GGG Auth ---

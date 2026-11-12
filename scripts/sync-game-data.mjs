@@ -1,34 +1,37 @@
-// ABOUTME: Pulls the latest atlas tree (GGG atlastree-export) and map-mod regex data (poe.re)
-// ABOUTME: into the repo, adds a CHANGELOG entry and reports changed/valid. --dry-run writes nothing.
+// ABOUTME: Refreshes the app's bundled fallback game data by hand: the latest atlas tree (GGG atlastree-export, with its
+// ABOUTME: release date) and map-mod regex data (data.poe.re); adds a CHANGELOG entry, prints a summary. --dry-run writes nothing.
 
-import { appendFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  checkAtlas, checkMapMods, insertChangelogEntry, latestTag, modIdAliases, nextPatchVersion, summarizeAtlas,
-  summarizeMapMods,
+  checkAtlas, checkMapMods, insertChangelogEntry, latestTag, modIdAliases, nextPatchVersion, sha256For,
+  summarizeAtlas, summarizeMapMods,
 } from './game-data.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const ATLAS_REPO = 'grindinggear/atlastree-export';
-const POE_RE_REPO = 'veiset/poe.re';
-const MAP_MODS_PATH = 'poe/generated/mapmods/Generated.Map.ENGLISH.json';
+const POE_RE_DATA = 'https://data.poe.re';
+const MAP_MODS_PATH = 'mapmods/Generated.Map.ENGLISH.json';
 
 const dryRun = process.argv.includes('--dry-run');
-const summaryIndex = process.argv.indexOf('--summary');
-const summaryFile = summaryIndex > -1 ? process.argv[summaryIndex + 1] : null;
 
-const headers = {
-  'User-Agent': 'niko-data-sync',
-  ...(process.env.GITHUB_TOKEN && { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }),
-};
+// data.poe.re asks every client for a `<name>/<version> (<url>)` User-Agent. The GitHub token only goes to GitHub.
+const USER_AGENT = 'niko-data-sync/1.0 (https://github.com/berkbulgan/niko-poe)';
+const headersFor = (url) => ({
+  'User-Agent': USER_AGENT,
+  ...(process.env.GITHUB_TOKEN && new URL(url).hostname.endsWith('github.com') && {
+    Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+  }),
+});
 
 async function get(url) {
-  const res = await fetch(url, { headers });
+  const res = await fetch(url, { headers: headersFor(url) });
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
   return res;
 }
 const getJson = async (url) => (await get(url)).json();
+const getText = async (url) => (await get(url)).text();
 const getBytes = async (url) => Buffer.from(await (await get(url)).arrayBuffer());
 
 const file = (p) => path.join(ROOT, p);
@@ -58,12 +61,23 @@ if (atlasTag && atlasTag !== sources.atlasTag) {
     }
   }
   sources.atlasTag = atlasTag;
+  // The app maps trees saved before tags were recorded to a patch by this date.
+  const commit = await getJson(`https://api.github.com/repos/${ATLAS_REPO}/commits/${atlasTag}`);
+  sources.atlasReleasedAt = commit.commit.committer.date;
 }
 
-// --- Map mod regex: latest commit that touched the English map-mods file ---
-const [commit] = await getJson(`https://api.github.com/repos/${POE_RE_REPO}/commits?path=${MAP_MODS_PATH}&per_page=1`);
-if (commit.sha !== sources.poeReSha) {
-  const next = await getJson(`https://raw.githubusercontent.com/${POE_RE_REPO}/${commit.sha}/${MAP_MODS_PATH}`);
+// --- Map mod regex: the English map-mods file of data.poe.re's current PoE 1 patch ---
+// SHA256SUMS is tiny, so a day without changes costs two small requests and no download.
+const { current } = await getJson(`${POE_RE_DATA}/current.json`);
+const patch = current.poe1.patch;
+const patchUrl = `${POE_RE_DATA}/generated/poe1/${patch}`;
+const sha256 = sha256For(await getText(`${patchUrl}/SHA256SUMS`), MAP_MODS_PATH);
+if (!sha256) throw new Error(`${MAP_MODS_PATH} is not listed in ${patchUrl}/SHA256SUMS`);
+if (sha256 !== sources.poeReSha256) {
+  const raw = await getBytes(`${patchUrl}/${MAP_MODS_PATH}`);
+  const actual = createHash('sha256').update(raw).digest('hex');
+  if (actual !== sha256) throw new Error(`${MAP_MODS_PATH} checksum mismatch: expected ${sha256}, got ${actual}`);
+  const next = JSON.parse(raw.toString('utf8'));
   const prevTokens = await readJson('src/data/map-mods-full.json');
   const prevTable = await readJson('src/data/optimization-table.json');
 
@@ -71,7 +85,7 @@ if (commit.sha !== sources.poeReSha) {
   // Saved presets store mod ids; keep them pointing at the same mods when upstream re-ids them.
   const aliases = modIdAliases(prevTokens, nextTokens);
   const line = summarizeMapMods(prevTokens, nextTokens, prevTable, next.optimizationTable, aliases);
-  // Upstream commits that don't touch fields we use are ignored (and re-checked next run).
+  // Upstream changes that don't touch fields we use are ignored (and re-checked next run).
   if (line) {
     problems.push(...checkMapMods(next, prevTokens.length));
     const remapped = Object.keys(aliases).length;
@@ -81,7 +95,8 @@ if (commit.sha !== sources.poeReSha) {
       await writeJson('src/data/optimization-table.json', next.optimizationTable);
       await writeJson('src/data/mod-id-aliases.json', { ...(await readJson('src/data/mod-id-aliases.json')), ...aliases });
     }
-    sources.poeReSha = commit.sha;
+    sources.poeRePatch = patch;
+    sources.poeReSha256 = sha256;
   }
 }
 
@@ -100,5 +115,3 @@ const summary = changed
   ? [...changelog.map((l) => `- ${l}`), ...(valid ? [] : ['', '**Problems:**', ...problems.map((p) => `- ${p}`)])].join('\n')
   : 'No changes.';
 console.log(summary);
-if (summaryFile) await writeFile(summaryFile, summary + '\n');
-if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changed}\nvalid=${valid}\n`);

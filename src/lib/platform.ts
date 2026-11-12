@@ -1,8 +1,9 @@
 // ABOUTME: Platform abstraction layer for browser APIs that differ in Tauri vs browser.
-// ABOUTME: All window.*, localStorage, clipboard, and external link calls go through here.
+// ABOUTME: All window.*, localStorage, clipboard, external link and local file URL calls go through here.
 
 import { open } from '@tauri-apps/plugin-shell';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { confirm, type ConfirmOptions } from '@/lib/stores/confirm-store';
 
 // --- Storage ---
@@ -58,4 +59,11 @@ export function confirmDiscard(hasUnsavedChanges: boolean): Promise<boolean> {
 /** The in-game overlay is a second Tauri window loading `#/overlay`. */
 export function isOverlayWindow(): boolean {
   return window.location.hash.startsWith('#/overlay');
+}
+
+// --- Local files ---
+
+/** A URL the WebView can load for a file in the app data dir's game-data folder (Tauri asset protocol). */
+export function assetFileUrl(path: string): string {
+  return convertFileSrc(path);
 }

@@ -1,17 +1,15 @@
 // ABOUTME: Pure helpers for Filters autosave: the "Untitled preset" name, empty-draft and config equality checks.
-// ABOUTME: Kept free of React so they can be unit tested; used by use-filters-autosave.
+// ABOUTME: Kept free of React so they can be unit tested; used by use-entity-autosave and use-filters-autosave.
 
 import { EMPTY_FILTERS } from '@/lib/stores/filters-store';
 import type { FilterPresetConfig } from '@/types/filters';
 
-const UNTITLED = 'Untitled preset';
-
-/** "Untitled preset", or "Untitled preset N" with the smallest N >= 2 not already used. */
-export function untitledName(existingNames: string[]): string {
+/** `base`, or "`base` N" with the smallest N >= 2 not already used. */
+export function untitledName(existingNames: string[], base = 'Untitled preset'): string {
   const taken = new Set(existingNames);
-  if (!taken.has(UNTITLED)) return UNTITLED;
+  if (!taken.has(base)) return base;
   for (let n = 2; ; n++) {
-    if (!taken.has(`${UNTITLED} ${n}`)) return `${UNTITLED} ${n}`;
+    if (!taken.has(`${base} ${n}`)) return `${base} ${n}`;
   }
 }
 

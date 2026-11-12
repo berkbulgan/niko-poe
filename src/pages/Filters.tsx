@@ -1,7 +1,7 @@
 // ABOUTME: Regex Filters page — preset sidebar + map mod picker, autosaved.
 // ABOUTME: Toolbar shows the open preset's editable name, save status and a New preset button.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   useFilterPresets,
@@ -10,23 +10,19 @@ import {
   useDeletePreset,
   type FilterPresetParsed,
 } from '@/lib/hooks/use-filter-presets';
-import { useFiltersAutosave, type AutosaveStatus } from '@/lib/hooks/use-filters-autosave';
+import { useFiltersAutosave } from '@/lib/hooks/use-filters-autosave';
+import { useStrategiesUsing } from '@/lib/hooks/use-strategies';
+import { UsedInLinks } from '@/components/ui/used-in-links';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
 import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { EntityTitle } from '@/components/ui/entity-title';
 import { StatPicker } from '@/components/filters/stat-picker';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { useFiltersStore } from '@/lib/stores/filters-store';
-
-const STATUS_TEXT: Record<AutosaveStatus, string> = {
-  idle: '',
-  saving: 'Saving…',
-  saved: 'Saved',
-  error: 'Not saved',
-};
+import { useGameDataStore } from '@/lib/stores/game-data-store';
 
 function PresetRow({
   preset,
@@ -44,6 +40,7 @@ function PresetRow({
   onBeforeDelete: () => void;
 }) {
   const deletePreset = useDeletePreset(preset.id);
+  const usedIn = useStrategiesUsing('filterPresetId', preset.id);
 
   return (
     <SidebarEntityRow
@@ -54,45 +51,7 @@ function PresetRow({
       onDuplicate={onDuplicate}
       onDelete={() => { onBeforeDelete(); deletePreset.mutate(undefined); }}
       isDeleting={deletePreset.isPending}
-    />
-  );
-}
-
-/** Click to rename; Enter or blur saves, Escape cancels, a blank name reverts. */
-function PresetName({ name, onRename }: { name: string; onRename: (name: string) => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const cancelled = useRef(false);
-
-  if (draft === null) {
-    return (
-      <button
-        type="button"
-        onClick={() => setDraft(name)}
-        title="Rename"
-        className="truncate text-sm font-semibold tracking-wide text-poe-text-dim hover:text-poe-text"
-      >
-        {name}
-      </button>
-    );
-  }
-
-  return (
-    <Input
-      autoFocus
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        const next = draft.trim();
-        setDraft(null);
-        if (cancelled.current) { cancelled.current = false; return; }
-        if (next && next !== name) onRename(next);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') e.currentTarget.blur();
-        if (e.key === 'Escape') { cancelled.current = true; e.currentTarget.blur(); }
-      }}
-      aria-label="Preset name"
-      className="h-7 w-64 text-sm"
+      extra={usedIn.length > 0 && <UsedInLinks strategies={usedIn} />}
     />
   );
 }
@@ -100,6 +59,8 @@ function PresetName({ name, onRename }: { name: string; onRename: (name: string)
 export function Filters() {
   const [showImport, setShowImport] = useState(false);
   const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+  // New map mod data remounts the picker so its memoized lists and regex use it.
+  const gameDataVersion = useGameDataStore((s) => s.version);
 
   const { activePresetId, getConfig } = useFiltersStore();
   const { data: presets, isLoading } = useFilterPresets();
@@ -117,6 +78,12 @@ export function Filters() {
       { name: `${preset.name} (copy)`, config },
       { onSuccess: (dup) => { void open(dup.id, dup.config); } },
     );
+  }
+
+  async function handleExport(preset: FilterPresetParsed) {
+    await flush();
+    const config = preset.id === activePresetId ? getConfig() : preset.config;
+    setExportInput({ type: 'F', name: preset.name, config });
   }
 
   // Dashboard links here with ?preset=<id> to open that preset.
@@ -147,7 +114,7 @@ export function Filters() {
             active={activePresetId === preset.id}
             onSelect={() => { if (preset.id !== activePresetId) void open(preset.id, preset.config); }}
             onDuplicate={() => { void handleDuplicate(preset); }}
-            onExport={() => setExportInput({ type: 'F', name: preset.name, config: preset.config })}
+            onExport={() => { void handleExport(preset); }}
             onBeforeDelete={() => { if (preset.id === activePresetId) void startNew({ discard: true }); }}
           />
         ))}
@@ -156,22 +123,17 @@ export function Filters() {
       {/* ── Right panel: Regex Filters editor ── */}
       <main className="flex flex-1 flex-col overflow-y-auto">
         <div className="flex items-center justify-between border-b border-poe-border/20 px-4 py-3 lg:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            {activePreset ? (
-              <PresetName name={activePreset.name} onRename={(name) => updatePreset.mutate({ name })} />
-            ) : (
-              <h3 className="text-sm font-semibold tracking-wide text-poe-text-dim">New preset</h3>
-            )}
-            {STATUS_TEXT[status] && (
-              <span className={`text-xs ${status === 'error' ? 'text-poe-error' : 'text-poe-text-muted'}`}>
-                {STATUS_TEXT[status]}
-              </span>
-            )}
-          </div>
+          <EntityTitle
+            name={activePreset?.name ?? null}
+            placeholder="New preset"
+            onRename={(name) => updatePreset.mutate({ name })}
+            status={status}
+            ariaLabel="Preset name"
+          />
           <Button variant="secondary" size="sm" onClick={() => { void startNew(); }}>New preset</Button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <StatPicker />
+          <StatPicker key={gameDataVersion} />
         </div>
       </main>
 

@@ -26,6 +26,7 @@ use commands::{
         create_filter_preset, delete_filter_preset, get_filter_preset, get_filter_presets,
         update_filter_preset,
     },
+    game_data::{atlas_data, atlas_versions, map_mod_data_cached, refresh_map_mod_data},
     prices::{
         fetch_all_prices, get_price_leagues, get_prices, is_prices_loading, lookup_item_prices,
         lookup_item_prices_advanced,
@@ -218,6 +219,11 @@ pub fn run() {
             community_report,
             community_submit_result,
             set_community_base_url,
+            // game data
+            map_mod_data_cached,
+            refresh_map_mod_data,
+            atlas_versions,
+            atlas_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

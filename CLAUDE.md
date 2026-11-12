@@ -36,7 +36,8 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 - **`lib/hooks/`** — TanStack Query hooks for each data domain. Pattern: `useQuery({ queryFn: () => ipc.commandName() })`. `use-tracking.ts` also subscribes to the `tracker-state` event.
 - **`pages/Overlay.tsx`** — In-game overlay, rendered alone in the `overlay` Tauri window (`main.tsx` checks `isOverlayWindow()`).
 - **`lib/tracking-results.ts`** — Per-strategy profit attribution for tracked runs (a run's profit and time split evenly across its maps).
-- **`lib/atlas-sprite-loader.ts`** — Loads GGG sprite sheets by zoom level, caches images, provides drawSprite API for Canvas rendering.
+- **`lib/atlas-sprite-loader.ts`** — Loads GGG sprite sheets by zoom level through a per-tag `assetUrl` function, caches images by full URL, provides drawSprite API for Canvas rendering.
+- **`lib/atlas-data.ts`** — Atlas data per tag (`useAtlasData`, `useTreeAtlas`): the bundled tag from `src/data/`, other tags from the app data dir via `ipc.atlasData`. `refreshAtlasTag` picks the current tag (startup, every 24 h, Settings "Check now").
 - **`lib/atlas-canvas-renderer.ts`** — Canvas-based atlas tree renderer with 6 layers: background, group bg, start node, connections (orbit arcs + straight lines), node icons/frames, highlights. Handles hit testing, path/prune previews, mastery group highlights, blinking animations, off-screen arrows.
 - **`lib/atlas-tree-utils.ts`** — Pure utility functions: node positioning, stat aggregation, BFS pathfinding, hub node detection, allocatable neighbor computation, connectivity pruning, connection building.
 - **`pages/`** — Route-level components. React Router v6 HashRouter (required for Tauri production builds).
@@ -44,7 +45,26 @@ React Component → useQuery hook → ipc.ts invoke() → Rust #[tauri::command]
 
 ### Atlas Tree Data (`src/data/atlas-tree-data.json`)
 
-GGG's official `data.json` export from [atlastree-export](https://github.com/grindinggear/atlastree-export) at its latest release tag, kept current by `scripts/sync-game-data.mjs` (map mod data in `src/data/` comes from [poe.re](https://github.com/veiset/poe.re) the same way; `src/data/sources.json` records the bundled versions and `mod-id-aliases.json` maps re-id'd mods for saved presets). Contains node definitions, group positions, sprite sheet coordinates, orbit constants, wormhole data, and tree bounds. Sprite assets served from `public/atlas/` (41 files, ~10MB).
+At runtime the app gets game data from the N.I.K.O. server (`/v1/data/*` on the community base URL), which fetches it once a day.
+
+- **Atlas trees:** GGG's `data.json` exports and sprites from [atlastree-export](https://github.com/grindinggear/atlastree-export) release tags. The server keeps the newest 3 tags.
+- **Map mods:** the English map mod data from [data.poe.re](https://data.poe.re). Every request to data.poe.re must send a `<name>/<version> (<url>)` User-Agent.
+
+`commands/game_data.rs` stores downloads under `game-data/` in the app data dir:
+- `atlas/index.json`
+- `atlas/<tag>/data.json`
+- `atlas/<tag>/assets/`
+
+Atlas tags are downloaded one at a time, and HTTP 429 means "try again later". Sprites load through the Tauri asset protocol (scope `$APPDATA/game-data/**`).
+
+The current atlas tag is the newest server tag whose files load; otherwise it is the bundled one. Saved trees record their tag in `config.treeVersion`. Older saves are mapped to a tag by `updatedAt`, never past the bundled tag. A tree on another tag opens read-only until **Update** migrates it.
+
+`src/data/` and `public/atlas/` (41 sprite files, ~10MB) hold the bundled fallback:
+- `node scripts/sync-game-data.mjs` refreshes them by hand.
+- `src/data/sources.json` records the bundled versions and the bundled atlas tag's release date (`atlasReleasedAt`).
+- `mod-id-aliases.json` maps re-id'd mods for saved presets.
+
+The data.json contains node definitions, group positions, sprite sheet coordinates, orbit constants, wormhole data, and tree bounds.
 
 ### Atlas Tree Architecture
 
@@ -119,4 +139,5 @@ feature branch → PR → dev → PR (with semver label) → main → auto tag +
 |----------|---------|--------------|
 | `auto-release.yml` | PR with semver label merged to `main` | Version bump → commit → tag push → merge `main` back into `dev` |
 | `release.yml` | Tag push (`v*.*.*`) | Tauri build → NSIS installer → GitHub Release (published) |
-| `data-sync.yml` | Daily 06:00 UTC + manual | Pulls atlas/regex data → PR (label `patch`) → auto-merge when checks pass |
+
+Game data has no workflow: the app downloads it from the N.I.K.O. server at runtime, and the bundled fallback is refreshed by hand with `node scripts/sync-game-data.mjs`.

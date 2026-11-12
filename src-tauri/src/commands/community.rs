@@ -35,7 +35,7 @@ fn map_status(status: u16, body: &str) -> Error {
     }
 }
 
-async fn request(state: &AppState, method: Method, path: &str) -> Result<RequestBuilder> {
+pub(crate) async fn request(state: &AppState, method: Method, path: &str) -> Result<RequestBuilder> {
     let base = state
         .community_base_url
         .lock()
@@ -197,6 +197,17 @@ mod tests {
         let query = ListQuery { tag: Some(" Delirium ".into()), sort: niko_community_api::Sort::Favourites, ..Default::default() };
         let req = reqwest::Client::new().get("http://x/v1/strategies").query(&query.normalize()).build().unwrap();
         assert_eq!(req.url().query(), Some("tag=delirium&sort=favourites&page=1&limit=20"));
+    }
+
+    #[test]
+    fn list_query_encodes_budget_and_difficulty() {
+        let query = ListQuery {
+            budget: Some(niko_community_api::Budget::Low),
+            difficulty: Some(niko_community_api::Difficulty::Hard),
+            ..Default::default()
+        };
+        let req = reqwest::Client::new().get("http://x/v1/strategies").query(&query.normalize()).build().unwrap();
+        assert_eq!(req.url().query(), Some("budget=low&difficulty=hard&sort=new&page=1&limit=20"));
     }
 
     #[test]

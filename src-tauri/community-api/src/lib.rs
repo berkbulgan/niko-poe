@@ -1,7 +1,9 @@
-// ABOUTME: Request/response types and field validation for the community strategies API.
+// ABOUTME: Request/response types and field validation for the community server API (strategies and game data).
 // ABOUTME: Compiled by both the desktop app and the server so the wire contract cannot drift.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 
 pub const ID_LEN: usize = 8;
@@ -193,6 +195,11 @@ pub struct ListQuery {
     pub q: Option<String>,
     pub tag: Option<String>,
     pub league: Option<String>,
+    /// Omitted from the wire when unset, so servers from before this filter see the same query.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget: Option<Budget>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub difficulty: Option<Difficulty>,
     #[serde(default)]
     pub sort: Sort,
     #[serde(default = "default_page")]
@@ -211,7 +218,16 @@ fn default_limit() -> u32 {
 
 impl Default for ListQuery {
     fn default() -> Self {
-        ListQuery { q: None, tag: None, league: None, sort: Sort::New, page: 1, limit: default_limit() }
+        ListQuery {
+            q: None,
+            tag: None,
+            league: None,
+            budget: None,
+            difficulty: None,
+            sort: Sort::New,
+            page: 1,
+            limit: default_limit(),
+        }
     }
 }
 
@@ -223,6 +239,8 @@ impl ListQuery {
             q: blank_to_none(self.q),
             tag: blank_to_none(self.tag).map(|t| t.to_lowercase()),
             league: blank_to_none(self.league),
+            budget: self.budget,
+            difficulty: self.difficulty,
             sort: self.sort,
             page: self.page.max(1),
             limit: self.limit.clamp(1, MAX_LIST_LIMIT),
@@ -308,6 +326,31 @@ pub struct ApiErrorBody {
     pub message: String,
 }
 
+/// Map mod regex data served by `GET /v1/data/mapmods`: data.poe.re's file plus chained mod id aliases.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapModData {
+    /// data.poe.re patch, e.g. "3.30.0.1".
+    pub patch: String,
+    /// SHA-256 (hex) of the upstream file; also the response ETag.
+    pub sha256: String,
+    /// Passed through as published.
+    pub tokens: Vec<serde_json::Value>,
+    pub optimization_table: serde_json::Value,
+    /// Any old mod id → its current id. JSON object keys are strings.
+    pub aliases: HashMap<String, i64>,
+}
+
+/// One stored atlas tree export tag, listed newest first by `GET /v1/data/atlas`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtlasVersion {
+    /// GGG atlastree-export release tag, e.g. "3.30.0".
+    pub tag: String,
+    /// Commit date of the tag.
+    pub released_at: DateTime<Utc>,
+}
+
 /// Community ids are exactly `ID_LEN` ASCII alphanumerics; share codes are far longer.
 pub fn is_community_id(s: &str) -> bool {
     s.len() == ID_LEN && s.chars().all(|c| c.is_ascii_alphanumeric())
@@ -385,6 +428,23 @@ mod tests {
     }
 
     #[test]
+    fn list_query_budget_and_difficulty_are_optional() {
+        let q: ListQuery = serde_json::from_str(r#"{"budget":"low","difficulty":"hard"}"#).unwrap();
+        assert_eq!((q.budget, q.difficulty), (Some(Budget::Low), Some(Difficulty::Hard)));
+        let q = q.normalize();
+        assert_eq!((q.budget, q.difficulty), (Some(Budget::Low), Some(Difficulty::Hard)));
+
+        let q: ListQuery = serde_json::from_str("{}").unwrap();
+        assert_eq!((q.budget, q.difficulty), (None, None));
+        assert_eq!(ListQuery::default().budget, None);
+
+        let json = serde_json::to_value(ListQuery::default()).unwrap();
+        assert!(json.get("budget").is_none() && json.get("difficulty").is_none(), "None is omitted: {json}");
+        let json = serde_json::to_value(ListQuery { budget: Some(Budget::High), ..Default::default() }).unwrap();
+        assert_eq!(json["budget"], "high");
+    }
+
+    #[test]
     fn detects_community_ids() {
         assert!(is_community_id("aZ09bC12"));
         assert!(!is_community_id("aZ09bC1"));
@@ -445,5 +505,26 @@ mod tests {
         assert_eq!(s.stats, None);
         let stats = Stats { runs: 3, players: 2, median_div_per_hour: 4.0, median_maps_per_hour: 20.0, median_profit_per_map: 0.2 };
         assert_eq!(serde_json::to_value(&stats).unwrap()["medianDivPerHour"], 4.0);
+    }
+
+    #[test]
+    fn game_data_wire_format_round_trips() {
+        let data = MapModData {
+            patch: "3.30.0.1".into(),
+            sha256: "e809c1be".into(),
+            tokens: vec![serde_json::json!({ "id": -2064669900, "regex": "cco", "options": { "scary": 1001 } })],
+            optimization_table: serde_json::json!({ "a": { "ids": [1], "regex": "a" } }),
+            aliases: HashMap::from([("5".to_string(), 7)]),
+        };
+        let json = serde_json::to_value(&data).unwrap();
+        assert_eq!(json["optimizationTable"]["a"]["regex"], "a");
+        assert_eq!(json["aliases"]["5"], 7);
+        assert_eq!(json["tokens"][0]["id"], -2064669900);
+        assert_eq!(serde_json::from_value::<MapModData>(json).unwrap(), data);
+
+        let version: AtlasVersion = serde_json::from_str(r#"{"tag":"3.30.0","releasedAt":"2026-11-10T12:00:00Z"}"#).unwrap();
+        assert_eq!(version.tag, "3.30.0");
+        assert_eq!(version.released_at.to_rfc3339(), "2026-11-10T12:00:00+00:00");
+        assert_eq!(serde_json::to_value(&version).unwrap()["releasedAt"], "2026-11-10T12:00:00Z");
     }
 }

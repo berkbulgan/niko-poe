@@ -57,6 +57,8 @@ export interface ListQuery {
   q?: string;
   tag?: string;
   league?: string;
+  budget?: Budget;
+  difficulty?: Difficulty;
   sort: CommunitySort;
   page: number;
   limit: number;
