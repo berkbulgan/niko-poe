@@ -615,7 +615,6 @@ export function TreeRenderer({
         <div
           className="absolute left-3 top-3 flex flex-col items-start gap-2"
           onMouseDown={(e) => e.stopPropagation()}
-          onMouseUp={(e) => e.stopPropagation()}
         >
           <div className="flex flex-col overflow-hidden rounded-md border border-poe-border/40 bg-poe-panel/90 shadow-lg">
             {controls.map(({ label, icon: Icon, onClick, disabled }) => (
