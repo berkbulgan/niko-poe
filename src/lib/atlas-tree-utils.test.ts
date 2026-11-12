@@ -8,6 +8,7 @@ import {
   boundsOf,
   clampPan,
   buildConnections,
+  chosenVariants,
   cleanTreeText,
   cycleIndex,
   formatStatLine,
@@ -16,6 +17,7 @@ import {
   getStartPosition,
   groupByMechanic,
   isEmptyAtlasConfig,
+  keepChoices,
   jumpBox,
   mechanicCoreNodeIds,
   migrateTree,
@@ -62,9 +64,34 @@ describe('atlasConfigsEqual', () => {
     expect(atlasConfigsEqual({ allocatedNodeIds: [1, 2], treeVersion: 'a' }, { allocatedNodeIds: [1, 3], treeVersion: 'a' })).toBe(false);
     expect(atlasConfigsEqual({ allocatedNodeIds: [1], treeVersion: 'a' }, { allocatedNodeIds: [1, 2], treeVersion: 'a' })).toBe(false);
   });
+  it('compares variant choices, with a missing map equal to an empty one', () => {
+    const a = { allocatedNodeIds: [1], treeVersion: 'a' };
+    expect(atlasConfigsEqual(a, { ...a, variantChoices: {} })).toBe(true);
+    expect(atlasConfigsEqual({ ...a, variantChoices: { 1: 7 } }, { ...a, variantChoices: { 1: 7 } })).toBe(true);
+    expect(atlasConfigsEqual({ ...a, variantChoices: { 1: 7 } }, { ...a, variantChoices: { 1: 8 } })).toBe(false);
+    expect(atlasConfigsEqual({ ...a, variantChoices: { 1: 7 } }, a)).toBe(false);
+  });
   it('treats null as different from any config', () => {
     expect(atlasConfigsEqual({ allocatedNodeIds: [], treeVersion: 'a' }, null)).toBe(false);
     expect(atlasConfigsEqual(null, null)).toBe(true);
+  });
+});
+
+describe('chosenVariants', () => {
+  it('keeps the choices of allocated nodes only', () => {
+    expect(chosenVariants({ 1: 7, 2: 8 }, [1, 3])).toEqual({ 1: 7 });
+    expect(chosenVariants(undefined, [1])).toEqual({});
+  });
+});
+
+describe('keepChoices', () => {
+  it('keeps a choice when the node was kept and still offers that variant', () => {
+    const next = {
+      '1': node(1, { variantEffects: [{ stats: ['a'], effect: 7 }] }),
+      '2': node(2, { variantEffects: [{ stats: ['b'], effect: 9 }] }),
+      '3': node(3, { variantEffects: [{ stats: ['c'], effect: 5 }] }),
+    };
+    expect(keepChoices({ 1: 7, 2: 8, 3: 5 }, [1, 2], next)).toEqual({ 1: 7 });
   });
 });
 
@@ -338,6 +365,11 @@ describe('statsText', () => {
       'My tree — 12/132 points\n\nKeystones\n- Keystone K\n\nBreach (3)\n- Breach notable\n+8% increased Quantity\n'
         + 'Your Maps have +16% chance to contain Ore Deposits\n\nOther (1)',
     );
+  });
+  it('adds the chosen variant after a multiple-choice notable', () => {
+    const notable = node(11, { name: 'Unthreaded', stats: ['Threads cannot be of type'], variantEffects: [{ stats: ['Abyss and\nmore'], effect: 7 }] });
+    const text = statsText('T', 1, 132, [], [{ mechanic: 'Delirium', points: 1, notables: [notable], smallStats: [] }], { 11: 7 });
+    expect(text).toBe('T — 1/132 points\n\nDelirium (1)\n- Unthreaded: Abyss and more');
   });
   it('leaves out the keystones block when there are none', () => {
     expect(statsText('Atlas tree', 0, 132, [], [])).toBe('Atlas tree — 0/132 points');

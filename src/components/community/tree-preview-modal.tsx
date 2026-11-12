@@ -32,6 +32,7 @@ export function TreePreviewModal({ tree, onClose }: { tree: AtlasTreePayload | n
             rawNodes={atlas.data.nodes}
             allocatedIds={allocatedIds}
             readOnly
+            variantChoices={tree.config.variantChoices}
             initialFit="allocated"
             sprites={atlas.data.sprites}
             imageZoomLevels={atlas.data.imageZoomLevels}

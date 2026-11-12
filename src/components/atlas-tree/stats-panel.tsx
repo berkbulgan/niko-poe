@@ -9,6 +9,7 @@ import { copyToClipboard, storage } from '@/lib/platform';
 import { toast } from '@/lib/stores/toast-store';
 import { Button } from '@/components/ui/button';
 import { IconTooltip } from '@/components/ui/tooltip';
+import { NodeChoices } from '@/components/atlas-tree/node-choices';
 
 const COLLAPSED_KEY = 'niko_atlas_stats_collapsed';
 
@@ -21,6 +22,8 @@ interface StatsPanelProps {
   /** First line of the copied summary. */
   treeName: string;
   onFocusNode: (nodeId: string) => void;
+  /** Chosen variant of each allocated multiple-choice notable. */
+  variantChoices: Record<string, number>;
 }
 
 function AccordionSection({
@@ -69,7 +72,7 @@ function AggregatedStatRow({ stat }: { stat: AggregatedStat }) {
   );
 }
 
-function NodeDetailRow({ node, onFocusNode }: { node: AtlasNodeData; onFocusNode: (nodeId: string) => void }) {
+function NodeDetailRow({ node, chosen, onFocusNode }: { node: AtlasNodeData; chosen?: number; onFocusNode: (nodeId: string) => void }) {
   return (
     <div className="border-b border-poe-border/10 px-4 py-2 last:border-b-0">
       <button
@@ -87,6 +90,7 @@ function NodeDetailRow({ node, onFocusNode }: { node: AtlasNodeData; onFocusNode
           ))}
         </ul>
       )}
+      <NodeChoices node={node} chosen={chosen} chosenOnly />
       {node.flavourText && node.flavourText.length > 0 && (
         <p className="mt-1 text-xs italic text-poe-text-muted">
           {node.flavourText.join(' ')}
@@ -96,7 +100,7 @@ function NodeDetailRow({ node, onFocusNode }: { node: AtlasNodeData; onFocusNode
   );
 }
 
-export function StatsPanel({ allocatedNodes, totalPoints, maxPoints, mechanics, treeName, onFocusNode }: StatsPanelProps) {
+export function StatsPanel({ allocatedNodes, totalPoints, maxPoints, mechanics, treeName, onFocusNode, variantChoices }: StatsPanelProps) {
   const [collapsed, setCollapsed] = useState(() => storage.get(COLLAPSED_KEY) === '1');
   const { keystones, sections } = useMemo(
     () => groupByMechanic(allocatedNodes, mechanics),
@@ -112,7 +116,7 @@ export function StatsPanel({ allocatedNodes, totalPoints, maxPoints, mechanics, 
   }
 
   async function handleCopy() {
-    const ok = await copyToClipboard(statsText(treeName, totalPoints, maxPoints, keystones, sections));
+    const ok = await copyToClipboard(statsText(treeName, totalPoints, maxPoints, keystones, sections, variantChoices));
     if (ok) toast.success('Stats copied');
     else toast.error('Could not copy to clipboard');
   }
@@ -176,7 +180,7 @@ export function StatsPanel({ allocatedNodes, totalPoints, maxPoints, mechanics, 
           {keystones.length > 0 ? (
             <div className="py-1">
               {keystones.map((node) => (
-                <NodeDetailRow key={node.skill} node={node} onFocusNode={onFocusNode} />
+                <NodeDetailRow key={node.skill} node={node} chosen={variantChoices[String(node.skill)]} onFocusNode={onFocusNode} />
               ))}
             </div>
           ) : (
@@ -189,7 +193,7 @@ export function StatsPanel({ allocatedNodes, totalPoints, maxPoints, mechanics, 
           <AccordionSection key={section.mechanic} title={section.mechanic} count={section.points}>
             <div className="py-1">
               {section.notables.map((node) => (
-                <NodeDetailRow key={node.skill} node={node} onFocusNode={onFocusNode} />
+                <NodeDetailRow key={node.skill} node={node} chosen={variantChoices[String(node.skill)]} onFocusNode={onFocusNode} />
               ))}
               {section.smallStats.map((stat) => (
                 <AggregatedStatRow key={stat.text} stat={stat} />

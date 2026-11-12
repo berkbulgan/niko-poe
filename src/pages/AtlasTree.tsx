@@ -23,7 +23,7 @@ import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
-import { mechanicCoreNodeIds, migrateTree, nodeMechanics, pruneDisconnected, resolveTreeTag } from '@/lib/atlas-tree-utils';
+import { chosenVariants, keepChoices, mechanicCoreNodeIds, migrateTree, nodeMechanics, pruneDisconnected, resolveTreeTag } from '@/lib/atlas-tree-utils';
 import { useAtlasData, useAtlasVersions, useTreeAtlas } from '@/lib/atlas-data';
 import { useAtlasTreeStore } from '@/lib/stores/atlas-tree-store';
 import { useConfirmStore } from '@/lib/stores/confirm-store';
@@ -89,7 +89,7 @@ export function AtlasTree() {
   const focusNode = (nodeId: string) => setFocus({ nodeId });
 
   const {
-    activeTreeId, allocatedIds, history, searchQuery,
+    activeTreeId, allocatedIds, history, searchQuery, variantChoices,
     setSearchQuery, toggleNode, allocatePath, undo, getConfig,
   } = useAtlasTreeStore();
 
@@ -137,8 +137,11 @@ export function AtlasTree() {
     maxY: treeData.max_y,
   } : null), [treeData]);
 
-  const handleToggleNode = useCallback((nodeId: number) => {
-    toggleNode(nodeId, rawNodes, pruneDisconnected);
+  // Choices of deallocated nodes stay in the store for undo; only allocated nodes show theirs.
+  const allocatedChoices = useMemo(() => chosenVariants(variantChoices, allocatedIds), [variantChoices, allocatedIds]);
+
+  const handleToggleNode = useCallback((nodeId: number, choices?: Record<string, number>) => {
+    toggleNode(nodeId, rawNodes, pruneDisconnected, choices);
   }, [rawNodes, toggleNode]);
 
   // Ctrl+Z undoes the last allocation (except while typing in a field, or on a read-only tree).
@@ -157,8 +160,8 @@ export function AtlasTree() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [undo, readOnly]);
 
-  const handleAllocatePath = useCallback((nodeIds: number[]) => {
-    allocatePath(nodeIds);
+  const handleAllocatePath = useCallback((nodeIds: number[], choices?: Record<string, number>) => {
+    allocatePath(nodeIds, choices);
   }, [allocatePath]);
 
   /** Sidebar badge for a tree on another patch: its tag, or "old" when the patch is unknown. */
@@ -189,7 +192,11 @@ export function AtlasTree() {
   function handleUpdate() {
     if (!activeTree || !currentAtlas) return;
     const { kept, removed } = migrateTree(activeTree.config.allocatedNodeIds, currentAtlas.data.nodes);
-    const config: AtlasTreeConfig = { allocatedNodeIds: kept, treeVersion: currentTag };
+    const config: AtlasTreeConfig = {
+      allocatedNodeIds: kept,
+      treeVersion: currentTag,
+      variantChoices: keepChoices(activeTree.config.variantChoices, kept, currentAtlas.data.nodes),
+    };
     // Saved directly: autosave compares node ids only, so an update that keeps every node would never be written.
     saveConfig.mutate({ id: activeTree.id, config }, {
       onSuccess: () => {
@@ -287,6 +294,7 @@ export function AtlasTree() {
               allocatedIds={allocatedIds}
               onToggleNode={handleToggleNode}
               onAllocatePath={handleAllocatePath}
+              variantChoices={allocatedChoices}
               searchHighlight={searchQuery}
               sprites={atlas.data.sprites}
               imageZoomLevels={atlas.data.imageZoomLevels}
@@ -331,6 +339,7 @@ export function AtlasTree() {
         mechanics={mechanics}
         treeName={activeTree?.name ?? 'Atlas tree'}
         onFocusNode={focusNode}
+        variantChoices={allocatedChoices}
       />
 
       <ImportModal open={showImport} onClose={() => setShowImport(false)} />

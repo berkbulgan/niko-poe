@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { SimpleSelect } from '@/components/ui/select';
 import { IconTooltip } from '@/components/ui/tooltip';
+import { NodeChoices, VariantPicker } from '@/components/atlas-tree/node-choices';
 import type {
   ProcessedAtlasNode,
   AtlasNodeData,
@@ -22,9 +23,12 @@ interface TreeRendererProps {
   nodes: ProcessedAtlasNode[];
   rawNodes: Record<string, AtlasNodeData>;
   allocatedIds: Set<number>;
-  onToggleNode?: (nodeId: number) => void;
+  /** choices: variants picked for the multiple-choice notables an allocation adds (asked in a popup first). */
+  onToggleNode?: (nodeId: number, choices?: Record<string, number>) => void;
   /** Allocate a list of node skills at once (for shortest-path selection). */
-  onAllocatePath?: (nodeIds: number[]) => void;
+  onAllocatePath?: (nodeIds: number[], choices?: Record<string, number>) => void;
+  /** Chosen variant of each allocated multiple-choice notable, shown in tooltips. */
+  variantChoices?: Record<string, number>;
   searchHighlight?: string;
   sprites: AtlasSprites;
   imageZoomLevels: number[];
@@ -50,6 +54,19 @@ interface TooltipState {
   screenY: number;
 }
 
+/** An allocation waiting for its multiple-choice notables' variants, asked one node at a time. */
+interface PickState {
+  /** The allocation the skills were computed from; any change to it (undo, another tree) drops the pick. */
+  base: Set<number>;
+  skills: number[];
+  path: boolean;
+  queue: AtlasNodeData[];
+  picked: Record<string, number>;
+  x: number;
+  y: number;
+  maxHeight: number;
+}
+
 interface PanState {
   isPanning: boolean;
   startX: number;
@@ -73,6 +90,7 @@ export function TreeRenderer({
   allocatedIds,
   onToggleNode,
   onAllocatePath,
+  variantChoices,
   searchHighlight,
   sprites,
   imageZoomLevels,
@@ -95,6 +113,7 @@ export function TreeRenderer({
   const [spritesReady, setSpritesReady] = useState(false);
   const [spritesFailed, setSpritesFailed] = useState(false);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const [picking, setPicking] = useState<PickState | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   /** Bumped when the canvas needs a new frame without a render state change (resize, sprites loaded). */
@@ -492,12 +511,29 @@ export function TreeRenderer({
     const hit = hitTestNode(mouseX, mouseY, renderState);
 
     if (hit && hit.nodeType !== 'mastery') {
+      // Allocations that add multiple-choice notables wait for their variants; the popup sits by the cursor, inside the tree.
+      const allocate = (skills: number[], path: boolean) => {
+        const queue = skills.map((s) => rawNodes[String(s)]).filter((n) => n?.variantEffects?.length);
+        if (queue.length === 0) {
+          if (path) onAllocatePath?.(skills);
+          else onToggleNode?.(skills[0]);
+          return;
+        }
+        setTooltip(null);
+        const y = Math.max(rect.top, Math.min(e.clientY + 12, rect.bottom - 260));
+        setPicking({
+          base: allocatedIds, skills, path, queue, picked: {},
+          x: Math.max(rect.left, Math.min(e.clientX + 12, rect.right - 330)),
+          y,
+          maxHeight: rect.bottom - y - 8,
+        });
+      };
       const isAllocated = allocatedIds.has(hit.skill);
       const isAllocatable = allocatableNeighbors.has(hit.id);
       if (isAllocated) {
         onToggleNode?.(hit.skill);
       } else if (isAllocatable) {
-        onToggleNode?.(hit.skill);
+        allocate([hit.skill], false);
       } else {
         // Find shortest path — use hubs as root when nothing is allocated
         const fromSet = new Set(allocatedStringIds);
@@ -508,12 +544,27 @@ export function TreeRenderer({
             .map((id) => rawNodes[id]?.skill)
             .filter((s): s is number => s != null);
           if (pathSkills.length > 0) {
-            onAllocatePath?.(pathSkills);
+            allocate(pathSkills, true);
           }
         }
       }
     }
   }, [readOnly, renderState, allocatedIds, allocatedStringIds, allocatableNeighbors, hubNodeIds, onToggleNode, onAllocatePath, rawNodes]);
+
+  const activePick = picking?.base === allocatedIds ? picking : null;
+  const handlePick = useCallback((effect: number) => {
+    if (!picking || picking.base !== allocatedIds) return;
+    const [node, ...rest] = picking.queue;
+    const picked = { ...picking.picked, [String(node.skill)]: effect };
+    if (rest.length > 0) {
+      setPicking({ ...picking, queue: rest, picked });
+      return;
+    }
+    setPicking(null);
+    if (picking.path) onAllocatePath?.(picking.skills, picked);
+    else onToggleNode?.(picking.skills[0], picked);
+  }, [picking, allocatedIds, onAllocatePath, onToggleNode]);
+  const cancelPick = useCallback(() => setPicking(null), []);
 
   const handleMouseLeave = useCallback(() => {
     panStateRef.current.isPanning = false;
@@ -587,6 +638,7 @@ export function TreeRenderer({
               ))}
             </ul>
           )}
+          <NodeChoices node={tooltip.node} chosen={variantChoices?.[tooltip.node.id]} />
           {tooltip.node.reminderText && tooltip.node.reminderText.length > 0 && (
             <p className="mt-1 text-xs italic text-poe-text-muted">
               {tooltip.node.reminderText.join(' ')}
@@ -599,6 +651,18 @@ export function TreeRenderer({
           )}
         </div>,
         document.body,
+      )}
+
+      {activePick && (
+        <VariantPicker
+          key={activePick.queue[0].skill}
+          node={activePick.queue[0]}
+          x={activePick.x}
+          y={activePick.y}
+          maxHeight={activePick.maxHeight}
+          onPick={handlePick}
+          onCancel={cancelPick}
+        />
       )}
 
       {/* Zoom controls and Jump to (stop mouse events so clicks here don't pan or allocate) */}

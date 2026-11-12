@@ -65,7 +65,7 @@ export interface AtlasNodeData {
   flavourText?: string[];
   reminderText?: string[];
   /** Since 3.30: alternative stats a node can roll. */
-  variantEffects?: Array<{ stats: string[]; effect: number }>;
+  variantEffects?: Array<{ stats: string[]; effect: number; reminderText?: string[] }>;
   /** Since 3.30: connections drawn as an arc around a given centre instead of the group's. */
   connections?: Array<{ to: string; orbit: number; orbitX?: number; orbitY?: number }>;
 }
@@ -124,6 +124,8 @@ export interface ProcessedAtlasNode extends AtlasNodeData {
 export interface AtlasTreeConfig {
   allocatedNodeIds: number[];
   treeVersion: string;
+  /** Multiple-choice notable (node id) → the variantEffects effect picked for it. Absent on older trees. */
+  variantChoices?: Record<string, number>;
 }
 
 export interface AtlasTree {

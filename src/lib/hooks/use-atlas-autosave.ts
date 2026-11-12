@@ -18,6 +18,7 @@ const atlasAdapter: AutosaveAdapter<AtlasTreeConfig> = {
   loadConfig: (config) => useAtlasTreeStore.getState().loadAllocation(
     config.allocatedNodeIds,
     resolveTreeTag({ config }, []) ?? useGameDataStore.getState().atlasTag,
+    config.variantChoices,
   ),
   clear: () => useAtlasTreeStore.getState().loadAllocation([], null),
   equal: atlasConfigsEqual,
