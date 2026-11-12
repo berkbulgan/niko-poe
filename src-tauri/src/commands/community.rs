@@ -35,7 +35,7 @@ fn map_status(status: u16, body: &str) -> Error {
     }
 }
 
-async fn request(state: &AppState, method: Method, path: &str) -> Result<RequestBuilder> {
+pub(crate) async fn request(state: &AppState, method: Method, path: &str) -> Result<RequestBuilder> {
     let base = state
         .community_base_url
         .lock()

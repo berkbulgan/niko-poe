@@ -1,14 +1,32 @@
 // ABOUTME: Runtime game data from the N.I.K.O. community server, cached as JSON files under <app data>/game-data.
 // ABOUTME: Map mod data: read the saved copy and refresh it with an ETag check. Files are written atomically.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use niko_community_api::MapModData;
+use reqwest::{header, Method};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager, State};
 
+use crate::commands::community::request;
+use crate::error::{Error, Result};
+use crate::state::AppState;
+
+/// Every game data request gives up after this long; the app then keeps what it has.
+pub const SERVER_TIMEOUT: Duration = Duration::from_secs(10);
 const MAP_MODS_FILE: &str = "map-mods.json";
+
+/// `<app data dir>/game-data`, where all runtime game data lives.
+pub fn game_data_dir(app: &AppHandle) -> Result<PathBuf> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| Error::Validation(format!("app data dir unavailable: {e}")))?;
+    Ok(dir.join("game-data"))
+}
 
 /// `game-data/map-mods.json`: the last map mod data the server sent, and when it last answered.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -100,6 +118,42 @@ fn map_mod_outcome(
         },
         _ => (None, MapModRefresh::failed()),
     }
+}
+
+/// The map mod data saved by an earlier refresh, or `None` when there is none (or it is corrupt).
+#[tauri::command]
+pub async fn map_mod_data_cached(app: AppHandle) -> Result<Option<CachedMapMods>> {
+    Ok(read_json(&game_data_dir(&app)?.join(MAP_MODS_FILE)))
+}
+
+/// Asks the server for newer map mod data (ETag check against the saved copy) and saves it.
+/// Server problems (no URL configured, offline, timeout, 429, 503, bad body) return `Failed`, not an error.
+#[tauri::command]
+pub async fn refresh_map_mod_data(app: AppHandle, state: State<'_, AppState>) -> Result<MapModRefresh> {
+    let path = game_data_dir(&app)?.join(MAP_MODS_FILE);
+    let cached: Option<CachedMapMods> = read_json(&path);
+    let mut req = match request(&state, Method::GET, "/v1/data/mapmods").await {
+        Ok(req) => req.timeout(SERVER_TIMEOUT),
+        Err(_) => return Ok(MapModRefresh::failed()),
+    };
+    if let Some(cached) = &cached {
+        // The server compares the quoted ETag byte for byte.
+        req = req.header(header::IF_NONE_MATCH, format!("\"{}\"", cached.sha256));
+    }
+    let (status, body) = match req.send().await {
+        Ok(res) => (res.status().as_u16(), res.text().await.unwrap_or_default()),
+        Err(e) => {
+            eprintln!("map mod data refresh failed: {e}");
+            return Ok(MapModRefresh::failed());
+        }
+    };
+    let (file, result) = map_mod_outcome(status, &body, cached, Utc::now());
+    if let Some(file) = file {
+        if let Err(e) = write_json(&path, &file) {
+            eprintln!("could not save map mod data: {e}");
+        }
+    }
+    Ok(result)
 }
 
 #[cfg(test)]
