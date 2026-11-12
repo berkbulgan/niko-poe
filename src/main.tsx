@@ -1,5 +1,5 @@
-// ABOUTME: Vite entry point — mounts the React Router app into #root.
-// ABOUTME: The overlay window renders only <Overlay />; prices are fetched on league selection, not at startup.
+// ABOUTME: Vite entry point — mounts the React Router app into #root; the overlay window renders only <Overlay />.
+// ABOUTME: The main window applies saved map mod data before the first render, then refreshes game data from the server.
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -9,6 +9,7 @@ import { Providers } from './providers';
 import { Overlay } from './pages/Overlay';
 import { QueryProvider } from '@/lib/query-provider';
 import { isOverlayWindow } from '@/lib/platform';
+import { loadCachedMapMods, startGameDataRefresh } from '@/lib/stores/game-data-store';
 import './globals.css';
 
 function App() {
@@ -25,6 +26,9 @@ if (!root) throw new Error('Root element not found');
 const overlay = isOverlayWindow();
 if (overlay) document.documentElement.classList.add('overlay-window');
 
+// Saved data first, so the Regex page never renders on bundled data and then jumps.
+if (!overlay) await loadCachedMapMods();
+
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
     {overlay ? (
@@ -36,3 +40,5 @@ ReactDOM.createRoot(root).render(
     )}
   </React.StrictMode>
 );
+
+if (!overlay) startGameDataRefresh();
