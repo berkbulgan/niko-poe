@@ -48,7 +48,14 @@ export function VariantPicker({ node, x, y, onPick, onCancel }: {
   }, [onCancel]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[60]" onMouseDown={onCancel}>
+    // React events bubble out of a portal to the tree's handlers: without stopPropagation a cancelling click would
+    // also start a pan and allocate the node under the cursor, and moves would show tooltips behind the popup.
+    <div
+      className="fixed inset-0 z-[60]"
+      onMouseDown={(e) => { e.stopPropagation(); onCancel(); }}
+      onMouseUp={(e) => e.stopPropagation()}
+      onMouseMove={(e) => e.stopPropagation()}
+    >
       <div
         role="dialog"
         aria-label={`Choose ${node.name}`}
