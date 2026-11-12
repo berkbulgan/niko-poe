@@ -22,6 +22,7 @@ import { EntityTitle } from '@/components/ui/entity-title';
 import { StatPicker } from '@/components/filters/stat-picker';
 import type { ExportInput } from '@/lib/hooks/use-sharing';
 import { useFiltersStore } from '@/lib/stores/filters-store';
+import { useGameDataStore } from '@/lib/stores/game-data-store';
 
 function PresetRow({
   preset,
@@ -58,6 +59,8 @@ function PresetRow({
 export function Filters() {
   const [showImport, setShowImport] = useState(false);
   const [exportInput, setExportInput] = useState<ExportInput | null>(null);
+  // New map mod data remounts the picker so its memoized lists and regex use it.
+  const gameDataVersion = useGameDataStore((s) => s.version);
 
   const { activePresetId, getConfig } = useFiltersStore();
   const { data: presets, isLoading } = useFilterPresets();
@@ -130,7 +133,7 @@ export function Filters() {
           <Button variant="secondary" size="sm" onClick={() => { void startNew(); }}>New preset</Button>
         </div>
         <div className="flex-1 overflow-hidden">
-          <StatPicker />
+          <StatPicker key={gameDataVersion} />
         </div>
       </main>
 
