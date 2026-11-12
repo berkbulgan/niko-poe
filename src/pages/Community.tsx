@@ -182,7 +182,8 @@ export function Community() {
     ? [...new Map((list.data?.pages.flatMap((p) => p.items) ?? []).map((s) => [s.id, s])).values()]
     : local.items.filter((s) => s.name.toLowerCase().includes(needle));
   const loading = showAll ? list.isLoading : local.isLoading;
-  const error = showAll ? list.error : local.error;
+  // A failed background refetch keeps the strategies that already loaded; show the error only when none did.
+  const error = showAll ? list.error : local.items.length === 0 ? local.error : null;
 
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
