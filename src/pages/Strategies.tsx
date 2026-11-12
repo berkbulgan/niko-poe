@@ -1,7 +1,8 @@
 // ABOUTME: Strategies page — preset sidebar + strategy cost calculator.
 // ABOUTME: Left panel: saved strategies with share codes. Right panel: strategy-builder component.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   useStrategies,
   useCreateStrategy,
@@ -18,6 +19,7 @@ import { EditorToolbar } from '@/components/ui/editor-toolbar';
 import { StrategyBuilder } from '@/components/strategies/strategy-builder';
 import { StrategyResults } from '@/components/strategies/strategy-results';
 import { PublishModal } from '@/components/strategies/publish-modal';
+import { PublishBadge, usePublishState } from '@/components/strategies/publish-badge';
 import { Button } from '@/components/ui/button';
 import { useUnpublish } from '@/lib/hooks/use-community';
 import { getPublished } from '@/lib/community-storage';
@@ -44,6 +46,7 @@ function StrategyRow({
   onExport: () => void;
 }) {
   const deleteStrategy = useDeleteStrategy(strategy.id);
+  const publishState = usePublishState(strategy);
 
   return (
     <SidebarEntityRow
@@ -54,8 +57,14 @@ function StrategyRow({
       onDuplicate={onDuplicate}
       onDelete={() => deleteStrategy.mutate(undefined)}
       isDeleting={deleteStrategy.isPending}
+      subtitle={<PublishBadge state={publishState} />}
     />
   );
+}
+
+/** Toolbar badge; a component so the hook only runs while a strategy is open. */
+function ActivePublishBadge({ strategy }: { strategy: StrategyParsed }) {
+  return <PublishBadge state={usePublishState(strategy)} />;
 }
 
 
@@ -65,6 +74,7 @@ export function Strategies() {
   const [exportInput, setExportInput] = useState<ExportInput | null>(null);
   const [publishTarget, setPublishTarget] = useState<StrategyParsed | null>(null);
   const unpublish = useUnpublish();
+  const navigate = useNavigate();
 
   const { activeStrategyId, setActiveStrategyId, getConfig, loadConfig } = useStrategiesStore();
 
@@ -134,6 +144,19 @@ export function Strategies() {
     loadConfig(strategy.config, MAPS_PER_USE);
   }
 
+  // Preset/tree cards and Community link here with ?strategy=<id> to open that strategy.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedStrategyId = searchParams.get('strategy');
+  useEffect(() => {
+    if (!linkedStrategyId || !strategies) return;
+    setSearchParams({}, { replace: true });
+    const strategy = strategies.find((s) => s.id === linkedStrategyId);
+    if (!strategy || strategy.id === activeStrategyId) return;
+    void handleLoadStrategy(strategy);
+  // handleLoadStrategy is recreated every render; the param is cleared first, so this runs once per link.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedStrategyId, strategies, activeStrategyId, setSearchParams]);
+
   return (
     <div className="-m-6 flex h-[calc(100%+3rem)] gap-0 overflow-hidden lg:-m-8 lg:h-[calc(100%+4rem)]">
       <EntitySidebar
@@ -160,6 +183,7 @@ export function Strategies() {
       <main className="flex flex-1 flex-col overflow-y-auto">
         <EditorToolbar
           title="Strategy Cost Calculator"
+          titleExtra={activeStrategy && <ActivePublishBadge strategy={activeStrategy} />}
           hasUnsavedChanges={hasUnsavedChanges}
           hasActiveEntity={!!activeStrategy}
           onSave={handleSaveOverwrite}
@@ -167,9 +191,14 @@ export function Strategies() {
           actions={activeStrategy && (
             <>
               {published && (
-                <Button variant="ghost" size="sm" onClick={handleUnpublish} disabled={unpublish.isPending}>
-                  Unpublish
-                </Button>
+                <>
+                  <Button variant="ghost" size="sm" onClick={handleUnpublish} disabled={unpublish.isPending}>
+                    Unpublish
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => navigate(`/community?id=${published.communityId}`)}>
+                    View in Community
+                  </Button>
+                </>
               )}
               <Button variant="secondary" size="sm" onClick={() => setPublishTarget(activeStrategy)}>
                 {published ? 'Update Published' : 'Publish'}

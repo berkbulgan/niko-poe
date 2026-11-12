@@ -15,7 +15,8 @@ import {
   useRenameAtlasTree,
 } from '@/lib/hooks/use-atlas-trees';
 import { useAtlasAutosave } from '@/lib/hooks/use-atlas-autosave';
-import { useUsedIn } from '@/lib/hooks/use-strategies';
+import { useStrategiesUsing } from '@/lib/hooks/use-strategies';
+import { UsedInLinks } from '@/components/ui/used-in-links';
 import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
 import { EntitySidebar } from '@/components/ui/entity-sidebar';
 import { ExportModal } from '@/components/ui/export-modal';
@@ -50,7 +51,7 @@ function AtlasTreeRow({
   onBeforeDelete: () => void;
 }) {
   const deleteTree = useDeleteAtlasTree(tree.id);
-  const usedIn = useUsedIn('atlasTreeId', tree.id);
+  const usedIn = useStrategiesUsing('atlasTreeId', tree.id);
 
   return (
     <SidebarEntityRow
@@ -64,9 +65,9 @@ function AtlasTreeRow({
       subtitle={
         <span className="block truncate text-xs text-poe-text-muted">
           {tree.config.allocatedNodeIds.length} pts
-          {usedIn.length > 0 && ` · Used in ${usedIn.join(', ')}`}
         </span>
       }
+      extra={usedIn.length > 0 && <UsedInLinks strategies={usedIn} />}
     />
   );
 }
@@ -155,6 +156,12 @@ export function AtlasTree() {
     );
   }
 
+  async function handleExport(tree: AtlasTreeType) {
+    await flush();
+    const config = tree.id === activeTreeId ? getConfig(treeData.tree) : tree.config;
+    setExportInput({ type: 'A', name: tree.name, config });
+  }
+
   // Strategies link here with ?tree=<id> to open that tree.
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedTreeId = searchParams.get('tree');
@@ -183,7 +190,7 @@ export function AtlasTree() {
             active={activeTreeId === tree.id}
             onSelect={() => { if (tree.id !== activeTreeId) void open(tree.id, tree.config); }}
             onDuplicate={() => { void handleDuplicate(tree); }}
-            onExport={() => setExportInput({ type: 'A', name: tree.name, config: tree.config })}
+            onExport={() => { void handleExport(tree); }}
             onBeforeDelete={() => { if (tree.id === activeTreeId) void startNew({ discard: true }); }}
           />
         ))}

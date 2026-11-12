@@ -1,5 +1,5 @@
 // ABOUTME: Shared sidebar row for entity lists (presets, strategies, atlas trees).
-// ABOUTME: Renders name, optional subtitle, active state styling, and Export/Duplicate/Delete actions
+// ABOUTME: Renders name, optional subtitle and extra content (e.g. links), active state styling, and Export/Duplicate/Delete actions
 // ABOUTME: (always on the active row, on hover/focus for the others). Delete asks for confirmation.
 
 import type React from 'react';
@@ -15,6 +15,8 @@ interface SidebarEntityRowProps {
   isDeleting: boolean;
   /** Optional content rendered below the name (e.g. point count) */
   subtitle?: React.ReactNode;
+  /** Optional content rendered below the select button; may hold links, which cannot sit inside the button. */
+  extra?: React.ReactNode;
 }
 
 export function SidebarEntityRow({
@@ -26,6 +28,7 @@ export function SidebarEntityRow({
   onDelete,
   isDeleting,
   subtitle,
+  extra,
 }: SidebarEntityRowProps) {
   return (
     <div className={`group border-l-2 transition-all duration-100 ${active ? 'border-poe-gold bg-poe-gold/8' : 'border-transparent hover:bg-poe-panel-light/30'}`}>
@@ -37,6 +40,7 @@ export function SidebarEntityRow({
         <span className="block truncate text-sm text-poe-text">{name}</span>
         {subtitle}
       </button>
+      {extra && <div className="px-3 pb-1">{extra}</div>}
       <div className={`items-center gap-2 px-3 pb-2 ${active ? 'flex' : 'hidden group-focus-within:flex group-hover:flex'}`}>
         <button
           onClick={onExport}

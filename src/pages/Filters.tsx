@@ -11,7 +11,8 @@ import {
   type FilterPresetParsed,
 } from '@/lib/hooks/use-filter-presets';
 import { useFiltersAutosave } from '@/lib/hooks/use-filters-autosave';
-import { useUsedIn } from '@/lib/hooks/use-strategies';
+import { useStrategiesUsing } from '@/lib/hooks/use-strategies';
+import { UsedInLinks } from '@/components/ui/used-in-links';
 import { ExportModal } from '@/components/ui/export-modal';
 import { ImportModal } from '@/components/ui/import-modal';
 import { SidebarEntityRow } from '@/components/ui/sidebar-entity-row';
@@ -38,7 +39,7 @@ function PresetRow({
   onBeforeDelete: () => void;
 }) {
   const deletePreset = useDeletePreset(preset.id);
-  const usedIn = useUsedIn('filterPresetId', preset.id);
+  const usedIn = useStrategiesUsing('filterPresetId', preset.id);
 
   return (
     <SidebarEntityRow
@@ -49,9 +50,7 @@ function PresetRow({
       onDuplicate={onDuplicate}
       onDelete={() => { onBeforeDelete(); deletePreset.mutate(undefined); }}
       isDeleting={deletePreset.isPending}
-      subtitle={usedIn.length > 0 && (
-        <span className="block truncate text-xs text-poe-text-muted">Used in {usedIn.join(', ')}</span>
-      )}
+      extra={usedIn.length > 0 && <UsedInLinks strategies={usedIn} />}
     />
   );
 }
@@ -76,6 +75,12 @@ export function Filters() {
       { name: `${preset.name} (copy)`, config },
       { onSuccess: (dup) => { void open(dup.id, dup.config); } },
     );
+  }
+
+  async function handleExport(preset: FilterPresetParsed) {
+    await flush();
+    const config = preset.id === activePresetId ? getConfig() : preset.config;
+    setExportInput({ type: 'F', name: preset.name, config });
   }
 
   // Dashboard links here with ?preset=<id> to open that preset.
@@ -106,7 +111,7 @@ export function Filters() {
             active={activePresetId === preset.id}
             onSelect={() => { if (preset.id !== activePresetId) void open(preset.id, preset.config); }}
             onDuplicate={() => { void handleDuplicate(preset); }}
-            onExport={() => setExportInput({ type: 'F', name: preset.name, config: preset.config })}
+            onExport={() => { void handleExport(preset); }}
             onBeforeDelete={() => { if (preset.id === activePresetId) void startNew({ discard: true }); }}
           />
         ))}
