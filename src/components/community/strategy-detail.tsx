@@ -13,7 +13,7 @@ import { PricedItemTable, type PricedItem } from '@/components/ui/priced-item-ta
 import { Spinner } from '@/components/ui/spinner';
 import { PresetPreviewModal } from '@/components/community/preset-preview-modal';
 import { TreePreviewModal } from '@/components/community/tree-preview-modal';
-import { useCommunityStrategy, useReportStrategy, useToggleFavourite } from '@/lib/hooks/use-community';
+import { isGone, useCommunityStrategy, useReportStrategy, useToggleFavourite } from '@/lib/hooks/use-community';
 import { useDivinePrice } from '@/lib/hooks/use-prices';
 import { useImportEntity, type StrategyBundlePayload } from '@/lib/hooks/use-sharing';
 import { useStrategies } from '@/lib/hooks/use-strategies';
@@ -27,7 +27,7 @@ import type { StrategyConfig } from '@/types/strategies';
 import type { StrategyStats } from '@/types/community';
 
 function Chip({ children }: { children: React.ReactNode }) {
-  return <span className="rounded bg-poe-panel-light/60 px-1.5 py-0.5 text-[11px] capitalize text-poe-text-dim">{children}</span>;
+  return <span className="rounded bg-poe-panel-light/60 px-1.5 py-0.5 text-[11px] text-poe-text-dim">{children}</span>;
 }
 
 /** Linked preset or tree box; a button that opens a preview when the bundle carries that payload. */
@@ -101,7 +101,7 @@ export function StrategyDetailPanel({ id }: { id: string }) {
 
   if (isLoading) return <div className="flex justify-center py-12"><Spinner /></div>;
   if (error || !detail) {
-    return <p className="p-6 text-sm text-poe-error">{error?.message ?? 'Strategy not found'}</p>;
+    return <p className="p-6 text-sm text-poe-error">{isGone(error) ? 'This strategy no longer exists' : (error?.message ?? 'Strategy not found')}</p>;
   }
 
   const config = bundle.data?.config;
@@ -149,8 +149,8 @@ export function StrategyDetailPanel({ id }: { id: string }) {
             {detail.league}{detail.patch ? ` · ${detail.patch}` : ''} · updated {new Date(detail.updatedAt).toLocaleDateString()}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            <Chip>{detail.budget} budget</Chip>
-            <Chip>{detail.difficulty}</Chip>
+            <Chip><span className="capitalize">{detail.budget}</span> budget</Chip>
+            <Chip><span className="capitalize">{detail.difficulty}</span></Chip>
             {detail.tags.map((t) => <Chip key={t}>{t}</Chip>)}
           </div>
         </div>

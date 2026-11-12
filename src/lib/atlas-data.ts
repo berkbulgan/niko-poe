@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import * as ipc from '@/lib/ipc';
 import { assetFileUrl } from '@/lib/platform';
-import { pickAtlasTag, processTreeData } from '@/lib/atlas-tree-utils';
+import { cleanTreeText, pickAtlasTag, processTreeData } from '@/lib/atlas-tree-utils';
 import { useGameDataStore } from '@/lib/stores/game-data-store';
 import rawTreeData from '@/data/atlas-tree-data.json';
 import sources from '@/data/sources.json';
@@ -28,7 +28,7 @@ const REFRESH_MS = 24 * 60 * 60 * 1000;
 let bundled: AtlasDataset | undefined;
 function bundledDataset(): AtlasDataset {
   if (!bundled) {
-    const data = rawTreeData as unknown as AtlasTreeRawData;
+    const data = cleanTreeText(rawTreeData as unknown as AtlasTreeRawData);
     bundled = { tag: BUNDLED_ATLAS.tag, data, nodes: processTreeData(data), assetUrl: (f) => `/atlas/${f}` };
   }
   return bundled;
@@ -38,7 +38,7 @@ async function loadDataset(tag: string): Promise<AtlasDataset | null> {
   if (tag === BUNDLED_ATLAS.tag) return bundledDataset();
   const files = await ipc.atlasData(tag);
   if (!files) return null;
-  const data = JSON.parse(files.dataJson) as AtlasTreeRawData;
+  const data = cleanTreeText(JSON.parse(files.dataJson) as AtlasTreeRawData);
   return { tag, data, nodes: processTreeData(data), assetUrl: (f) => assetFileUrl(`${files.assetDir}/${f}`) };
 }
 

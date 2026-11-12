@@ -59,12 +59,12 @@ function AccordionSection({
 }
 
 function AggregatedStatRow({ stat }: { stat: AggregatedStat }) {
+  const [before, after] = stat.text.split('#');
   return (
-    <div className="flex items-baseline justify-between px-4 py-1">
-      <span className="text-xs text-poe-text-dim">{stat.text}</span>
-      <span className="ml-2 shrink-0 text-xs font-medium tabular-nums text-poe-gold">
-        {formatStatTotal(stat)}
-      </span>
+    <div className="px-4 py-1 text-xs text-poe-text-dim">
+      {before}
+      <span className="font-medium tabular-nums text-poe-gold">{formatStatTotal(stat)}</span>
+      {after}
     </div>
   );
 }

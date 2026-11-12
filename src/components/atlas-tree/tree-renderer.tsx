@@ -14,7 +14,7 @@ import type {
   AtlasSprites,
   AtlasConnection,
 } from '@/types/atlas-tree';
-import { getAllocatableNeighbors, getStartingNodeIds, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected, searchMatches, boundsOf } from '@/lib/atlas-tree-utils';
+import { getAllocatableNeighbors, getStartingNodeIds, getStartPosition, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected, searchMatches, boundsOf, clampPan, jumpBox } from '@/lib/atlas-tree-utils';
 import { renderAtlasTree, hitTestNode, type RenderState } from '@/lib/atlas-canvas-renderer';
 import { initZoomLevels, preloadSprites, pickZoomLevel, type AssetUrl } from '@/lib/atlas-sprite-loader';
 
@@ -34,9 +34,9 @@ interface TreeRendererProps {
   groups: Record<string, { x: number; y: number; background?: { image: string; offsetX?: number; offsetY?: number } }>;
   /** A new object centers the view on that node (zoom at least FOCUS_ZOOM) and gives it the hover highlight. */
   focus?: { nodeId: string } | null;
-  /** Options of the "Jump to…" select; choosing one fits the view to those nodes. */
+  /** Options of the "Jump to…" select; choosing one fits the view to those nodes, or to the nearest of their groups when they do not all fit. */
   jumpTargets?: Array<{ label: string; nodeIds: string[] }>;
-  /** View only: no click allocation, no hover previews or point cost, no keyboard zoom. */
+  /** View only: no click allocation, no hover previews or point cost (zooming still works). */
   readOnly?: boolean;
   /** What the first render fits: the whole tree (default), or the allocated nodes when there are any. */
   initialFit?: 'tree' | 'allocated';
@@ -58,46 +58,14 @@ interface PanState {
   startPanY: number;
 }
 
-const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 0.5;
 const ZOOM_SPEED = 0.002;
 /** Zoom factor of one +/- button press or key. */
 const ZOOM_STEP = 1.15;
 /** Minimum zoom when centering on a focused node. */
 const FOCUS_ZOOM = 0.3;
-
-/**
- * Clamps pan so the tree background never leaves the viewport.
- * The tree world-space rect (bounds) scaled by zoom must cover the container.
- */
-function clampPan(
-  px: number,
-  py: number,
-  currentZoom: number,
-  containerW: number,
-  containerH: number,
-  bounds: { minX: number; minY: number; maxX: number; maxY: number },
-): { x: number; y: number } {
-  // Scaled tree edges in screen space = pan + worldCoord * zoom
-  // We want: pan + bounds.minX * zoom >= 0  (left edge stays in view)
-  //          pan + bounds.maxX * zoom <= containerW (right edge stays in view)
-  // => pan in [containerW - maxX*zoom, -minX*zoom]
-  // 10% margin so nodes near the edge aren't clipped
-  const treeW = (bounds.maxX - bounds.minX) * currentZoom;
-  const treeH = (bounds.maxY - bounds.minY) * currentZoom;
-  const marginX = treeW * 0.1;
-  const marginY = treeH * 0.1;
-
-  const minPanX = containerW - bounds.maxX * currentZoom - marginX;
-  const maxPanX = -bounds.minX * currentZoom + marginX;
-  const minPanY = containerH - bounds.maxY * currentZoom - marginY;
-  const maxPanY = -bounds.minY * currentZoom + marginY;
-
-  return {
-    x: Math.min(maxPanX, Math.max(minPanX, px)),
-    y: Math.min(maxPanY, Math.max(minPanY, py)),
-  };
-}
+/** Height fraction a focused node is centred at: above the middle, clear of the search results list. */
+const FOCUS_Y = 0.35;
 
 export function TreeRenderer({
   nodes,
@@ -116,9 +84,11 @@ export function TreeRenderer({
   readOnly = false,
   initialFit = 'tree',
 }: TreeRendererProps) {
+  // Lowest zoom = smallest sprite sheet scale, so Fit can show as much of the tree as the sprites allow
+  const minZoom = Math.min(...imageZoomLevels);
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [zoom, setZoom] = useState(MIN_ZOOM);
+  const [zoom, setZoom] = useState(minZoom);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [initialized, setInitialized] = useState(false);
@@ -127,6 +97,8 @@ export function TreeRenderer({
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  /** Bumped when the canvas needs a new frame without a render state change (resize, sprites loaded). */
+  const [redrawTick, setRedrawTick] = useState(0);
   const animTimeRef = useRef(0);
   const rafIdRef = useRef(0);
 
@@ -138,13 +110,13 @@ export function TreeRenderer({
     startPanY: 0,
   });
   const didDragRef = useRef(false);
-  const zoomRef = useRef(MIN_ZOOM);
+  const zoomRef = useRef(minZoom);
   const panRef = useRef({ x: 0, y: 0 });
 
   // Initialize sprite system and preload
   useEffect(() => {
     initZoomLevels(imageZoomLevels, sprites);
-    const zoomKey = pickZoomLevel(MIN_ZOOM);
+    const zoomKey = pickZoomLevel(minZoom);
     preloadSprites(sprites, zoomKey, assetUrl).then(
       () => setSpritesReady(true),
       (err: unknown) => {
@@ -152,13 +124,13 @@ export function TreeRenderer({
         setSpritesFailed(true);
       },
     );
-  }, [sprites, imageZoomLevels, assetUrl]);
+  }, [sprites, imageZoomLevels, assetUrl, minZoom]);
 
-  // Preload next zoom level when zoom changes
+  // Preload the zoom level's sprites when zoom changes, then redraw with them
   useEffect(() => {
     if (!spritesReady) return;
     const zoomKey = pickZoomLevel(zoom);
-    preloadSprites(sprites, zoomKey, assetUrl);
+    preloadSprites(sprites, zoomKey, assetUrl).then(() => setRedrawTick((t) => t + 1));
   }, [zoom, sprites, spritesReady, assetUrl]);
 
   const allocatedStringIds = useMemo(
@@ -217,6 +189,8 @@ export function TreeRenderer({
     [rawNodes],
   );
 
+  const startPosition = useMemo(() => getStartPosition(rawNodes, groups), [rawNodes, groups]);
+
   const hubNodeIds = useMemo(
     () => getHubNodeIds(rawNodes),
     [rawNodes],
@@ -271,6 +245,7 @@ export function TreeRenderer({
     hoveredNodeId: hoveredNodeId ?? focusedId,
     searchMatchIds,
     startingNodeIds,
+    startPosition,
     pathPreviewIds,
     prunePreviewIds,
     hoveredMasteryName,
@@ -278,7 +253,7 @@ export function TreeRenderer({
     animTime: 0,
     viewportWidth: 0,
     viewportHeight: 0,
-  }), [nodes, connections, allocatedIds, allocatableNeighbors, sprites, assetUrl, bounds, groups, zoom, panX, panY, hoveredNodeId, focusedId, searchMatchIds, startingNodeIds, pathPreviewIds, prunePreviewIds, hoveredMasteryName, masteryGroupMap]);
+  }), [nodes, connections, allocatedIds, allocatableNeighbors, sprites, assetUrl, bounds, groups, zoom, panX, panY, hoveredNodeId, focusedId, searchMatchIds, startingNodeIds, startPosition, pathPreviewIds, prunePreviewIds, hoveredMasteryName, masteryGroupMap]);
 
   /** Sets zoom and pan (clamped) in both the refs and the state. */
   const applyView = useCallback((z: number, px: number, py: number) => {
@@ -291,14 +266,17 @@ export function TreeRenderer({
     setZoom(z);
     setPanX(clamped.x);
     setPanY(clamped.y);
+    // The view moved under the cursor, so the old hover no longer matches what is under it
+    setTooltip(null);
+    setHoveredNodeId(null);
   }, [bounds]);
 
-  /** Puts world point (wx, wy) in the middle of the viewport at zoom z. */
-  const centerOn = useCallback((z: number, wx: number, wy: number) => {
+  /** Puts world point (wx, wy) at the horizontal middle and fy of the height of the viewport at zoom z. */
+  const centerOn = useCallback((z: number, wx: number, wy: number, fy = 0.5) => {
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    applyView(z, rect.width / 2 - wx * z, rect.height / 2 - wy * z);
+    applyView(z, rect.width / 2 - wx * z, rect.height * fy - wy * z);
   }, [applyView]);
 
   /** Fits a world-space box with a 10% margin on each side. */
@@ -307,9 +285,9 @@ export function TreeRenderer({
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const fit = Math.min(rect.width / (box.maxX - box.minX), rect.height / (box.maxY - box.minY)) / 1.2;
-    const z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, fit));
+    const z = Math.max(minZoom, Math.min(MAX_ZOOM, fit));
     centerOn(z, (box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2);
-  }, [centerOn]);
+  }, [centerOn, minZoom]);
 
   /** Zooms by a factor around the viewport center. */
   const zoomBy = useCallback((factor: number) => {
@@ -317,13 +295,13 @@ export function TreeRenderer({
     if (!container) return;
     const rect = container.getBoundingClientRect();
     const oldZoom = zoomRef.current;
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, oldZoom * factor));
+    const newZoom = Math.min(MAX_ZOOM, Math.max(minZoom, oldZoom * factor));
     centerOn(
       newZoom,
       (rect.width / 2 - panRef.current.x) / oldZoom,
       (rect.height / 2 - panRef.current.y) / oldZoom,
     );
-  }, [centerOn]);
+  }, [centerOn, minZoom]);
 
   // Fit the tree (or the allocated nodes) once the sprites are ready
   useEffect(() => {
@@ -338,12 +316,11 @@ export function TreeRenderer({
     const node = nodeMap.get(focus.nodeId);
     if (!node) return;
     setFocusedId(node.id);
-    centerOn(Math.max(zoomRef.current, FOCUS_ZOOM), node.x, node.y);
+    centerOn(Math.max(zoomRef.current, FOCUS_ZOOM), node.x, node.y, FOCUS_Y);
   }, [focus, nodeMap, centerOn]);
 
   // Keyboard zoom: + / = in, - out, 0 fits the tree (not while typing or with modifiers)
   useEffect(() => {
-    if (readOnly) return;
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
@@ -354,9 +331,10 @@ export function TreeRenderer({
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [readOnly, zoomBy, fitBox, bounds]);
+  }, [zoomBy, fitBox, bounds]);
 
-  // Resize canvas to match container
+  // Resize canvas to match container. Assigning width/height clears the bitmap, so only do it on a
+  // real size change, and then ask for a new frame.
   useEffect(() => {
     const container = containerRef.current;
     const canvas = canvasRef.current;
@@ -366,10 +344,14 @@ export function TreeRenderer({
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         const dpr = window.devicePixelRatio || 1;
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
+        const w = Math.round(width * dpr);
+        const h = Math.round(height * dpr);
+        if (canvas.width === w && canvas.height === h) continue;
+        canvas.width = w;
+        canvas.height = h;
         canvas.style.width = `${width}px`;
         canvas.style.height = `${height}px`;
+        setRedrawTick((t) => t + 1);
       }
     });
 
@@ -410,7 +392,7 @@ export function TreeRenderer({
 
     rafIdRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafIdRef.current);
-  }, [renderState, spritesReady, needsAnimation]);
+  }, [renderState, spritesReady, needsAnimation, redrawTick]);
 
   // Wheel zoom with zoom-toward-cursor
   useEffect(() => {
@@ -425,7 +407,7 @@ export function TreeRenderer({
 
       const oldZoom = zoomRef.current;
       const delta = -e.deltaY * ZOOM_SPEED;
-      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, oldZoom + delta * oldZoom));
+      const newZoom = Math.min(MAX_ZOOM, Math.max(minZoom, oldZoom + delta * oldZoom));
 
       // Zoom toward cursor
       const worldX = (mouseX - panRef.current.x) / oldZoom;
@@ -439,11 +421,14 @@ export function TreeRenderer({
       setZoom(newZoom);
       setPanX(clamped.x);
       setPanY(clamped.y);
+      // The node under the cursor changes with the zoom; the next mouse move hit-tests again.
+      setTooltip(null);
+      setHoveredNodeId(null);
     }
 
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, []);
+  }, [bounds, minZoom]);
 
   const handleMouseDown = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -547,7 +532,7 @@ export function TreeRenderer({
   const controls = [
     { label: 'Zoom in (+)', icon: Plus, onClick: () => zoomBy(ZOOM_STEP), disabled: false },
     { label: 'Zoom out (−)', icon: Minus, onClick: () => zoomBy(1 / ZOOM_STEP), disabled: false },
-    { label: 'Fit tree (0)', icon: Maximize, onClick: () => fitBox(bounds), disabled: false },
+    { label: 'Zoom out fully (0)', icon: Maximize, onClick: () => fitBox(bounds), disabled: false },
     { label: 'Fit allocated', icon: Crosshair, onClick: () => { if (allocatedBox) fitBox(allocatedBox); }, disabled: !allocatedBox },
   ];
 
@@ -637,7 +622,17 @@ export function TreeRenderer({
               value=""
               onValueChange={(label) => {
                 const target = jumpTargets.find((t) => t.label === label);
-                const box = target && boundsOf(target.nodeIds.flatMap((id) => nodeMap.get(id) ?? []));
+                const container = containerRef.current;
+                if (!target || !container) return;
+                const rect = container.getBoundingClientRect();
+                const z = zoomRef.current;
+                // From the view centre; the limit is what minZoom shows (fitBox drops its margin there)
+                const box = jumpBox(
+                  target.nodeIds.flatMap((id) => nodeMap.get(id) ?? []),
+                  { x: (rect.width / 2 - panRef.current.x) / z, y: (rect.height / 2 - panRef.current.y) / z },
+                  rect.width / minZoom,
+                  rect.height / minZoom,
+                );
                 if (box) fitBox(box);
               }}
               options={jumpTargets.map((t) => ({ value: t.label, label: t.label }))}
@@ -651,7 +646,7 @@ export function TreeRenderer({
 
       {/* Zoom indicator */}
       <div className="absolute bottom-3 right-3 rounded bg-poe-panel/80 px-2 py-1 text-xs text-poe-text-muted">
-        {Math.round(((zoom - MIN_ZOOM) / (MAX_ZOOM - MIN_ZOOM)) * 100)}%
+        {Math.round(((zoom - minZoom) / (MAX_ZOOM - minZoom)) * 100)}%
       </div>
     </div>
   );

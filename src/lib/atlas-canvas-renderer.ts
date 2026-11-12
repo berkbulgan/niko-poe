@@ -40,8 +40,10 @@ export interface RenderState {
   hoveredNodeId: string | null;
   /** Search-matching node IDs. */
   searchMatchIds: Set<string>;
-  /** Starting node IDs (connected to hub at origin). */
+  /** Starting node IDs (connected to the hub). */
   startingNodeIds: Set<string>;
+  /** World position of the start icon and the hub the starting nodes connect to. */
+  startPosition: { x: number; y: number };
   /** Node IDs that would be allocated on click (path preview). */
   pathPreviewIds: Set<string>;
   /** Node IDs that would be deallocated on click (prune preview). */
@@ -271,7 +273,7 @@ function drawStartNode(
     state.sprites.startNode,
     'AtlasPassiveSkillScreenStart',
     zoomKey,
-    0, 0,
+    state.startPosition.x, state.startPosition.y,
     w, h,
     state.assetUrl,
   );
@@ -287,7 +289,7 @@ function drawConnections(
 ): void {
   const { connections, allocatedIds, startingNodeIds, nodes, pathPreviewIds, prunePreviewIds } = state;
 
-  // Draw hub-to-starting-node lines (from origin to each starting node)
+  // Draw hub-to-starting-node lines (from the start icon to each starting node)
   const nodeById = new Map<string, ProcessedAtlasNode>();
   for (const n of nodes) nodeById.set(n.id, n);
 
@@ -300,7 +302,7 @@ function drawConnections(
     const isPrunePreview = prunePreviewIds.has(startId);
 
     ctx.beginPath();
-    ctx.moveTo(0, 0);
+    ctx.moveTo(state.startPosition.x, state.startPosition.y);
     ctx.lineTo(startNode.x, startNode.y);
 
     if (isPrunePreview) {
@@ -392,7 +394,7 @@ function drawPreviewLine(
 
   if (conn.sameOrbit) {
     // Draw orbit arc
-    const group = state.groups[String(conn.fromNode.group)];
+    const group = conn.arcCenter ?? state.groups[String(conn.fromNode.group)];
     if (group) {
       const cx = group.x;
       const cy = group.y;
@@ -497,7 +499,7 @@ function drawOrbitArc(
   const { fromNode, toNode } = conn;
 
   // Both nodes are in the same group — draw an arc through the orbit
-  const group = state.groups[String(fromNode.group)];
+  const group = conn.arcCenter ?? state.groups[String(fromNode.group)];
   if (!group) {
     // Fallback to straight line
     const isActive = fromAllocated && toAllocated;
@@ -741,6 +743,40 @@ function drawPreviewRing(
 // Off-screen arrows — point toward highlighted nodes outside viewport
 // ---------------------------------------------------------------------------
 
+const ARROW_MARGIN = 40;
+/**
+ * Top-left screen area covered by the zoom controls and the Jump to select (w-40 at left-3, so x 12-172), plus a 12px
+ * arrow margin; arrows stay out of it. Kept even on trees without the select, where it only nudges a few arrows.
+ */
+export const CONTROLS_KEEP_OUT = { width: 184, height: 192 };
+
+/**
+ * Where to draw the arrow pointing at screen point (sx, sy), or null when the point is on screen.
+ * The arrow sits on an ellipse inside the viewport edge, in the direction of the point from the centre.
+ */
+export function offScreenArrowPoint(
+  sx: number,
+  sy: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): { x: number; y: number; angle: number } | null {
+  const m = ARROW_MARGIN;
+  if (sx >= m && sx <= viewportWidth - m && sy >= m && sy <= viewportHeight - m) return null;
+
+  const cx = viewportWidth / 2;
+  const cy = viewportHeight / 2;
+  const angle = Math.atan2(sy - cy, sx - cx);
+  let x = Math.max(m, Math.min(viewportWidth - m, cx + Math.cos(angle) * (viewportWidth / 2 - m)));
+  let y = Math.max(m, Math.min(viewportHeight - m, cy + Math.sin(angle) * (viewportHeight / 2 - m)));
+
+  // In the controls corner: a target further out to the left moves the arrow down, one further up moves it right
+  if (x < CONTROLS_KEEP_OUT.width && y < CONTROLS_KEEP_OUT.height) {
+    if (-sx > -sy) y = CONTROLS_KEEP_OUT.height;
+    else x = CONTROLS_KEEP_OUT.width;
+  }
+  return { x, y, angle };
+}
+
 function drawOffScreenArrows(
   ctx: CanvasRenderingContext2D,
   state: RenderState,
@@ -748,12 +784,11 @@ function drawOffScreenArrows(
   const { nodes, searchMatchIds, hoveredMasteryName, animTime, zoom, panX, panY, viewportWidth, viewportHeight } = state;
   if (searchMatchIds.size === 0 && !hoveredMasteryName) return;
 
-  const margin = 40;
   const arrowSize = 12;
   const pulse = 0.5 + 0.5 * Math.abs(Math.sin(animTime * 0.004));
 
   // Collect off-screen highlighted nodes
-  const targets: Array<{ sx: number; sy: number; color: string }> = [];
+  const targets: Array<{ x: number; y: number; angle: number; color: string }> = [];
 
   for (const node of nodes) {
     const isSearch = searchMatchIds.has(node.id);
@@ -764,27 +799,14 @@ function drawOffScreenArrows(
     const sx = node.x * zoom + panX;
     const sy = node.y * zoom + panY;
 
-    // Check if off-screen
-    if (sx >= margin && sx <= viewportWidth - margin && sy >= margin && sy <= viewportHeight - margin) continue;
-
-    targets.push({ sx, sy, color: isSearch ? '#FFD700' : '#b388ff' });
+    const point = offScreenArrowPoint(sx, sy, viewportWidth, viewportHeight);
+    if (point) targets.push({ ...point, color: isSearch ? '#FFD700' : '#b388ff' });
   }
 
   if (targets.length === 0) return;
 
-  const cx = viewportWidth / 2;
-  const cy = viewportHeight / 2;
-
   ctx.save();
-  for (const { sx, sy, color } of targets) {
-    const dx = sx - cx;
-    const dy = sy - cy;
-    const angle = Math.atan2(dy, dx);
-
-    // Clamp to viewport edge
-    const edgeX = Math.max(margin, Math.min(viewportWidth - margin, cx + Math.cos(angle) * (viewportWidth / 2 - margin)));
-    const edgeY = Math.max(margin, Math.min(viewportHeight - margin, cy + Math.sin(angle) * (viewportHeight / 2 - margin)));
-
+  for (const { x: edgeX, y: edgeY, angle, color } of targets) {
     // Draw arrow
     ctx.beginPath();
     ctx.moveTo(
