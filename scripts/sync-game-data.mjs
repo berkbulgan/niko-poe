@@ -1,5 +1,5 @@
-// ABOUTME: Pulls the latest atlas tree (GGG atlastree-export) and map-mod regex data (data.poe.re)
-// ABOUTME: into the repo, adds a CHANGELOG entry and reports changed/valid. --dry-run writes nothing.
+// ABOUTME: Refreshes the app's bundled fallback game data by hand: the latest atlas tree (GGG atlastree-export, with its
+// ABOUTME: release date) and map-mod regex data (data.poe.re); adds a CHANGELOG entry, reports changed/valid. --dry-run writes nothing.
 
 import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
@@ -64,6 +64,9 @@ if (atlasTag && atlasTag !== sources.atlasTag) {
     }
   }
   sources.atlasTag = atlasTag;
+  // The app maps trees saved before tags were recorded to a patch by this date.
+  const commit = await getJson(`https://api.github.com/repos/${ATLAS_REPO}/commits/${atlasTag}`);
+  sources.atlasReleasedAt = commit.commit.committer.date;
 }
 
 // --- Map mod regex: the English map-mods file of data.poe.re's current PoE 1 patch ---
