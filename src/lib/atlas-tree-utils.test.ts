@@ -5,8 +5,10 @@ import { describe, expect, it } from 'vitest';
 import {
   atlasConfigsEqual,
   boundsOf,
+  buildConnections,
   cycleIndex,
   formatStatTotal,
+  getStartPosition,
   groupByMechanic,
   isEmptyAtlasConfig,
   migrateTree,
@@ -276,5 +278,60 @@ describe('pickAtlasTag', () => {
     expect(await pickAtlasTag([V3280], V3291, async (t) => { tried.push(t); return true; })).toBe('3.29.1');
     expect(await pickAtlasTag([], V3291, async () => true)).toBe('3.29.1');
     expect(tried).toEqual([]);
+  });
+});
+
+describe('getStartPosition', () => {
+  const node = (over: Partial<AtlasNodeData>): AtlasNodeData =>
+    ({ skill: 0, name: '', icon: '', stats: [], group: 0, orbit: 0, orbitIndex: 0, out: [], in: [], ...over }) as AtlasNodeData;
+
+  it('is the hub group centre, near the origin on the bundled 3.29.1 tree', () => {
+    const d = rawTreeData as unknown as AtlasTreeRawData;
+    const p = getStartPosition(d.nodes, d.groups);
+    expect(Math.abs(p.x)).toBeLessThan(5);
+    expect(Math.abs(p.y)).toBeLessThan(5);
+  });
+
+  it('follows the hub when its group moves (3.30 put the start in the middle)', () => {
+    const nodes = {
+      root: node({ out: ['10'] }),
+      '10': node({ skill: 10, group: 7, out: ['11'] }),
+      '11': node({ skill: 11, name: 'Start', group: 8, in: ['10'] }),
+    };
+    const groups = { '7': { x: 42, y: -6724, orbits: [0], nodes: ['10'] }, '8': { x: 0, y: 0, orbits: [0], nodes: ['11'] } };
+    expect(getStartPosition(nodes, groups)).toEqual({ x: 42, y: -6724 });
+  });
+
+  it('falls back to the origin when there is no hub', () => {
+    expect(getStartPosition({}, {})).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('buildConnections arc centres', () => {
+  const pnode = (id: string, over: Partial<ProcessedAtlasNode>): ProcessedAtlasNode =>
+    ({ id, skill: Number(id), name: id, icon: '', stats: [], group: 1, orbit: 1, orbitIndex: 0, out: [], in: [],
+      nodeType: 'small', x: 0, y: 0, ...over }) as ProcessedAtlasNode;
+
+  it('uses the arc centre the data gives for a cross-group connection', () => {
+    const a = pnode('1', { group: 1, out: ['2'], connections: [{ to: '2', orbit: 2, orbitX: 5, orbitY: 6 }] });
+    const b = pnode('2', { group: 2, in: ['1'] });
+    const [conn] = buildConnections([a, b], new Map([['1', a], ['2', b]]));
+    expect(conn.arcCenter).toEqual({ x: 5, y: 6 });
+    expect(conn.sameOrbit).toBe(true);
+  });
+
+  it('finds the centre when it is listed on the target node', () => {
+    const a = pnode('1', { group: 1, out: ['2'] });
+    const b = pnode('2', { group: 2, in: ['1'], connections: [{ to: '1', orbit: 2, orbitX: -3, orbitY: 4 }] });
+    const [conn] = buildConnections([a, b], new Map([['1', a], ['2', b]]));
+    expect(conn.arcCenter).toEqual({ x: -3, y: 4 });
+  });
+
+  it('keeps straight lines and group arcs as before', () => {
+    const a = pnode('1', { group: 1, orbit: 1, out: ['2', '3'] });
+    const b = pnode('2', { group: 1, orbit: 1 });
+    const c = pnode('3', { group: 2, orbit: 1 });
+    const conns = buildConnections([a, b, c], new Map([['1', a], ['2', b], ['3', c]]));
+    expect(conns.map((x) => [x.toId, x.sameOrbit, x.arcCenter])).toEqual([['2', true, undefined], ['3', false, undefined]]);
   });
 });

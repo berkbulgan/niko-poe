@@ -266,6 +266,19 @@ export function getHubNodeIds(
 }
 
 /**
+ * World position of the start icon: the centre of the first hub's group. Up to 3.29 the hub sat at the
+ * origin (bottom of the tree); 3.30 moved it to the middle. Falls back to the origin without a hub.
+ */
+export function getStartPosition(
+  nodes: Record<string, AtlasNodeData>,
+  groups: Record<string, { x: number; y: number }>,
+): { x: number; y: number } {
+  const [hub] = getHubNodeIds(nodes);
+  const group = hub ? groups[String(nodes[hub].group)] : undefined;
+  return group ? { x: group.x, y: group.y } : { x: 0, y: 0 };
+}
+
+/**
  * Finds the starting node IDs reachable from "root" through hidden hub nodes.
  * In GGG data, root → hub (no name) → starting small passives.
  */
@@ -496,12 +509,17 @@ export function buildConnections(
       const target = nodeMap.get(outId);
       if (!target) continue;
 
+      const custom = node.connections?.find((c) => c.to === outId) ?? target.connections?.find((c) => c.to === node.id);
+      const arcCenter = custom?.orbitX !== undefined && custom.orbitY !== undefined
+        ? { x: custom.orbitX, y: custom.orbitY }
+        : undefined;
       connections.push({
         fromId: node.id,
         toId: outId,
         fromNode: node,
         toNode: target,
-        sameOrbit: node.group === target.group && node.orbit === target.orbit,
+        sameOrbit: arcCenter !== undefined || (node.group === target.group && node.orbit === target.orbit),
+        ...(arcCenter && { arcCenter }),
       });
     }
   }

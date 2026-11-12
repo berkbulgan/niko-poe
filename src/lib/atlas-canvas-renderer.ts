@@ -40,8 +40,10 @@ export interface RenderState {
   hoveredNodeId: string | null;
   /** Search-matching node IDs. */
   searchMatchIds: Set<string>;
-  /** Starting node IDs (connected to hub at origin). */
+  /** Starting node IDs (connected to the hub). */
   startingNodeIds: Set<string>;
+  /** World position of the start icon and the hub the starting nodes connect to. */
+  startPosition: { x: number; y: number };
   /** Node IDs that would be allocated on click (path preview). */
   pathPreviewIds: Set<string>;
   /** Node IDs that would be deallocated on click (prune preview). */
@@ -271,7 +273,7 @@ function drawStartNode(
     state.sprites.startNode,
     'AtlasPassiveSkillScreenStart',
     zoomKey,
-    0, 0,
+    state.startPosition.x, state.startPosition.y,
     w, h,
     state.assetUrl,
   );
@@ -287,7 +289,7 @@ function drawConnections(
 ): void {
   const { connections, allocatedIds, startingNodeIds, nodes, pathPreviewIds, prunePreviewIds } = state;
 
-  // Draw hub-to-starting-node lines (from origin to each starting node)
+  // Draw hub-to-starting-node lines (from the start icon to each starting node)
   const nodeById = new Map<string, ProcessedAtlasNode>();
   for (const n of nodes) nodeById.set(n.id, n);
 
@@ -300,7 +302,7 @@ function drawConnections(
     const isPrunePreview = prunePreviewIds.has(startId);
 
     ctx.beginPath();
-    ctx.moveTo(0, 0);
+    ctx.moveTo(state.startPosition.x, state.startPosition.y);
     ctx.lineTo(startNode.x, startNode.y);
 
     if (isPrunePreview) {
@@ -392,7 +394,7 @@ function drawPreviewLine(
 
   if (conn.sameOrbit) {
     // Draw orbit arc
-    const group = state.groups[String(conn.fromNode.group)];
+    const group = conn.arcCenter ?? state.groups[String(conn.fromNode.group)];
     if (group) {
       const cx = group.x;
       const cy = group.y;
@@ -497,7 +499,7 @@ function drawOrbitArc(
   const { fromNode, toNode } = conn;
 
   // Both nodes are in the same group — draw an arc through the orbit
-  const group = state.groups[String(fromNode.group)];
+  const group = conn.arcCenter ?? state.groups[String(fromNode.group)];
   if (!group) {
     // Fallback to straight line
     const isActive = fromAllocated && toAllocated;

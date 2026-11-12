@@ -64,6 +64,8 @@ export interface AtlasNodeData {
   isWormhole?: boolean;
   flavourText?: string[];
   reminderText?: string[];
+  /** Since 3.30: connections drawn as an arc around a given centre instead of the group's. */
+  connections?: Array<{ to: string; orbit: number; orbitX?: number; orbitY?: number }>;
 }
 
 export interface AtlasGroupData {
@@ -147,6 +149,8 @@ export interface AtlasConnection {
   toId: string;
   fromNode: ProcessedAtlasNode;
   toNode: ProcessedAtlasNode;
-  /** True if both nodes are in the same group AND same orbit (use orbit arc). */
+  /** True when the connection is drawn as an orbit arc (same group and orbit, or a centre given by the data). */
   sameOrbit: boolean;
+  /** Arc centre from the data (3.30+ `connections`); otherwise arcs use the group centre. */
+  arcCenter?: { x: number; y: number };
 }

@@ -14,7 +14,7 @@ import type {
   AtlasSprites,
   AtlasConnection,
 } from '@/types/atlas-tree';
-import { getAllocatableNeighbors, getStartingNodeIds, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected, searchMatches, boundsOf } from '@/lib/atlas-tree-utils';
+import { getAllocatableNeighbors, getStartingNodeIds, getStartPosition, getHubNodeIds, buildConnections, findShortestPath, pruneDisconnected, searchMatches, boundsOf } from '@/lib/atlas-tree-utils';
 import { renderAtlasTree, hitTestNode, type RenderState } from '@/lib/atlas-canvas-renderer';
 import { initZoomLevels, preloadSprites, pickZoomLevel, type AssetUrl } from '@/lib/atlas-sprite-loader';
 
@@ -217,6 +217,8 @@ export function TreeRenderer({
     [rawNodes],
   );
 
+  const startPosition = useMemo(() => getStartPosition(rawNodes, groups), [rawNodes, groups]);
+
   const hubNodeIds = useMemo(
     () => getHubNodeIds(rawNodes),
     [rawNodes],
@@ -271,6 +273,7 @@ export function TreeRenderer({
     hoveredNodeId: hoveredNodeId ?? focusedId,
     searchMatchIds,
     startingNodeIds,
+    startPosition,
     pathPreviewIds,
     prunePreviewIds,
     hoveredMasteryName,
@@ -278,7 +281,7 @@ export function TreeRenderer({
     animTime: 0,
     viewportWidth: 0,
     viewportHeight: 0,
-  }), [nodes, connections, allocatedIds, allocatableNeighbors, sprites, assetUrl, bounds, groups, zoom, panX, panY, hoveredNodeId, focusedId, searchMatchIds, startingNodeIds, pathPreviewIds, prunePreviewIds, hoveredMasteryName, masteryGroupMap]);
+  }), [nodes, connections, allocatedIds, allocatableNeighbors, sprites, assetUrl, bounds, groups, zoom, panX, panY, hoveredNodeId, focusedId, searchMatchIds, startingNodeIds, startPosition, pathPreviewIds, prunePreviewIds, hoveredMasteryName, masteryGroupMap]);
 
   /** Sets zoom and pan (clamped) in both the refs and the state. */
   const applyView = useCallback((z: number, px: number, py: number) => {
