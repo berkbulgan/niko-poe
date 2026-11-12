@@ -589,6 +589,37 @@ export function boundsOf(points: Array<{ x: number; y: number }>): { minX: numbe
 // 3k. Mechanic grouping
 // ---------------------------------------------------------------------------
 
+function isMechanicSkipped(nodes: Record<string, AtlasNodeData>, hubs: Set<string>, id: string): boolean {
+  const n = nodes[id];
+  return id === 'root' || !n || hubs.has(id) || !!n.isMastery || !!n.isWormhole;
+}
+
+/**
+ * Each mechanic's core: the node ids in the groups that hold a mastery of that name. Root, hubs,
+ * masteries and wormholes are left out. These are the nodes "Jump to" frames, unlike nodeMechanics,
+ * which also spreads over the travel paths between clusters.
+ */
+export function mechanicCoreNodeIds(
+  nodes: Record<string, AtlasNodeData>,
+  hubs: Set<string> = getHubNodeIds(nodes),
+): Map<string, string[]> {
+  const masteryByGroup = new Map<number, string>();
+  for (const n of Object.values(nodes)) {
+    if (n.isMastery) masteryByGroup.set(n.group, n.name);
+  }
+
+  const result = new Map<string, string[]>();
+  for (const [id, n] of Object.entries(nodes)) {
+    if (isMechanicSkipped(nodes, hubs, id)) continue;
+    const mechanic = masteryByGroup.get(n.group);
+    if (mechanic === undefined) continue;
+    const ids = result.get(mechanic);
+    if (ids) ids.push(id);
+    else result.set(mechanic, [id]);
+  }
+  return result;
+}
+
 /**
  * Maps node ids to a mechanic name. A node takes the name of the mastery in its own group;
  * the rest take the mechanic of the nearest mapped node along in/out edges (layered BFS, each
@@ -597,21 +628,11 @@ export function boundsOf(points: Array<{ x: number; y: number }>): { minX: numbe
  */
 export function nodeMechanics(nodes: Record<string, AtlasNodeData>): Map<string, string> {
   const hubs = getHubNodeIds(nodes);
-  const skipped = (id: string) => {
-    const n = nodes[id];
-    return id === 'root' || !n || hubs.has(id) || !!n.isMastery || !!n.isWormhole;
-  };
-
-  const masteryByGroup = new Map<number, string>();
-  for (const n of Object.values(nodes)) {
-    if (n.isMastery) masteryByGroup.set(n.group, n.name);
-  }
+  const skipped = (id: string) => isMechanicSkipped(nodes, hubs, id);
 
   const result = new Map<string, string>();
-  for (const [id, n] of Object.entries(nodes)) {
-    if (skipped(id)) continue;
-    const mechanic = masteryByGroup.get(n.group);
-    if (mechanic !== undefined) result.set(id, mechanic);
+  for (const [mechanic, ids] of mechanicCoreNodeIds(nodes, hubs)) {
+    for (const id of ids) result.set(id, mechanic);
   }
 
   let frontier = Array.from(result.keys());

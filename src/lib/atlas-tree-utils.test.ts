@@ -12,6 +12,7 @@ import {
   getStartPosition,
   groupByMechanic,
   isEmptyAtlasConfig,
+  mechanicCoreNodeIds,
   migrateTree,
   nodeMechanics,
   pickAtlasTag,
@@ -154,6 +155,35 @@ describe('nodeMechanics', () => {
       .filter(([id, n]) => id !== 'root' && n.stats.length > 0 && !n.isMastery && !n.isWormhole && !realMechanics.has(id))
       .map(([id]) => id);
     expect(unmapped).toEqual([]);
+  });
+});
+
+describe('mechanicCoreNodeIds', () => {
+  // Breach masteries sit in groups 2 and 4; 12 is a path node outside them that nodeMechanics would spread to.
+  const nodes = graph(
+    [
+      node(0, { name: '' }),
+      node(1, { name: '', group: 2 }),
+      node(10, { group: 2 }),
+      node(11, { group: 4 }),
+      node(12, { group: 5 }),
+      node(13, { name: 'Gateway', group: 2, isWormhole: true }),
+      node(100, { name: 'Breach', group: 2, isMastery: true }),
+      node(101, { name: 'Breach', group: 4, isMastery: true }),
+      node(20, { group: 3 }),
+      node(200, { name: 'Delirium', group: 3, isMastery: true }),
+    ],
+    [['root', '1'], ['1', '10'], ['1', '20'], ['10', '12'], ['12', '11'], ['10', '13']],
+  );
+  const core = mechanicCoreNodeIds(nodes);
+
+  it('takes only the nodes in the groups holding the mastery, not the paths between them', () => {
+    expect([...(core.get('Breach') ?? [])].sort()).toEqual(['10', '11']);
+    expect(core.get('Delirium')).toEqual(['20']);
+  });
+  it('leaves out hubs, masteries and wormholes', () => {
+    const all = [...core.values()].flat();
+    for (const id of ['root', '1', '13', '100', '101', '200', '12']) expect(all).not.toContain(id);
   });
 });
 
