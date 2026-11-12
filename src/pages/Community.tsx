@@ -70,8 +70,9 @@ function StrategyCard({
         )}
       </div>
       <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-poe-text-muted">
-        <span className="truncate capitalize">
-          {[s.authorName, `${s.budget} budget`, s.difficulty].filter(Boolean).join(' · ')}
+        <span className="truncate">
+          {s.authorName && <>{s.authorName} · </>}
+          <span className="capitalize">{s.budget}</span> budget · <span className="capitalize">{s.difficulty}</span>
         </span>
         <span className="flex shrink-0 items-center gap-1">
           <Star size={11} className={favourited ? 'fill-poe-currency text-poe-currency' : ''} /> {s.favouriteCount}

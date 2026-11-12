@@ -24,7 +24,7 @@ const COMMUNITY_KEY = ['community'] as const;
 const SERVER_URL_KEY = ['community-url'] as const;
 
 /** The server copy was deleted (e.g. by a moderator), so the local edit token is useless. */
-function isGone(err: unknown): boolean {
+export function isGone(err: unknown): boolean {
   return err instanceof Error && /not found/i.test(err.message);
 }
 
