@@ -3,6 +3,7 @@
 
 import { create } from 'zustand';
 import { useGameDataStore } from '@/lib/stores/game-data-store';
+import { chosenVariants } from '@/lib/atlas-tree-utils';
 import type { AtlasNodeData, AtlasTreeConfig } from '@/types/atlas-tree';
 
 const MAX_HISTORY = 50;
@@ -22,6 +23,8 @@ interface AtlasTreeState {
    * draft got its first node on. null: an empty new draft, which follows the current tag.
    */
   editingTag: string | null;
+  /** Multiple-choice notable → chosen effect. Not in undo history: a deallocated node's choice stays for undo and is dropped by getConfig. */
+  variantChoices: Record<string, number>;
 
   // Actions
   setActiveTreeId: (id: string | null) => void;
@@ -29,15 +32,16 @@ interface AtlasTreeState {
   setSearchQuery: (query: string) => void;
 
   // History-aware mutations
-  toggleNode: (nodeId: number, rawNodes: Record<string, AtlasNodeData>, pruneDisconnected: (nodeId: string, allocated: Set<string>, rawNodes: Record<string, AtlasNodeData>) => Set<string>) => void;
-  allocatePath: (nodeIds: number[]) => void;
+  /** choices: variants picked for multiple-choice notables this allocation adds. */
+  toggleNode: (nodeId: number, rawNodes: Record<string, AtlasNodeData>, pruneDisconnected: (nodeId: string, allocated: Set<string>, rawNodes: Record<string, AtlasNodeData>) => Set<string>, choices?: Record<string, number>) => void;
+  allocatePath: (nodeIds: number[], choices?: Record<string, number>) => void;
   undo: () => void;
 
   // Config get/load
   /** The allocation, stamped with editingTag (the current tag for an empty new draft). */
   getConfig: () => AtlasTreeConfig;
   /** Replaces the allocation and its tag and clears undo history (opening a tree, or a new empty draft with tag null). */
-  loadAllocation: (ids: number[], tag: string | null) => void;
+  loadAllocation: (ids: number[], tag: string | null, choices?: Record<string, number>) => void;
 }
 
 export const useAtlasTreeStore = create<AtlasTreeState>((set, get) => ({
@@ -46,12 +50,13 @@ export const useAtlasTreeStore = create<AtlasTreeState>((set, get) => ({
   history: [],
   searchQuery: '',
   editingTag: null,
+  variantChoices: {},
 
   setActiveTreeId: (id) => set({ activeTreeId: id }),
   setAllocatedIds: (ids) => set({ allocatedIds: ids }),
   setSearchQuery: (query) => set({ searchQuery: query }),
 
-  toggleNode: (nodeId, rawNodes, pruneDisconnected) => set((state) => {
+  toggleNode: (nodeId, rawNodes, pruneDisconnected, choices) => set((state) => {
     const prev = state.allocatedIds;
     if (prev.has(nodeId)) {
       const stringIds = new Set(Array.from(prev).map(String));
@@ -67,10 +72,11 @@ export const useAtlasTreeStore = create<AtlasTreeState>((set, get) => ({
       history: [...state.history.slice(-(MAX_HISTORY - 1)), prev],
       allocatedIds: next,
       editingTag: state.editingTag ?? currentTag(),
+      variantChoices: { ...state.variantChoices, ...choices },
     };
   }),
 
-  allocatePath: (nodeIds) => {
+  allocatePath: (nodeIds, choices) => {
     if (nodeIds.length === 0) return;
     set((state) => {
       const next = new Set(state.allocatedIds);
@@ -79,6 +85,7 @@ export const useAtlasTreeStore = create<AtlasTreeState>((set, get) => ({
         history: [...state.history.slice(-(MAX_HISTORY - 1)), state.allocatedIds],
         allocatedIds: next,
         editingTag: state.editingTag ?? currentTag(),
+        variantChoices: { ...state.variantChoices, ...choices },
       };
     });
   },
@@ -95,11 +102,13 @@ export const useAtlasTreeStore = create<AtlasTreeState>((set, get) => ({
   getConfig: () => ({
     allocatedNodeIds: Array.from(get().allocatedIds),
     treeVersion: get().editingTag ?? currentTag(),
+    variantChoices: chosenVariants(get().variantChoices, get().allocatedIds),
   }),
 
-  loadAllocation: (ids, tag) => set({
+  loadAllocation: (ids, tag, choices = {}) => set({
     allocatedIds: new Set(ids),
     history: [],
     editingTag: tag,
+    variantChoices: choices,
   }),
 }));
