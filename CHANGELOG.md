@@ -2,6 +2,14 @@
 
 All notable changes to N.I.K.O. are documented here. Format follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.3] - 2026-11-13
+
+### Added
+- Atlas 3.30 multiple-choice notables: hovering lists their options, and allocating one asks which option to take in a small popup. The choice is saved with the tree and shown in the stats panel and Copy stats. To change it, deallocate the notable and allocate it again
+
+### Fixed
+- Multiple-choice notables no longer show a cut-off or empty description
+
 ## [0.9.2] - 2026-11-13
 
 ### Fixed
